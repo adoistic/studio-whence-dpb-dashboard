@@ -1,0 +1,206 @@
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+
+// ─── Mocks for firebase-admin modular subpaths ─────────────────────────────────
+//
+// `firebase-admin/app`     → initializeApp is a no-op; getApps returns [] so the
+//                            module-load guard initializes exactly once.
+// `firebase-admin/auth`    → getAuth().verifyIdToken is controllable per-test.
+// `firebase-admin/firestore` → getFirestore().collection().doc().get() is
+//                            controllable per-test (snap.exists toggles allow/deny).
+
+const verifyIdToken = vi.fn()
+const docGet = vi.fn()
+
+vi.mock('firebase-admin/app', () => ({
+  initializeApp: vi.fn(),
+  getApps: vi.fn(() => []),
+}))
+
+vi.mock('firebase-admin/auth', () => ({
+  getAuth: vi.fn(() => ({ verifyIdToken })),
+}))
+
+vi.mock('firebase-admin/firestore', () => ({
+  getFirestore: vi.fn(() => ({
+    collection: vi.fn(() => ({
+      doc: vi.fn(() => ({ get: docGet })),
+    })),
+  })),
+}))
+
+// Import after the mocks are registered.
+import { authorize } from '../auth'
+
+// Build a minimal request-like object carrying an Authorization header.
+function req(authorization?: string) {
+  const headers: Record<string, string> = {}
+  if (authorization !== undefined) headers.authorization = authorization
+  return { headers }
+}
+
+// Helper: make verifyIdToken resolve to a decoded token with the given email.
+function decodesTo(email: string | undefined) {
+  verifyIdToken.mockResolvedValue({ email })
+}
+
+// Helper: make the allowlist doc exist (or not).
+function allowlistDoc(exists: boolean) {
+  docGet.mockResolvedValue({ exists })
+}
+
+describe('authorize', () => {
+  const ORIGINAL_ENV = { ...process.env }
+
+  beforeEach(() => {
+    verifyIdToken.mockReset()
+    docGet.mockReset()
+    delete process.env.ADMIN_EMAIL
+  })
+
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV }
+  })
+
+  test('admin email (default adnan@thothica.com) → allowed', async () => {
+    decodesTo('adnan@thothica.com')
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toEqual({ email: 'adnan@thothica.com' })
+    // No Firestore lookup needed for admin.
+    expect(docGet).not.toHaveBeenCalled()
+  })
+
+  test('@thothica.com domain → allowed (no Firestore lookup)', async () => {
+    decodesTo('x@thothica.com')
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toEqual({ email: 'x@thothica.com' })
+    expect(docGet).not.toHaveBeenCalled()
+  })
+
+  test('@dpb.in domain → allowed (no Firestore lookup)', async () => {
+    decodesTo('y@dpb.in')
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toEqual({ email: 'y@dpb.in' })
+    expect(docGet).not.toHaveBeenCalled()
+  })
+
+  test('gmail WITH allowlist doc → allowed', async () => {
+    decodesTo('friend@gmail.com')
+    allowlistDoc(true)
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toEqual({ email: 'friend@gmail.com' })
+    expect(docGet).toHaveBeenCalledTimes(1)
+  })
+
+  test('gmail WITHOUT allowlist doc → denied', async () => {
+    decodesTo('stranger@gmail.com')
+    allowlistDoc(false)
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toBeNull()
+  })
+
+  test('missing Authorization header → null (verifyIdToken never called)', async () => {
+    const result = await authorize(req(undefined))
+    expect(result).toBeNull()
+    expect(verifyIdToken).not.toHaveBeenCalled()
+  })
+
+  test('malformed header "Token abc" → null (verifyIdToken never called)', async () => {
+    const result = await authorize(req('Token abc'))
+    expect(result).toBeNull()
+    expect(verifyIdToken).not.toHaveBeenCalled()
+  })
+
+  test('"Bearer" with no token → null (verifyIdToken never called)', async () => {
+    const result = await authorize(req('Bearer'))
+    expect(result).toBeNull()
+    expect(verifyIdToken).not.toHaveBeenCalled()
+  })
+
+  test('"Bearer    " (whitespace only) → null', async () => {
+    const result = await authorize(req('Bearer    '))
+    expect(result).toBeNull()
+    expect(verifyIdToken).not.toHaveBeenCalled()
+  })
+
+  test('verifyIdToken throws → null (fail closed)', async () => {
+    verifyIdToken.mockRejectedValue(new Error('invalid token'))
+    const result = await authorize(req('Bearer bad'))
+    expect(result).toBeNull()
+  })
+
+  test('Firestore .get() throws → null (fail closed)', async () => {
+    decodesTo('friend@gmail.com')
+    docGet.mockRejectedValue(new Error('firestore down'))
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toBeNull()
+  })
+
+  test('decoded token with no email → null (fail closed)', async () => {
+    decodesTo(undefined)
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toBeNull()
+    expect(docGet).not.toHaveBeenCalled()
+  })
+
+  test('case-insensitive: Adnan@Thothica.com → admin, returns normalized email', async () => {
+    decodesTo('Adnan@Thothica.com')
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toEqual({ email: 'adnan@thothica.com' })
+    expect(docGet).not.toHaveBeenCalled()
+  })
+
+  test('case-insensitive: X@THOTHICA.COM → allowed (domain), normalized', async () => {
+    decodesTo('X@THOTHICA.COM')
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toEqual({ email: 'x@thothica.com' })
+  })
+
+  test('case-insensitive bearer scheme: "bearer tok" → parsed', async () => {
+    decodesTo('x@thothica.com')
+    const result = await authorize(req('bearer tok'))
+    expect(result).toEqual({ email: 'x@thothica.com' })
+    expect(verifyIdToken).toHaveBeenCalledWith('tok')
+  })
+
+  test('ADMIN_EMAIL env override is honored (different admin)', async () => {
+    process.env.ADMIN_EMAIL = 'boss@example.com'
+    decodesTo('boss@example.com')
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toEqual({ email: 'boss@example.com' })
+    expect(docGet).not.toHaveBeenCalled()
+  })
+
+  test('ADMIN_EMAIL override: the default admin then needs allowlist', async () => {
+    // With a custom admin set, adnan@thothica.com is no longer admin — but it
+    // still wins on the @thothica.com domain rule, so it is allowed without a
+    // Firestore lookup. Verify the domain rule still holds.
+    process.env.ADMIN_EMAIL = 'boss@example.com'
+    decodesTo('adnan@thothica.com')
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toEqual({ email: 'adnan@thothica.com' })
+    expect(docGet).not.toHaveBeenCalled()
+  })
+
+  test('ADMIN_EMAIL override with trailing case/space is normalized', async () => {
+    process.env.ADMIN_EMAIL = '  Boss@Example.com  '
+    decodesTo('boss@example.com')
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toEqual({ email: 'boss@example.com' })
+  })
+
+  test('the allowlist doc is looked up under the normalized email', async () => {
+    // A gmail with mixed case: lookup must use the lowercased key.
+    const collection = vi.fn(() => ({ doc }))
+    const doc = vi.fn(() => ({ get: docGet }))
+    const { getFirestore } = await import('firebase-admin/firestore')
+    ;(getFirestore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      collection,
+    })
+    decodesTo('Mixed.Case@Gmail.com')
+    allowlistDoc(true)
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toEqual({ email: 'mixed.case@gmail.com' })
+    expect(collection).toHaveBeenCalledWith('allowlist')
+    expect(doc).toHaveBeenCalledWith('mixed.case@gmail.com')
+  })
+})
