@@ -11,7 +11,7 @@ export type ChangelogEntry = string | { date: string; note: string }
 
 export interface Comic {
   title: string
-  subject: string
+  subject?: string
   line: LineSlug
   series?: string
   comic_number?: number
@@ -37,7 +37,7 @@ export interface Comic {
   language?: string
   // Future-proofing (not yet in data)
   sample_image?: string
-  artifacts?: string[]
+  artifacts?: Record<string, string>
 }
 
 export interface Figure {
