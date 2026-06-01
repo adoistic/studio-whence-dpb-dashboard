@@ -1,3 +1,4 @@
+import { ActivityFeed } from '@/components/ActivityFeed'
 import { Eyebrow } from '@/components/Eyebrow'
 import { Footer } from '@/components/Footer'
 import { KpiStrip } from '@/components/KpiStrip'
@@ -31,7 +32,10 @@ export default function Home() {
 
         <KpiStrip kpis={kpis} />
 
-        {/* TODO Task 3.2: ActivityFeed — recent commits / status changes */}
+        <section className="flex flex-col gap-6">
+          <Eyebrow>What's new</Eyebrow>
+          <ActivityFeed entries={content.activity} />
+        </section>
 
         {/* TODO Task 3.3: LineCards — one card per active line (biographies, indic, awareness, toddlers) */}
       </main>
