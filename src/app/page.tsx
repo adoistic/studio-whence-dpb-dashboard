@@ -3,6 +3,7 @@ import { Eyebrow } from '@/components/Eyebrow'
 import { Footer } from '@/components/Footer'
 import { KpiStrip } from '@/components/KpiStrip'
 import type { Kpi } from '@/components/KpiStrip'
+import { LineCard } from '@/components/LineCard'
 import { loadContent } from '@/lib/content'
 
 // "words on file" is a known library figure — 10 million words across ~70 books
@@ -37,7 +38,14 @@ export default function Home() {
           <ActivityFeed entries={content.activity} />
         </section>
 
-        {/* TODO Task 3.3: LineCards — one card per active line (biographies, indic, awareness, toddlers) */}
+        <section className="flex flex-col gap-6">
+          <Eyebrow>The lines</Eyebrow>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {content.lines.map((line) => (
+              <LineCard key={line.slug} line={line} />
+            ))}
+          </div>
+        </section>
       </main>
 
       <Footer
