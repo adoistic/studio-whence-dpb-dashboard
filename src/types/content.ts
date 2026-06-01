@@ -3,7 +3,8 @@
 
 export type Status = 'draft' | 'in-review' | 'approved' | 'published' | 'placeholder'
 
-export type LineSlug = 'biographies' | 'awareness' | 'indic' | 'toddlers'
+// A line slug is data (the publisher emits the line set), not a compile-time constant.
+export type LineSlug = string
 
 // changelog is heterogeneous: biography comics use objects, toddlers comics
 // use plain strings (already-formatted "YYYY-MM-DD — note" entries).

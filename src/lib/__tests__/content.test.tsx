@@ -44,6 +44,9 @@ const fixture: Content = {
     { slug: 'awareness', title: 'Awareness', subtitle: '', comics: [], figures: [] },
     { slug: 'indic', title: 'Indic', subtitle: '', comics: [], figures: [] },
     { slug: 'toddlers', title: 'Toddlers', subtitle: '', comics: [], figures: [] },
+    // A fifth line whose slug is outside the original four — proves LineSlug is
+    // data (string), not a closed union, so a new line needs no type change.
+    { slug: 'bollywood-legends', title: 'Bollywood Legends', subtitle: '', comics: [], figures: [] },
   ],
   activity: [],
   images: [],
@@ -65,7 +68,14 @@ describe('pure helpers (moved from content.ts)', () => {
   })
 
   test('findLine returns undefined for an unknown slug', () => {
-    expect(findLine('nope' as never, fixture)).toBeUndefined()
+    expect(findLine('nope', fixture)).toBeUndefined()
+  })
+
+  test('findLine resolves a fifth line whose slug is outside the original four', () => {
+    const line = findLine('bollywood-legends', fixture)
+    expect(line).toBeDefined()
+    expect(line?.slug).toBe('bollywood-legends')
+    expect(line?.title).toBe('Bollywood Legends')
   })
 
   test('findComic finds a known comic slug', () => {
@@ -84,7 +94,7 @@ describe('pure helpers (moved from content.ts)', () => {
   })
 
   test('requireLine throws for a missing slug', () => {
-    expect(() => requireLine('nonexistent' as never, fixture)).toThrow(
+    expect(() => requireLine('nonexistent', fixture)).toThrow(
       'Line "nonexistent" missing from content.json'
     )
   })
@@ -129,13 +139,22 @@ describe('useLine / useComic', () => {
   test('useLine resolves a known line and undefined for missing', async () => {
     mockedFetchContent.mockResolvedValue(fixture)
     const { result } = renderHook(
-      () => ({ bio: useLine('biographies'), missing: useLine('nope' as never) }),
+      () => ({ bio: useLine('biographies'), missing: useLine('nope') }),
       { wrapper }
     )
 
     await waitFor(() => expect(result.current.bio).toBeDefined())
     expect(result.current.bio?.slug).toBe('biographies')
     expect(result.current.missing).toBeUndefined()
+  })
+
+  test('useLine resolves a fifth line whose slug is outside the original four', async () => {
+    mockedFetchContent.mockResolvedValue(fixture)
+    const { result } = renderHook(() => useLine('bollywood-legends'), { wrapper })
+
+    await waitFor(() => expect(result.current).toBeDefined())
+    expect(result.current?.slug).toBe('bollywood-legends')
+    expect(result.current?.title).toBe('Bollywood Legends')
   })
 
   test('useComic resolves a known comic and undefined for unknown', async () => {
