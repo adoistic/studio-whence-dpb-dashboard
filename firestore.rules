@@ -10,7 +10,7 @@ service cloud.firestore {
       );
     }
     function isAdmin() {
-      return isSignedIn() && userEmail() == 'siraj@thothica.com';
+      return isSignedIn() && userEmail() == 'adnan@thothica.com';
     }
     function isAllowlisted() {
       return isDomainAllowed() ||
