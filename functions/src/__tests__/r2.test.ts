@@ -21,6 +21,9 @@ vi.mock('@aws-sdk/s3-request-presigner', () => ({
 
 vi.mock('@aws-sdk/client-s3', () => {
   const configs: unknown[] = []
+  // A controllable `send` shared by every S3Client instance the mock builds —
+  // exposed as `__send` so `getObject` tests can stage a fake response stream.
+  const send = vi.fn()
   class FakeGetObjectCommand {
     input: Record<string, unknown>
     constructor(input: Record<string, unknown>) {
@@ -30,8 +33,10 @@ vi.mock('@aws-sdk/client-s3', () => {
   return {
     // Exposed for assertions (not part of the real SDK surface).
     __configs: configs,
+    __send: send,
     S3Client: class {
       config: unknown
+      send = send
       constructor(config: unknown) {
         this.config = config
         configs.push(config)
@@ -47,6 +52,9 @@ vi.mock('@aws-sdk/client-s3', () => {
 // with a fresh, uncached client and a fresh `__configs` record.
 
 type PresignGet = (key: string, expiresIn?: number) => Promise<string>
+type GetObject = (
+  key: string
+) => Promise<{ body: Buffer; contentType: string | undefined }>
 type CommandCtor = new (input: Record<string, unknown>) => {
   input: Record<string, unknown>
 }
@@ -55,6 +63,7 @@ let presignGet: PresignGet
 let getSignedUrl: ReturnType<typeof vi.fn>
 let FakeGetObjectCommand: CommandCtor
 let s3ClientConfigs: unknown[]
+let s3Send: ReturnType<typeof vi.fn>
 
 describe('presignGet', () => {
   const ORIGINAL_ENV = { ...process.env }
@@ -76,11 +85,13 @@ describe('presignGet', () => {
       clientS3 as unknown as { GetObjectCommand: CommandCtor }
     ).GetObjectCommand
     s3ClientConfigs = (clientS3 as unknown as { __configs: unknown[] }).__configs
+    s3Send = (clientS3 as unknown as { __send: ReturnType<typeof vi.fn> }).__send
 
     // `vi.resetModules()` gives a fresh `../r2` (uncached singleton) but does
     // NOT re-run the `vi.mock` factories, so the mock's call history and the
     // `__configs` record persist across tests. Reset both here.
     getSignedUrl.mockClear()
+    s3Send.mockReset()
     s3ClientConfigs.length = 0
   })
 
@@ -146,5 +157,94 @@ describe('presignGet', () => {
     // client() throws synchronously (before getSignedUrl), so we use the
     // synchronous .toThrow form — not .rejects.toThrow.
     expect(() => presignGetFresh('images/x.jpg')).toThrow(/R2 not configured/)
+  })
+})
+
+describe('getObject', () => {
+  const ORIGINAL_ENV = { ...process.env }
+
+  beforeEach(async () => {
+    vi.resetModules()
+    process.env.R2_ENDPOINT = 'https://acct.r2.cloudflarestorage.com'
+    process.env.R2_ACCESS_KEY_ID = 'test-access-key'
+    process.env.R2_SECRET_ACCESS_KEY = 'test-secret-key'
+    process.env.R2_BUCKET = 'studio-whence-dpb'
+
+    const clientS3 = await import('@aws-sdk/client-s3')
+    FakeGetObjectCommand = (
+      clientS3 as unknown as { GetObjectCommand: CommandCtor }
+    ).GetObjectCommand
+    s3ClientConfigs = (clientS3 as unknown as { __configs: unknown[] }).__configs
+    s3Send = (clientS3 as unknown as { __send: ReturnType<typeof vi.fn> }).__send
+    s3Send.mockReset()
+    s3ClientConfigs.length = 0
+  })
+
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV }
+  })
+
+  // A fake SDK-v3 streaming Body: only `transformToByteArray` is exercised.
+  function fakeBody(bytes: Uint8Array) {
+    return { transformToByteArray: vi.fn(async () => bytes) }
+  }
+
+  test('returns the object bytes as a Buffer and its content-type', async () => {
+    const bytes = new TextEncoder().encode('{"k":"v"}')
+    s3Send.mockResolvedValue({
+      Body: fakeBody(bytes),
+      ContentType: 'application/json',
+    })
+    const { getObject } = await import('../r2')
+    const result: { body: Buffer; contentType: string | undefined } =
+      await (getObject as GetObject)('content.json')
+    expect(Buffer.isBuffer(result.body)).toBe(true)
+    expect(result.body.toString('utf8')).toBe('{"k":"v"}')
+    expect(result.contentType).toBe('application/json')
+  })
+
+  test('passes a GetObjectCommand with the right Bucket and Key', async () => {
+    s3Send.mockResolvedValue({
+      Body: fakeBody(new Uint8Array()),
+      ContentType: 'text/markdown',
+    })
+    const { getObject } = await import('../r2')
+    await (getObject as GetObject)('research/dhirubhai/ch01.md')
+    expect(s3Send).toHaveBeenCalledTimes(1)
+    const command = s3Send.mock.calls[0][0]
+    expect(command).toBeInstanceOf(FakeGetObjectCommand)
+    expect((command as { input: Record<string, unknown> }).input).toMatchObject({
+      Bucket: 'studio-whence-dpb',
+      Key: 'research/dhirubhai/ch01.md',
+    })
+  })
+
+  test('contentType is undefined when the object has none', async () => {
+    s3Send.mockResolvedValue({ Body: fakeBody(new Uint8Array([1, 2, 3])) })
+    const { getObject } = await import('../r2')
+    const result = await (getObject as GetObject)('drafts/x.md')
+    expect(result.contentType).toBeUndefined()
+    expect([...result.body]).toEqual([1, 2, 3])
+  })
+
+  test('propagates the SDK error when send rejects (e.g. NoSuchKey)', async () => {
+    const err = Object.assign(new Error('not found'), { name: 'NoSuchKey' })
+    s3Send.mockRejectedValue(err)
+    const { getObject } = await import('../r2')
+    await expect((getObject as GetObject)('research/missing.md')).rejects.toThrow(
+      /not found/
+    )
+  })
+
+  test('throws with a clear error when R2 env vars are missing', async () => {
+    vi.resetModules()
+    vi.stubEnv('R2_ENDPOINT', '')
+    vi.stubEnv('R2_ACCESS_KEY_ID', '')
+    vi.stubEnv('R2_SECRET_ACCESS_KEY', '')
+    vi.stubEnv('R2_BUCKET', '')
+    const { getObject: getObjectFresh } = await import('../r2')
+    await expect((getObjectFresh as GetObject)('research/x.md')).rejects.toThrow(
+      /R2 not configured/
+    )
   })
 })

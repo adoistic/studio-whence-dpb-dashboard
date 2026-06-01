@@ -70,3 +70,34 @@ export function presignGet(
   })
   return getSignedUrl(s3, command, { expiresIn })
 }
+
+/**
+ * Fetch an R2 object's bytes + content-type INLINE (not presigned).
+ *
+ * Used by `/content` (hard-coded `content.json`) and `/read` (a validated text
+ * key), where the function returns the bytes itself rather than handing back a
+ * presigned URL. Uses the same lazy `client()` (and therefore the same env
+ * guard) as `presignGet`.
+ *
+ * The SDK v3 response `Body` is a streaming blob; `transformToByteArray()` is
+ * the cleanest way to drain it to bytes in Node 20.
+ *
+ * @param key The R2 object key (hard-coded `content.json`, or already validated
+ *            via `safeKey`).
+ * @returns   `{ body, contentType }` — `body` is a Buffer of the object bytes,
+ *            `contentType` is the object's stored Content-Type (or undefined).
+ */
+export async function getObject(
+  key: string
+): Promise<{ body: Buffer; contentType: string | undefined }> {
+  // client() throws if any R2 env var is absent — call it first so the env
+  // guard runs before we read R2_BUCKET for the command.
+  const s3 = client()
+  const command = new GetObjectCommand({
+    Bucket: process.env.R2_BUCKET!,
+    Key: key,
+  })
+  const response = await s3.send(command)
+  const bytes = await response.Body!.transformToByteArray()
+  return { body: Buffer.from(bytes), contentType: response.ContentType }
+}
