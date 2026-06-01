@@ -65,7 +65,9 @@ function routeOf(path: string): string {
   return path.replace(/\/+$/, "").split("/").pop() ?? "";
 }
 
-export const dataApi = onRequest(async (req: Request, res: Response) => {
+export const dataApi = onRequest(
+  { secrets: ["R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET"] },
+  async (req: Request, res: Response) => {
   // CORS FIRST, always — so even 403/404/500 and the preflight carry the header.
   applyCors(req, res);
 
@@ -174,4 +176,5 @@ export const dataApi = onRequest(async (req: Request, res: Response) => {
 
   // ── Unknown route ──────────────────────────────────────────────────────────
   res.status(404).json({ error: "not found" });
-});
+  }
+);

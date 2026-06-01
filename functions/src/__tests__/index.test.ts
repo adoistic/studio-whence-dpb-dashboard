@@ -19,7 +19,10 @@ const { authorize, presignGet, getObject } = vi.hoisted(() => ({
 vi.mock("../auth", () => ({ authorize }));
 vi.mock("../r2", () => ({ presignGet, getObject }));
 vi.mock("firebase-functions/v2/https", () => ({
-  onRequest: (handler: unknown) => handler,
+  // The real call shape is `onRequest(options, handler)`, but it may also be
+  // called as `onRequest(handler)`. The actual handler is the function arg.
+  onRequest: (arg1: unknown, arg2?: unknown) =>
+    typeof arg1 === "function" ? arg1 : arg2,
 }));
 
 // Import after mocks are registered. `dataApi` is the bare handler here.
