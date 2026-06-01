@@ -51,7 +51,7 @@ export function findComic(
 export interface ContentState {
   content: Content | null
   loading: boolean
-  error?: unknown
+  error?: Error
 }
 
 const ContentContext = createContext<ContentState | null>(null)
@@ -75,8 +75,13 @@ export function ContentProvider({ children }: { children: ReactNode }) {
       .then((content) => {
         if (active) setState({ content, loading: false })
       })
-      .catch((error) => {
-        if (active) setState({ content: null, loading: false, error })
+      .catch((err) => {
+        if (active)
+          setState({
+            content: null,
+            loading: false,
+            error: err instanceof Error ? err : new Error(String(err)),
+          })
       })
     return () => {
       active = false
