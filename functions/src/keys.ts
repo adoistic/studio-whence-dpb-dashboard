@@ -48,7 +48,7 @@ export function safeKey(
 
   // 2. Reject traversal / absolute / Windows-style keys.
   if (decoded.includes('..')) return null;
-  if (decoded.startsWith('/') || decoded.startsWith('\\')) return null;
+  if (decoded.startsWith('/')) return null;
   if (decoded.includes('\\')) return null;
 
   // 3. Require an allowed prefix (the primary safeguard).

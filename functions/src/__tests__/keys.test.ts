@@ -56,4 +56,8 @@ describe('safeKey', () => {
   test('rejects malformed percent-encoding without throwing', () => {
     expect(safeKey('research/%E0%A4', RESOLVE_PREFIXES)).toBeNull()
   })
+
+  test('rejects prefix-substring match without trailing slash (research-evil/)', () => {
+    expect(safeKey('research-evil/x.md', RESOLVE_PREFIXES)).toBeNull()
+  })
 })
