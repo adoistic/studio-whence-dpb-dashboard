@@ -12,9 +12,8 @@
  * {BASE} = NEXT_PUBLIC_DATA_API_URL (the deployed Function URL). The routes are
  * appended; a trailing slash on BASE is trimmed so `${BASE}/content` is clean.
  *
- * Auth failures return 403 from the Function, but per the plan we also retry
- * once on a 401: force-refresh the token and replay the same request once (no
- * loop). This is harmless if the server never sends 401.
+ * Auth failures always return 403 from the Function (per the spec / acceptance
+ * gate), so the 401-retry branch below is a purely defensive safety net.
  */
 
 import { auth } from '@/lib/firebase'
@@ -29,14 +28,21 @@ function baseUrl(): string {
  * Current user's Firebase ID token, or null if signed out.
  * Pass forceRefresh=true to bypass the SDK cache (used on a 401 retry).
  */
-export async function getIdToken(forceRefresh = false): Promise<string | null> {
+async function getIdToken(forceRefresh = false): Promise<string | null> {
   return (await auth.currentUser?.getIdToken(forceRefresh)) ?? null
 }
 
 /**
- * Fetch `${BASE}${path}` with a Bearer token. On a 401, force-refresh the token
- * once and retry the identical request a single time. Returns the Response;
- * callers inspect `res.ok`.
+ * Fetch `${BASE}${path}` with a Bearer token. Returns the Response; callers
+ * inspect `res.ok`.
+ *
+ * 401-retry rationale: `getIdToken(false)` already auto-refreshes a near-expiry
+ * token via the Firebase SDK cache, so the common token-expiry case is handled
+ * before the request goes out. The current Function returns 403 for all auth
+ * failures (per the design / acceptance gate), so this 401 branch is a
+ * defensive safety net that won't fire against the current server — it's kept
+ * cheap and harmless in case the backend ever distinguishes 401 (authn) from
+ * 403 (authz). One force-refresh + one retry, no loop.
  */
 async function authedFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const url = `${baseUrl()}${path}`
@@ -82,5 +88,5 @@ export async function resolveUrls(keys: string[]): Promise<Record<string, string
 export async function readMarkdown(key: string): Promise<string> {
   const res = await authedFetch(`/read?key=${encodeURIComponent(key)}`)
   if (!res.ok) throw new Error(`read failed: ${res.status}`)
-  return res.text()
+  return await res.text()
 }

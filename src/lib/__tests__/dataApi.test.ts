@@ -107,6 +107,20 @@ describe('fetchContent', () => {
     await fetchContent()
     expect(mockFetch.mock.calls[0][0]).toBe(`${BASE}/content`)
   })
+
+  test('signed-out (null token) → request sent without Authorization header', async () => {
+    // Simulate a signed-out user: getIdToken resolves to null.
+    mockGetIdToken.mockResolvedValue(null)
+    // Server would 403 such a request; the point here is to assert the header is absent.
+    mockFetch.mockResolvedValueOnce(fakeRes({ ok: false, status: 403 }))
+
+    await expect(fetchContent()).rejects.toThrow(/403/)
+
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    const [, init] = mockFetch.mock.calls[0]
+    const headers = new Headers((init as RequestInit).headers)
+    expect(headers.has('Authorization')).toBe(false)
+  })
 })
 
 // ─── resolveUrls ──────────────────────────────────────────────────────────
