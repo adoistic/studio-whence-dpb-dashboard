@@ -22,7 +22,7 @@ import LinePage from '../line/page'
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
-let mockUseContent: () => { content: Content | null; loading: boolean }
+let mockUseContent: () => { content: Content | null; loading: boolean; error?: Error }
 
 vi.mock('@/lib/content', () => ({
   useContent: () => mockUseContent(),
@@ -104,5 +104,18 @@ describe('LinePage — data-driven /line routing', () => {
 
     expect(screen.queryByText('Biographies')).not.toBeInTheDocument()
     expect(screen.getByText(/loading/i)).toBeInTheDocument()
+  })
+
+  test('renders an error state when the content load finished but failed', () => {
+    setPathname('/biographies')
+    mockUseContent = () => ({ content: null, loading: false, error: new Error('boom') })
+
+    render(<LinePage />)
+
+    // A finished-but-failed load must not show the loading spinner forever,
+    // and must not show a real line title.
+    expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
+    expect(screen.queryByText('Biographies')).not.toBeInTheDocument()
+    expect(screen.getByText(/couldn.t load/i)).toBeInTheDocument()
   })
 })

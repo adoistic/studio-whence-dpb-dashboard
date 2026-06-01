@@ -16,10 +16,11 @@ function lineSlugFromPath(): string {
 }
 
 export default function LinePage() {
-  const { content, loading } = useContent()
+  const { content, loading, error } = useContent()
   const slug = lineSlugFromPath()
 
-  if (loading || !content) return <LoadingState />
+  if (loading) return <LoadingState />
+  if (error || !content) return <ErrorState />
 
   const line = content.lines.find((l) => l.slug === slug)
   if (!line) return <NotFoundState slug={slug} />
@@ -37,6 +38,19 @@ function LoadingState() {
     <div className="flex min-h-[40vh] items-center justify-center">
       <p className="font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
         Loading…
+      </p>
+    </div>
+  )
+}
+
+function ErrorState() {
+  return (
+    <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 text-center">
+      <p className="font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
+        Couldn’t load
+      </p>
+      <p className="max-w-xs font-sans text-[0.7rem] uppercase tracking-label text-brand-pale-dusk/55">
+        Please reload the page.
       </p>
     </div>
   )
