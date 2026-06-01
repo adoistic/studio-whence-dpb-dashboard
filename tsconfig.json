@@ -19,9 +19,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@content/*": ["./content/*"]
     },
-    "types": ["vitest/globals"]
+    "types": ["vitest/globals", "@types/mdx"]
   },
   "include": [
     "next-env.d.ts",

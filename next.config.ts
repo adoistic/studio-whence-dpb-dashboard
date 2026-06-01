@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import path from "node:path";
+import createMDX from "@next/mdx";
 
 const nextConfig: NextConfig = {
   // Pin the workspace root so Next/Turbopack doesn't infer a stray lockfile
@@ -7,6 +8,9 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname),
   },
+  pageExtensions: ["ts", "tsx", "mdx"],
 };
 
-export default nextConfig;
+const withMDX = createMDX({});
+
+export default withMDX(nextConfig);
