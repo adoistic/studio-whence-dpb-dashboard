@@ -1,4 +1,4 @@
-import { GoldRule } from './GoldRule'
+import { GoldRule } from '@/components/GoldRule'
 
 export type Kpi = {
   label: string
@@ -18,20 +18,20 @@ function formatValue(value: number, formatter: Kpi['formatter'] = 'default'): st
 
 export function KpiStrip({ kpis }: { kpis: Kpi[] }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+    <dl className="grid grid-cols-2 md:grid-cols-4 gap-8">
       {kpis.map((kpi) => (
         <div key={kpi.label} className="flex flex-col gap-2">
-          <span className="text-5xl font-serif font-light text-brand-indigo leading-none">
+          <dd className="text-5xl font-serif font-light text-brand-indigo leading-none m-0">
             {formatValue(kpi.value, kpi.formatter)}
-          </span>
+          </dd>
           <div className="flex flex-col gap-1">
             <GoldRule />
-            <span className="text-xs uppercase tracking-label font-sans text-brand-slate">
+            <dt className="text-xs uppercase tracking-label font-sans text-brand-slate">
               {kpi.label}
-            </span>
+            </dt>
           </div>
         </div>
       ))}
-    </div>
+    </dl>
   )
 }
