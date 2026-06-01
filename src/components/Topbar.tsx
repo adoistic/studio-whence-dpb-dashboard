@@ -6,14 +6,9 @@ import { signOut } from 'firebase/auth'
 import { BrandLockup } from '@/components/BrandLockup'
 import { auth } from '@/lib/firebase'
 import { useUser, useAllowStatus } from '@/lib/auth'
+import { useContent } from '@/lib/content'
 
-const NAV_LINKS = [
-  { label: 'Home', href: '/' },
-  { label: 'Biographies', href: '/biographies' },
-  { label: 'Awareness', href: '/awareness' },
-  { label: 'Indic', href: '/indic' },
-  { label: 'Toddlers', href: '/toddlers' },
-] as const
+const NAV_LINKS = [{ label: 'Home', href: '/' }] as const
 
 const ADMIN_LINK = { label: 'Admin', href: '/admin' }
 
@@ -47,6 +42,7 @@ export function Topbar() {
   const router = useRouter()
   const { user, loading } = useUser()
   const allowStatus = useAllowStatus(user, loading)
+  const { content } = useContent()
 
   async function handleSignOut() {
     await signOut(auth)
@@ -63,6 +59,14 @@ export function Topbar() {
         <nav aria-label="Main navigation" className="flex flex-wrap items-center gap-x-7 gap-y-2 pl-2">
           {NAV_LINKS.map(({ label, href }) => (
             <NavItem key={href} label={label} href={href} active={isActive(href, pathname)} />
+          ))}
+          {(content?.lines ?? []).map((line) => (
+            <NavItem
+              key={line.slug}
+              label={line.title}
+              href={`/${line.slug}`}
+              active={isActive(`/${line.slug}`, pathname)}
+            />
           ))}
           {allowStatus === 'admin' && (
             <NavItem label={ADMIN_LINK.label} href={ADMIN_LINK.href} active={isActive(ADMIN_LINK.href, pathname)} />
