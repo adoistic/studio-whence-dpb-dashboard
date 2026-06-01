@@ -1,4 +1,4 @@
-import type { Content, Line, LineSlug } from '@/types/content'
+import type { Comic, Content, Line, LineSlug } from '@/types/content'
 import data from '../../public/data/content.json'
 
 export function loadContent(): Content {
@@ -13,6 +13,6 @@ export function findComic(
   line: LineSlug,
   slug: string,
   content: Content
-) {
+): Comic | undefined {
   return findLine(line, content)?.comics.find((c) => c.slug === slug)
 }

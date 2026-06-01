@@ -28,3 +28,9 @@ test('findComic returns undefined for a missing slug', () => {
   const comic = findComic('biographies', 'no-such-comic', c)
   expect(comic).toBeUndefined()
 })
+
+test('findComic returns undefined when line is valid but comic slug is absent', () => {
+  const c = loadContent()
+  const comic = findComic('biographies', 'no-such-comic-slug', c)
+  expect(comic).toBeUndefined()
+})
