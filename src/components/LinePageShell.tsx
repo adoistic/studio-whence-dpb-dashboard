@@ -3,7 +3,7 @@ import type { Line } from '@/types/content'
 import { ComicsTable } from '@/components/ComicsTable'
 import { SectionHead } from '@/components/SectionHead'
 import { TingalandGallery } from '@/components/TingalandGallery'
-import { LINE_VISUALS, imgUrl } from '@/lib/images'
+import { LINE_VISUALS, TINGALAND_CAST, imgUrl } from '@/lib/images'
 
 interface LinePageShellProps {
   line: Line
@@ -73,8 +73,8 @@ export function LinePageShell({ line, introMdx }: LinePageShellProps) {
           {seriesCount > 1 && <Stat value={seriesCount} label="series" />}
         </div>
 
-        {/* Toddlers: the Tingaland production gallery */}
-        {line.slug === 'toddlers' && (
+        {/* Toddlers: the Tingaland production gallery (hidden until gated image channel lands) */}
+        {line.slug === 'toddlers' && TINGALAND_CAST.length > 0 && (
           <section className="flex flex-col gap-8 pt-20">
             <SectionHead kicker="Tingaland" title="The world, drawn" />
             <TingalandGallery />

@@ -1,6 +1,39 @@
 import { loadContent, findLine, findComic, requireLine } from '../content'
+import type { Content } from '@/types/content'
 
-test('loadContent returns parsed content.json', () => {
+// findComic/findLine logic is tested against an inline fixture rather than the
+// bundled content.json — the public bundle is now a data-less skeleton (real
+// data is served gated at runtime), so loader tests must not depend on it.
+const fixture: Content = {
+  generated_at: '2026-06-01T00:00:00Z',
+  source_sha: 'test',
+  headline: { figures_researched: 0, comics_in_production: 1, lines_active: 4 },
+  lines: [
+    {
+      slug: 'biographies',
+      title: 'Biographies',
+      subtitle: 'Little Chanakya Presents…',
+      comics: [
+        {
+          title: 'The Man Who Built Trust',
+          slug: '01-the-man-who-built-trust',
+          subject_slug: 'ratan-tata',
+          subject: 'Ratan Tata',
+          line: 'biographies',
+          status: 'draft',
+        },
+      ],
+      figures: [],
+    },
+    { slug: 'awareness', title: 'Awareness', subtitle: '', comics: [], figures: [] },
+    { slug: 'indic', title: 'Indic', subtitle: '', comics: [], figures: [] },
+    { slug: 'toddlers', title: 'Toddlers', subtitle: '', comics: [], figures: [] },
+  ],
+  activity: [],
+  images: [],
+}
+
+test('loadContent returns parsed content.json with the four lines', () => {
   const c = loadContent()
   expect(c.lines.length).toBe(4)
   expect(c.lines.map((l) => l.slug)).toEqual(
@@ -8,17 +41,14 @@ test('loadContent returns parsed content.json', () => {
   )
 })
 
-test('findLine returns the biographies line', () => {
-  const c = loadContent()
-  const line = findLine('biographies', c)
+test('findLine returns the matching line', () => {
+  const line = findLine('biographies', fixture)
   expect(line).toBeDefined()
   expect(line?.slug).toBe('biographies')
-  expect(line?.comics.length).toBeGreaterThan(0)
 })
 
 test('findComic finds a known comic slug', () => {
-  const c = loadContent()
-  const comic = findComic('biographies', '01-the-man-who-built-trust', c)
+  const comic = findComic('biographies', '01-the-man-who-built-trust', fixture)
   expect(comic).toBeDefined()
   expect(comic?.subject).toBe('Ratan Tata')
 })
