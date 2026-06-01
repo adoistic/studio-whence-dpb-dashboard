@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() { return request.auth != null; }
+    function userEmail() { return request.auth.token.email; }
+    function isDomainAllowed() {
+      return isSignedIn() && (
+        userEmail().matches('.*@thothica[.]com$') ||
+        userEmail().matches('.*@dpb[.]in$')
+      );
+    }
+    function isAdmin() {
+      return isSignedIn() && userEmail() == 'siraj@thothica.com';
+    }
+    function isAllowlisted() {
+      return isDomainAllowed() ||
+             (isSignedIn() && exists(/databases/$(database)/documents/allowlist/$(userEmail())));
+    }
+
+    match /allowlist/{email} {
+      allow read: if isAllowlisted();
+      allow write: if isAdmin();
+    }
+    match /access_requests/{email} {
+      allow create: if isSignedIn();
+      allow read, update: if isAdmin();
+    }
+    match /access_log/{id} {
+      allow create: if isSignedIn();
+      allow read: if isAdmin();
+    }
+  }
+}
