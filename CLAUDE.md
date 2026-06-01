@@ -19,8 +19,10 @@ the live state of Studio Whence's comic production.
   `.env.local` (gitignored); admin/service-account keys never come near this repo.
 
 All of that is unpublished IP and third-party copyrighted source. **All data is
-served gated at runtime** through the Cloudflare Worker + R2 channel after a
-Firebase-auth check. When a feature needs real data, fetch it through that gated
+served gated at runtime** through a Firebase Cloud Function (auth + presign) in
+front of Cloudflare R2 (storage), after a Firebase-auth check. The Function
+validates the Firebase token + allowlist and returns short-lived presigned R2
+URLs; bytes flow R2 → client directly. When a feature needs real data, fetch it through that gated
 channel — do **not** bundle it into the static build. (A real `content.json` and
 character art were once committed here by mistake; this rule exists so it never
 recurs.)
@@ -49,4 +51,5 @@ recurs.)
 
 ## Deploy
 `npm run build && firebase deploy --only hosting` (also `firestore:rules` when rules change).
-Firebase **Storage is intentionally not used** — gated assets go through R2 + Worker.
+Firebase **Storage is intentionally not used** — gated assets go through the
+Firebase Cloud Function + R2 (presigned URLs).
