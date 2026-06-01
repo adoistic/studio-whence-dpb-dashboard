@@ -2,7 +2,7 @@ export function BrandMark({ size = 'md', color = 'indigo' }: { size?: 'sm' | 'md
   const px = { sm: 24, md: 32, lg: 48, xl: 64 }[size]
   const fill = color === 'indigo' ? '#3B3664' : '#E8E2F0'
   return (
-    <svg width={px} height={px} viewBox="0 -40 140 140" xmlns="http://www.w3.org/2000/svg">
+    <svg width={px} height={px} viewBox="0 -40 140 140" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <path
         fillRule="evenodd"
         fill={fill}
