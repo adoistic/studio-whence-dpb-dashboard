@@ -83,35 +83,38 @@ export function DataTable<T>({ rows, columns, filename, rowKey }: DataTableProps
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
-            <tr>
+            <tr className="border-b border-brand-gold">
               {columns.map(col => {
                 const isSortable = col.sortable !== false
                 const isActive = sort?.key === col.key
-                const indicator = isActive
-                  ? sort?.dir === 'asc' ? ' ▲' : ' ▼'
-                  : ''
+                const ariaSortValue = isSortable
+                  ? isActive
+                    ? sort?.dir === 'asc' ? 'ascending' : 'descending'
+                    : 'none'
+                  : undefined
                 return (
                   <th
                     key={col.key}
-                    onClick={isSortable ? () => handleHeaderClick(col) : undefined}
-                    className={
-                      'font-sans text-xs uppercase tracking-label text-brand-slate ' +
-                      'pb-3 text-left whitespace-nowrap ' +
-                      (isSortable ? 'cursor-pointer select-none hover:text-brand-indigo' : '')
-                    }
+                    aria-sort={ariaSortValue}
+                    className="font-sans text-xs uppercase tracking-label text-brand-slate pb-3 text-left whitespace-nowrap"
                   >
-                    {col.header}{indicator}
+                    {isSortable ? (
+                      <button
+                        type="button"
+                        onClick={() => handleHeaderClick(col)}
+                        className="inline-flex items-center gap-1 cursor-pointer select-none hover:text-brand-indigo transition-colors font-sans text-xs uppercase tracking-label"
+                      >
+                        {col.header}
+                        {isActive && (
+                          <span aria-hidden>{sort?.dir === 'asc' ? '▲' : '▼'}</span>
+                        )}
+                      </button>
+                    ) : (
+                      col.header
+                    )}
                   </th>
                 )
               })}
-            </tr>
-            {/* 28px gold rule under header band */}
-            <tr aria-hidden>
-              <td
-                colSpan={columns.length}
-                className="p-0"
-                style={{ height: 2, background: 'var(--color-brand-gold, #c9a84c)', paddingBottom: 0 }}
-              />
             </tr>
           </thead>
           <tbody className="divide-y divide-brand-pale-dusk">

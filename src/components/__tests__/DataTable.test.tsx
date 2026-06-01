@@ -78,4 +78,9 @@ describe('DataTable', () => {
     render(<DataTable rows={rows} columns={cols} filename="test.csv" rowKey={r => r.id} />)
     expect(screen.getByText(/Download CSV/i)).toBeVisible()
   })
+
+  test('sortable column header is keyboard-operable (exposed as a button)', () => {
+    render(<DataTable rows={rows} columns={cols} filename="test.csv" rowKey={r => r.id} />)
+    expect(screen.getByRole('button', { name: /Name/i })).toBeInTheDocument()
+  })
 })
