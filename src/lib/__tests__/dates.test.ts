@@ -65,3 +65,13 @@ test('handles ISO string with timezone offset correctly', () => {
   // 2026-06-01T17:30:00+05:30 == 2026-06-01T12:00:00Z — same instant as NOW
   expect(formatRelative('2026-06-01T17:30:00+05:30', NOW)).toBe('just now')
 })
+
+test('future date — clamps to "just now"', () => {
+  // 5 minutes ahead of NOW — committer drift / CI runner skew
+  const future = '2026-06-01T12:05:00Z'
+  expect(formatRelative(future, NOW)).toBe('just now')
+})
+
+test('invalid ISO string — returns raw input unchanged', () => {
+  expect(formatRelative('not-a-date', NOW)).toBe('not-a-date')
+})

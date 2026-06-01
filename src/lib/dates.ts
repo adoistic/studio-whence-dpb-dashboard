@@ -15,7 +15,8 @@
  */
 export function formatRelative(iso: string, now: Date = new Date()): string {
   const then = new Date(iso)
-  const diffMs = now.getTime() - then.getTime()
+  if (Number.isNaN(then.getTime())) return iso
+  const diffMs = Math.max(0, now.getTime() - then.getTime())
   const diffSecs = Math.floor(diffMs / 1000)
   const diffMins = Math.floor(diffMs / (1000 * 60))
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
