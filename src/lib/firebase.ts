@@ -1,7 +1,8 @@
 import { initializeApp, getApps, getApp, type FirebaseOptions } from 'firebase/app'
 import { getAuth, GoogleAuthProvider } from 'firebase/auth'
 import { getFirestore } from 'firebase/firestore'
-import { getStorage } from 'firebase/storage'
+// Artifact storage is Cloudflare R2 (fronted by an auth-validating Worker), not
+// Firebase Storage — see the gated-download design. No getStorage here.
 
 const firebaseConfig: FirebaseOptions = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -17,5 +18,4 @@ const firebaseConfig: FirebaseOptions = {
 export const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const db = getFirestore(app)
-export const storage = getStorage(app)
 export const googleProvider = new GoogleAuthProvider()
