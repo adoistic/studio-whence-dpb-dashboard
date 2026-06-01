@@ -1,6 +1,9 @@
+'use client'
+
 import Link from 'next/link'
 import type { Line } from '@/types/content'
-import { LINE_VISUALS, imgUrl } from '@/lib/images'
+import { LINE_VISUALS } from '@/lib/images'
+import { useResolved } from '@/lib/useResolved'
 
 interface LineCardProps {
   line: Line
@@ -12,6 +15,8 @@ export function LineCard({ line }: LineCardProps) {
   const seriesCount = new Set(
     line.comics.map((c) => c.series).filter(Boolean)
   ).size
+  const urls = useResolved(visual?.image ? [visual.image] : [])
+  const bannerUrl = visual?.image ? urls[visual.image] : undefined
 
   return (
     <Link
@@ -23,9 +28,9 @@ export function LineCard({ line }: LineCardProps) {
     >
       {/* Plate — banner image, or a deep typographic plate for lines without art yet */}
       <div className="relative h-44 overflow-hidden">
-        {visual?.image ? (
+        {visual?.image && bannerUrl ? (
           <img
-            src={imgUrl(visual.image)}
+            src={bannerUrl}
             alt=""
             loading="lazy"
             className="absolute inset-0 h-full w-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-105"

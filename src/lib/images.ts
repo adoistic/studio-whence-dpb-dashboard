@@ -6,10 +6,6 @@
 // paths. They are resolved to short-lived presigned URLs at render time via the
 // `useResolved` hook — the image bytes never ship in this public repo.
 
-export function imgUrl(rel: string): string {
-  return `/data/images/${rel.replace(/^\/+/, '')}`
-}
-
 export type SampleImage = { rel: string; caption: string }
 export const SAMPLE_PAGES: SampleImage[] = [
   { rel: 'images/samples/01-tingaland-rhymes/sample-page-twinkle.jpg', caption: 'Twinkle Twinkle' },

@@ -3,15 +3,14 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUser, useAllowStatus } from '@/lib/auth'
 import { Topbar } from '@/components/Topbar'
-import { Footer } from '@/components/Footer'
+import { FooterWithData } from '@/components/FooterWithData'
 import { Eyebrow } from '@/components/Eyebrow'
-import { loadContent } from '@/lib/content'
+import { ContentProvider } from '@/lib/content'
 
 export default function AuthedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const { user, loading } = useUser()
   const status = useAllowStatus(user, loading)
-  const content = loadContent()
 
   // redirects run as effects (never during render)
   useEffect(() => {
@@ -36,10 +35,10 @@ export default function AuthedLayout({ children }: { children: React.ReactNode }
   }
   // admin or allow
   return (
-    <>
+    <ContentProvider>
       <Topbar />
       {children}
-      <Footer sha={content.source_sha} lastUpdate={content.generated_at} />
-    </>
+      <FooterWithData />
+    </ContentProvider>
   )
 }

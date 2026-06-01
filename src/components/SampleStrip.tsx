@@ -1,7 +1,11 @@
-import { SAMPLE_PAGES, imgUrl } from '@/lib/images'
+'use client'
+
+import { SAMPLE_PAGES } from '@/lib/images'
+import { useResolved } from '@/lib/useResolved'
 
 // A horizontal filmstrip of finished sample pages — the studio's proof of work.
 export function SampleStrip() {
+  const urls = useResolved(SAMPLE_PAGES.map((p) => p.rel))
   return (
     <div className="-mx-6 overflow-x-auto px-6 no-scrollbar">
       <div className="flex min-w-max gap-5 pb-1">
@@ -12,12 +16,14 @@ export function SampleStrip() {
             style={{ ['--i' as string]: i + 1 }}
           >
             <div className="aspect-[3/4] overflow-hidden rounded-brand border border-brand-pale-dusk bg-brand-deep shadow-[0_30px_50px_-35px_rgba(30,26,58,0.5)]">
-              <img
-                src={imgUrl(page.rel)}
-                alt={`Sample page — ${page.caption}`}
-                loading="lazy"
-                className="h-full w-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.04]"
-              />
+              {urls[page.rel] && (
+                <img
+                  src={urls[page.rel]}
+                  alt={`Sample page — ${page.caption}`}
+                  loading="lazy"
+                  className="h-full w-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.04]"
+                />
+              )}
             </div>
             <figcaption className="mt-3 font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
               {page.caption}

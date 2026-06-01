@@ -44,8 +44,16 @@ vi.mock('@/components/Topbar', () => ({
   Topbar: () => <div data-testid="topbar" />,
 }))
 
-vi.mock('@/components/Footer', () => ({
-  Footer: () => <div data-testid="footer" />,
+// FooterWithData reads the gated content channel; the layout test only cares
+// that it is rendered in the authed branch, so stub it to a marker.
+vi.mock('@/components/FooterWithData', () => ({
+  FooterWithData: () => <div data-testid="footer" />,
+}))
+
+// ContentProvider wraps the authed children. Stub it to a passthrough so the
+// real runtime fetch never runs in this unit test.
+vi.mock('@/lib/content', () => ({
+  ContentProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

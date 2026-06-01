@@ -1,34 +1,45 @@
+'use client'
+
 import { ActivityFeed } from '@/components/ActivityFeed'
 import { KpiStrip } from '@/components/KpiStrip'
 import type { Kpi } from '@/components/KpiStrip'
 import { LineCard } from '@/components/LineCard'
 import { SampleStrip } from '@/components/SampleStrip'
 import { SectionHead } from '@/components/SectionHead'
-import { loadContent } from '@/lib/content'
-import { HERO_BACKDROP, SAMPLE_PAGES, imgUrl } from '@/lib/images'
+import { useContent } from '@/lib/content'
+import { useResolved } from '@/lib/useResolved'
+import { HERO_BACKDROP, SAMPLE_PAGES } from '@/lib/images'
 
 // "words on file" is a known library figure — ~10 million words across ~70 books
 // and ~224 transcripts. The build script will supply this dynamically later.
 const WORDS_ON_FILE = 10_000_000
 
 export default function Home() {
-  const content = loadContent()
-  const { figures_researched, comics_in_production, lines_active } = content.headline
+  const { content } = useContent()
 
-  const kpis: Kpi[] = [
-    { label: 'figures researched', value: figures_researched },
-    { label: 'comics in production', value: comics_in_production },
-    { label: 'words on file', value: WORDS_ON_FILE, formatter: 'million' },
-    { label: 'lines active', value: lines_active },
-  ]
+  // Resolve the hero backdrop key to a presigned URL; render the <img> only
+  // once it's present (degrades cleanly mid-load).
+  const heroUrls = useResolved(HERO_BACKDROP ? [HERO_BACKDROP] : [])
+  const heroUrl = heroUrls[HERO_BACKDROP]
+
+  // Content is null while the gated channel loads; the data-dependent sections
+  // (KPIs, line cards, activity) render only when content is present.
+  const kpis: Kpi[] | null = content
+    ? [
+        { label: 'figures researched', value: content.headline.figures_researched },
+        { label: 'comics in production', value: content.headline.comics_in_production },
+        { label: 'words on file', value: WORDS_ON_FILE, formatter: 'million' },
+        { label: 'lines active', value: content.headline.lines_active },
+      ]
+    : null
 
   return (
     <div>
       {/* ── Hero ───────────────────────────────────────────────────────── */}
       <section className="surface-deep grain relative overflow-hidden">
-        {HERO_BACKDROP && (
+        {heroUrl && (
           <img
-            src={imgUrl(HERO_BACKDROP)}
+            src={heroUrl}
             alt=""
             aria-hidden
             className="drift pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.18]"
@@ -57,25 +68,29 @@ export default function Home() {
             Toons — four lines, page by page.
           </p>
 
-          <div className="mt-14 border-t border-white/10 pt-10">
-            <KpiStrip kpis={kpis} tone="dark" />
-          </div>
+          {kpis && (
+            <div className="mt-14 border-t border-white/10 pt-10">
+              <KpiStrip kpis={kpis} tone="dark" />
+            </div>
+          )}
         </div>
       </section>
 
       {/* ── Body ───────────────────────────────────────────────────────── */}
       <main className="mx-auto max-w-[1200px] px-6">
         {/* The four lines */}
-        <section className="flex flex-col gap-8 pt-16 md:pt-20">
-          <SectionHead kicker="The lines" title="Four lines in production" />
-          <div className="grid grid-cols-1 gap-7 md:grid-cols-2">
-            {content.lines.map((line) => (
-              <LineCard key={line.slug} line={line} />
-            ))}
-          </div>
-        </section>
+        {content && (
+          <section className="flex flex-col gap-8 pt-16 md:pt-20">
+            <SectionHead kicker="The lines" title="Four lines in production" />
+            <div className="grid grid-cols-1 gap-7 md:grid-cols-2">
+              {content.lines.map((line) => (
+                <LineCard key={line.slug} line={line} />
+              ))}
+            </div>
+          </section>
+        )}
 
-        {/* What we make — finished sample pages (hidden until the gated image channel lands) */}
+        {/* What we make — finished sample pages */}
         {SAMPLE_PAGES.length > 0 && (
           <section className="flex flex-col gap-8 pt-20 md:pt-28">
             <SectionHead kicker="On the page" title="What we make" />
@@ -88,10 +103,12 @@ export default function Home() {
         )}
 
         {/* What's new */}
-        <section className="flex flex-col gap-8 pb-24 pt-20 md:pt-28">
-          <SectionHead kicker="What's new" title="Latest from the studio" />
-          <ActivityFeed entries={content.activity} />
-        </section>
+        {content && (
+          <section className="flex flex-col gap-8 pb-24 pt-20 md:pt-28">
+            <SectionHead kicker="What's new" title="Latest from the studio" />
+            <ActivityFeed entries={content.activity} />
+          </section>
+        )}
       </main>
     </div>
   )

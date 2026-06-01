@@ -1,6 +1,13 @@
+import { vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { LinePageShell } from '../LinePageShell'
 import type { Line } from '@/types/content'
+
+// LinePageShell resolves its masthead image via useResolved. The tests don't
+// depend on the masthead image, so an empty map (nothing resolved) is fine.
+vi.mock('@/lib/useResolved', () => ({
+  useResolved: () => ({}),
+}))
 
 const fakeBioLine: Line = {
   slug: 'biographies',

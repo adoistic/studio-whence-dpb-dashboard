@@ -1,9 +1,12 @@
+'use client'
+
 import type { ReactNode } from 'react'
 import type { Line } from '@/types/content'
 import { ComicsTable } from '@/components/ComicsTable'
 import { SectionHead } from '@/components/SectionHead'
 import { TingalandGallery } from '@/components/TingalandGallery'
-import { LINE_VISUALS, TINGALAND_CAST, imgUrl } from '@/lib/images'
+import { LINE_VISUALS, TINGALAND_CAST } from '@/lib/images'
+import { useResolved } from '@/lib/useResolved'
 
 interface LinePageShellProps {
   line: Line
@@ -22,14 +25,16 @@ function Stat({ value, label }: { value: number | string; label: string }) {
 export function LinePageShell({ line, introMdx }: LinePageShellProps) {
   const visual = LINE_VISUALS[line.slug]
   const seriesCount = new Set(line.comics.map((c) => c.series).filter(Boolean)).size
+  const urls = useResolved(visual?.image ? [visual.image] : [])
+  const mastheadUrl = visual?.image ? urls[visual.image] : undefined
 
   return (
     <div>
       {/* ── Masthead ───────────────────────────────────────────────────── */}
       <section className="surface-deep grain relative overflow-hidden">
-        {visual?.image && (
+        {mastheadUrl && (
           <img
-            src={imgUrl(visual.image)}
+            src={mastheadUrl}
             alt=""
             aria-hidden
             className="drift pointer-events-none absolute inset-0 h-full w-full object-cover opacity-[0.16]"
