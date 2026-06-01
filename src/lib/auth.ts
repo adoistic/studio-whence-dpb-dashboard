@@ -126,6 +126,10 @@ export function useAllowStatus(
     return () => {
       cancelled = true
     }
+    // `email` is the only value the effect acts on; `user` is read only to
+    // distinguish undefined/null, and both of those map to email=null. Keying on
+    // `email` (not the `user` object) avoids re-fetching the allowlist every time
+    // Firebase hands back a fresh User instance for the same account.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email, authLoading])
 

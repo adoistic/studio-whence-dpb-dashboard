@@ -10,6 +10,7 @@
 
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
+import type { User } from 'firebase/auth'
 import { classifyByEmail, useAllowStatus } from '@/lib/auth'
 
 // ─── Firebase mocks ───────────────────────────────────────────────────────────
@@ -32,8 +33,8 @@ vi.mock('firebase/firestore', () => ({
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /** Minimal Firebase User-like object for testing. */
-function fakeUser(email: string | null) {
-  return { email } as { email: string | null }
+function fakeUser(email: string | null): User {
+  return { email } as unknown as User
 }
 
 /** Make getDoc resolve to a document that exists with the given data. */
@@ -136,7 +137,7 @@ describe('useAllowStatus — hook tests', () => {
   test('admin-email user → "admin" without calling getDoc', async () => {
     const user = fakeUser(ADMIN_EMAIL)
     const { result } = renderHook(() =>
-      useAllowStatus(user as Parameters<typeof useAllowStatus>[0], false),
+      useAllowStatus(user, false),
     )
     await waitFor(() => expect(result.current).toBe('admin'))
     expect(mockGetDoc).not.toHaveBeenCalled()
@@ -147,7 +148,7 @@ describe('useAllowStatus — hook tests', () => {
   test('@thothica.com user → "allow" without calling getDoc', async () => {
     const user = fakeUser('editor@thothica.com')
     const { result } = renderHook(() =>
-      useAllowStatus(user as Parameters<typeof useAllowStatus>[0], false),
+      useAllowStatus(user, false),
     )
     await waitFor(() => expect(result.current).toBe('allow'))
     expect(mockGetDoc).not.toHaveBeenCalled()
@@ -158,7 +159,7 @@ describe('useAllowStatus — hook tests', () => {
   test('@dpb.in user → "allow" without calling getDoc', async () => {
     const user = fakeUser('reviewer@dpb.in')
     const { result } = renderHook(() =>
-      useAllowStatus(user as Parameters<typeof useAllowStatus>[0], false),
+      useAllowStatus(user, false),
     )
     await waitFor(() => expect(result.current).toBe('allow'))
     expect(mockGetDoc).not.toHaveBeenCalled()
@@ -170,7 +171,7 @@ describe('useAllowStatus — hook tests', () => {
     mockDocExists({ role: 'editor' })
     const user = fakeUser('partner@gmail.com')
     const { result } = renderHook(() =>
-      useAllowStatus(user as Parameters<typeof useAllowStatus>[0], false),
+      useAllowStatus(user, false),
     )
     await waitFor(() => expect(result.current).toBe('allow'))
     expect(mockGetDoc).toHaveBeenCalledOnce()
@@ -182,7 +183,7 @@ describe('useAllowStatus — hook tests', () => {
     mockDocExists({ role: 'admin' })
     const user = fakeUser('superuser@gmail.com')
     const { result } = renderHook(() =>
-      useAllowStatus(user as Parameters<typeof useAllowStatus>[0], false),
+      useAllowStatus(user, false),
     )
     await waitFor(() => expect(result.current).toBe('admin'))
     expect(mockGetDoc).toHaveBeenCalledOnce()
@@ -194,7 +195,7 @@ describe('useAllowStatus — hook tests', () => {
     mockDocMissing()
     const user = fakeUser('stranger@gmail.com')
     const { result } = renderHook(() =>
-      useAllowStatus(user as Parameters<typeof useAllowStatus>[0], false),
+      useAllowStatus(user, false),
     )
     await waitFor(() => expect(result.current).toBe('pending'))
     expect(mockGetDoc).toHaveBeenCalledOnce()
@@ -206,7 +207,7 @@ describe('useAllowStatus — hook tests', () => {
     mockDocError()
     const user = fakeUser('risky@gmail.com')
     const { result } = renderHook(() =>
-      useAllowStatus(user as Parameters<typeof useAllowStatus>[0], false),
+      useAllowStatus(user, false),
     )
     await waitFor(() => expect(result.current).toBe('pending'))
     expect(mockGetDoc).toHaveBeenCalledOnce()
