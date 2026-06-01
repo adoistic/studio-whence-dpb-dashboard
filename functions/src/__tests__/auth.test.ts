@@ -52,6 +52,13 @@ describe('authorize', () => {
   const ORIGINAL_ENV = { ...process.env }
 
   beforeEach(() => {
+    // Clear all mock call data and return-value overrides (including any
+    // per-test `mockReturnValue` overrides on getFirestore, etc.), while
+    // preserving the `vi.mock` factory implementations registered at module
+    // scope so module-level mocks remain functional.
+    vi.clearAllMocks()
+    // Re-establish default return values that the factory doesn't cover
+    // (clearAllMocks wipes mockReturnValue/mockResolvedValue overrides).
     verifyIdToken.mockReset()
     docGet.mockReset()
     delete process.env.ADMIN_EMAIL

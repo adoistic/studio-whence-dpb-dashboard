@@ -2,9 +2,14 @@
  * auth.ts — server-side authorization gate for the gated data backbone.
  *
  * `authorize(req)` is the AUTHORITATIVE access check. It verifies the caller's
- * Firebase ID token, then applies the same email rule the client uses for UX
+ * Firebase ID token, then applies the same email rules the client uses for UX
  * (`src/lib/auth.ts` `classifyByEmail`) and the Firestore `isAllowlisted()`
- * rule — so this Function and those two stay byte-for-byte equivalent:
+ * rule. The three allow-conditions (admin email, @thothica.com, @dpb.in) are
+ * kept in sync with the client in the same order, BUT the signatures differ
+ * deliberately: this server version reads ADMIN_EMAIL from env and takes an
+ * already-normalized email; the client version takes adminEmail as a parameter
+ * and normalizes internally. If you update the admin rule here, also update
+ * the client `src/lib/auth.ts` `classifyByEmail` — and vice versa.
  *
  *   1. empty email                → deny
  *   2. email === ADMIN_EMAIL      → allow   (default adnan@thothica.com)
@@ -65,17 +70,23 @@ function extractBearer(req: AuthRequestLike): string | null {
 
   if (typeof raw !== 'string') return null
 
-  const match = /^\s*Bearer\s+(.+?)\s*$/i.exec(raw)
+  // The `\s*$` anchor collapses trailing whitespace into the non-capturing
+  // suffix for non-edge inputs, but the lazy `.+?` can still capture a single
+  // space when the input is "Bearer   " (all whitespace after the scheme).
+  // Use a tighter pattern that excludes leading/trailing whitespace from the
+  // capture group explicitly, so no post-match .trim() is needed.
+  const match = /^\s*Bearer\s+(\S.*?\S|\S)\s*$/i.exec(raw)
   if (!match) return null
 
-  const token = match[1].trim()
-  return token.length > 0 ? token : null
+  return match[1]
 }
 
 /**
- * Classify an email by rules 1–4 (no Firestore). Returns true to ALLOW,
- * false to DENY, or null to signal that an /allowlist lookup is required.
- * Mirrors the client `classifyByEmail` (admin/domain) exactly.
+ * Classify an email by rules 1–4 (no Firestore). Returns `true` to allow
+ * immediately (admin email, @thothica.com, or @dpb.in), or `null` to signal
+ * that a Firestore /allowlist lookup is required. An empty email also returns
+ * `null`; the caller treats null + no allowlist doc as deny. There is no
+ * `false` return — only `true | null`.
  */
 function classifyByEmail(email: string): true | null {
   if (!email) return null // empty → caller treats null+empty as deny
