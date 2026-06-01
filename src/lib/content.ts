@@ -9,6 +9,12 @@ export function findLine(slug: LineSlug, content: Content): Line | undefined {
   return content.lines.find((l) => l.slug === slug)
 }
 
+export function requireLine(slug: LineSlug, content: Content): Line {
+  const line = findLine(slug, content)
+  if (!line) throw new Error(`Line "${slug}" missing from content.json`)
+  return line
+}
+
 export function findComic(
   line: LineSlug,
   slug: string,

@@ -1,4 +1,4 @@
-import { loadContent, findLine, findComic } from '../content'
+import { loadContent, findLine, findComic, requireLine } from '../content'
 
 test('loadContent returns parsed content.json', () => {
   const c = loadContent()
@@ -33,4 +33,18 @@ test('findComic returns undefined when line is valid but comic slug is absent', 
   const c = loadContent()
   const comic = findComic('biographies', 'no-such-comic-slug', c)
   expect(comic).toBeUndefined()
+})
+
+test('requireLine returns the biographies line', () => {
+  const c = loadContent()
+  const line = requireLine('biographies', c)
+  expect(line).toBeDefined()
+  expect(line.slug).toBe('biographies')
+})
+
+test('requireLine throws for a missing slug', () => {
+  const c = loadContent()
+  expect(() => requireLine('nonexistent' as any, c)).toThrow(
+    'Line "nonexistent" missing from content.json'
+  )
 })
