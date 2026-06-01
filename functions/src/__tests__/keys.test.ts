@@ -1,0 +1,59 @@
+import { describe, expect, test } from 'vitest'
+import { safeKey, RESOLVE_PREFIXES, READ_PREFIXES } from '../keys'
+
+describe('safeKey', () => {
+  test('rejects traversal', () => {
+    expect(safeKey('research/../content.json', RESOLVE_PREFIXES)).toBeNull()
+  })
+
+  test('rejects leading slash', () => {
+    expect(safeKey('/research/x.md', RESOLVE_PREFIXES)).toBeNull()
+  })
+
+  test('rejects disallowed prefix', () => {
+    expect(safeKey('secrets/x', RESOLVE_PREFIXES)).toBeNull()
+  })
+
+  test('allows research + drafts + images + artifacts', () => {
+    for (const p of [
+      'research/a/b.md',
+      'drafts/x.html',
+      'images/y.jpg',
+      'artifacts/z.pdf',
+    ]) {
+      expect(safeKey(p, RESOLVE_PREFIXES)).toBe(p)
+    }
+  })
+
+  test('content.json is NOT presignable via /resolve', () => {
+    expect(safeKey('content.json', RESOLVE_PREFIXES)).toBeNull()
+  })
+
+  test('/read allows research + drafts but not images', () => {
+    expect(safeKey('research/x.md', READ_PREFIXES)).toBe('research/x.md')
+    expect(safeKey('drafts/x.html', READ_PREFIXES)).toBe('drafts/x.html')
+    expect(safeKey('images/y.jpg', READ_PREFIXES)).toBeNull()
+  })
+
+  test('rejects backslash (Windows-style traversal)', () => {
+    expect(safeKey('research\\..\\secrets', RESOLVE_PREFIXES)).toBeNull()
+  })
+
+  test('rejects double-encoded traversal that survives one decode', () => {
+    // After ONE decode -> "research/../content.json" -> contains ".." -> null
+    expect(safeKey('research/%2e%2e/content.json', RESOLVE_PREFIXES)).toBeNull()
+  })
+
+  test('rejects leading slash that appears only after decode', () => {
+    // "%2fresearch/x.md" -> "/research/x.md" -> leading slash -> null
+    expect(safeKey('%2fresearch/x.md', RESOLVE_PREFIXES)).toBeNull()
+  })
+
+  test('rejects literal .. segment under an allowed prefix', () => {
+    expect(safeKey('drafts/../images/x.jpg', RESOLVE_PREFIXES)).toBeNull()
+  })
+
+  test('rejects malformed percent-encoding without throwing', () => {
+    expect(safeKey('research/%E0%A4', RESOLVE_PREFIXES)).toBeNull()
+  })
+})
