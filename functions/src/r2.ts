@@ -98,6 +98,7 @@ export async function getObject(
     Key: key,
   })
   const response = await s3.send(command)
-  const bytes = await response.Body!.transformToByteArray()
+  if (!response.Body) throw new Error(`R2 returned no body for key: ${key}`)
+  const bytes = await response.Body.transformToByteArray()
   return { body: Buffer.from(bytes), contentType: response.ContentType }
 }

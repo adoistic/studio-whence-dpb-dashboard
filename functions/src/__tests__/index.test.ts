@@ -276,16 +276,66 @@ describe("POST /resolve", () => {
     expect(res.statusCode).toBe(400);
   });
 
-  test("unauthorized → 403", async () => {
+  test("unauthorized → 403 (CORS header present)", async () => {
     authorize.mockResolvedValue(null);
     const req = makeReq({
       method: "POST",
       path: "/resolve",
+      origin: ALLOWED_ORIGIN,
       body: { keys: ["research/a.md"] },
     });
     const res = new FakeRes();
     await handler(req, res);
     expect(res.statusCode).toBe(403);
+    expect(presignGet).not.toHaveBeenCalled();
+    expect(res.headers["Access-Control-Allow-Origin"]).toBe(ALLOWED_ORIGIN);
+  });
+
+  test(">50 keys → 400 (CORS header present)", async () => {
+    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    const keys = Array.from({ length: 51 }, (_, i) => `research/${i}.md`);
+    const req = makeReq({
+      method: "POST",
+      path: "/resolve",
+      origin: ALLOWED_ORIGIN,
+      authorization: "Bearer tok",
+      body: { keys },
+    });
+    const res = new FakeRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(400);
+    expect(res.jsonBody).toEqual({ error: "too many keys" });
+    expect(presignGet).not.toHaveBeenCalled();
+    expect(res.headers["Access-Control-Allow-Origin"]).toBe(ALLOWED_ORIGIN);
+  });
+
+  test("presignGet throws → 500", async () => {
+    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    presignGet.mockRejectedValue(new Error("r2 down"));
+    const req = makeReq({
+      method: "POST",
+      path: "/resolve",
+      authorization: "Bearer tok",
+      body: { keys: ["research/a.md"] },
+    });
+    const res = new FakeRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(500);
+    expect(res.jsonBody).toEqual({ error: "resolve failed" });
+  });
+
+  test("all keys invalid → 200 { urls: {} }, presignGet never called", async () => {
+    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    const req = makeReq({
+      method: "POST",
+      path: "/resolve",
+      authorization: "Bearer tok",
+      body: { keys: ["secrets/x", "../content.json"] },
+    });
+    const res = new FakeRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(res.jsonBody).toEqual({ urls: {} });
     expect(presignGet).not.toHaveBeenCalled();
   });
 });
@@ -311,13 +361,29 @@ describe("GET /read", () => {
     expect(res.contentType).toBe("text/markdown");
   });
 
-  test("disallowed prefix key (secrets/) → 403, getObject never called", async () => {
+  test("disallowed prefix key (secrets/) → 403, getObject never called (CORS header present)", async () => {
+    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    const req = makeReq({
+      method: "GET",
+      path: "/read",
+      origin: ALLOWED_ORIGIN,
+      authorization: "Bearer tok",
+      query: { key: "secrets/x" },
+    });
+    const res = new FakeRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(403);
+    expect(getObject).not.toHaveBeenCalled();
+    expect(res.headers["Access-Control-Allow-Origin"]).toBe(ALLOWED_ORIGIN);
+  });
+
+  test("no ?key= param at all → 403 (safeKey('') is null)", async () => {
     authorize.mockResolvedValue({ email: "x@thothica.com" });
     const req = makeReq({
       method: "GET",
       path: "/read",
       authorization: "Bearer tok",
-      query: { key: "secrets/x" },
+      // no query.key
     });
     const res = new FakeRes();
     await handler(req, res);
@@ -352,7 +418,7 @@ describe("GET /read", () => {
     expect(getObject).not.toHaveBeenCalled();
   });
 
-  test("NoSuchKey error → 404", async () => {
+  test("NoSuchKey error → 404 (CORS header present)", async () => {
     authorize.mockResolvedValue({ email: "x@thothica.com" });
     getObject.mockRejectedValue(
       Object.assign(new Error("missing"), { name: "NoSuchKey" })
@@ -360,26 +426,30 @@ describe("GET /read", () => {
     const req = makeReq({
       method: "GET",
       path: "/read",
+      origin: ALLOWED_ORIGIN,
       authorization: "Bearer tok",
       query: { key: "research/missing.md" },
     });
     const res = new FakeRes();
     await handler(req, res);
     expect(res.statusCode).toBe(404);
+    expect(res.headers["Access-Control-Allow-Origin"]).toBe(ALLOWED_ORIGIN);
   });
 
-  test("other R2 error → 500", async () => {
+  test("other R2 error → 500 (CORS header present)", async () => {
     authorize.mockResolvedValue({ email: "x@thothica.com" });
     getObject.mockRejectedValue(new Error("r2 down"));
     const req = makeReq({
       method: "GET",
       path: "/read",
+      origin: ALLOWED_ORIGIN,
       authorization: "Bearer tok",
       query: { key: "research/x.md" },
     });
     const res = new FakeRes();
     await handler(req, res);
     expect(res.statusCode).toBe(500);
+    expect(res.headers["Access-Control-Allow-Origin"]).toBe(ALLOWED_ORIGIN);
   });
 });
 
