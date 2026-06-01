@@ -85,7 +85,8 @@ describe('(authed)/layout — auth gate matrix', () => {
 
   test('2. user null — renders placeholder, redirects to /login, no children', async () => {
     mockUseUserResult = { user: null, loading: false }
-    // useAllowStatus returns 'pending' when user is null (fail-closed)
+    // useAllowStatus contract: null user → 'pending' (fail-closed). The layout
+    // checks !user *before* status, so the redirect target is /login, not /pending.
     mockAllowStatus = 'pending'
 
     renderLayout()

@@ -20,21 +20,19 @@ export default function AuthedLayout({ children }: { children: React.ReactNode }
     if (status === 'pending') { router.replace('/pending') }
   }, [loading, status, user, router])
 
+  const checkingAccessScreen = (
+    <main className="min-h-screen flex items-center justify-center bg-brand-pale-dusk">
+      <Eyebrow>Checking access</Eyebrow>
+    </main>
+  )
+
   // gate the UI
   if (loading || status === 'loading') {
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-brand-pale-dusk">
-        <Eyebrow>Checking access</Eyebrow>
-      </main>
-    )
+    return checkingAccessScreen
   }
   if (!user || status === 'pending') {
     // redirect is in flight; render the same quiet placeholder (do NOT render children)
-    return (
-      <main className="min-h-screen flex items-center justify-center bg-brand-pale-dusk">
-        <Eyebrow>Checking access</Eyebrow>
-      </main>
-    )
+    return checkingAccessScreen
   }
   // admin or allow
   return (
