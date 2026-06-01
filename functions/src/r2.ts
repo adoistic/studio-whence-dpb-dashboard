@@ -26,16 +26,26 @@ const DEFAULT_EXPIRES_IN = 600
 /** Lazy singleton — built on first use, reused for warm-instance efficiency. */
 let cachedClient: S3Client | null = null
 
-/** Build (once) and return the R2 S3 client from runtime env. */
+/** Build (once) and return the R2 S3 client from runtime env.
+ *
+ * Throws immediately if any required R2 env var is missing or empty, so a
+ * misconfigured deployment surfaces a clear error rather than a cryptic 403.
+ */
 function client(): S3Client {
   if (cachedClient) return cachedClient
+  const endpoint = process.env.R2_ENDPOINT
+  const accessKeyId = process.env.R2_ACCESS_KEY_ID
+  const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY
+  const bucket = process.env.R2_BUCKET
+  if (!endpoint || !accessKeyId || !secretAccessKey || !bucket) {
+    throw new Error(
+      'R2 not configured: R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, and R2_BUCKET must all be set in Firebase secret config.'
+    )
+  }
   cachedClient = new S3Client({
-    endpoint: process.env.R2_ENDPOINT,
+    endpoint,
     region: 'auto',
-    credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID ?? '',
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY ?? '',
-    },
+    credentials: { accessKeyId, secretAccessKey },
   })
   return cachedClient
 }
@@ -51,9 +61,12 @@ export function presignGet(
   key: string,
   expiresIn: number = DEFAULT_EXPIRES_IN
 ): Promise<string> {
+  // client() throws if any R2 env var is absent — must be called first so the
+  // env guard runs before we read R2_BUCKET for the command.
+  const s3 = client()
   const command = new GetObjectCommand({
-    Bucket: process.env.R2_BUCKET,
+    Bucket: process.env.R2_BUCKET!,
     Key: key,
   })
-  return getSignedUrl(client(), command, { expiresIn })
+  return getSignedUrl(s3, command, { expiresIn })
 }

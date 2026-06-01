@@ -88,12 +88,11 @@ describe('presignGet', () => {
     process.env = { ...ORIGINAL_ENV }
   })
 
-  test('returns a URL string containing the bucket, key, and X-Amz-Signature', async () => {
+  test('returns exactly the value the presigner resolves with (wiring check)', async () => {
     const url = await presignGet('images/x.jpg')
-    expect(typeof url).toBe('string')
-    expect(url).toContain('studio-whence-dpb')
-    expect(url).toContain('images/x.jpg')
-    expect(url).toContain('X-Amz-Signature')
+    expect(url).toBe(
+      'https://acct.r2.cloudflarestorage.com/studio-whence-dpb/images/x.jpg?X-Amz-Signature=abc'
+    )
   })
 
   test('passes a GetObjectCommand with the right Bucket and Key, and default expiresIn 600', async () => {
@@ -117,7 +116,7 @@ describe('presignGet', () => {
 
   test('builds the S3Client from R2_* env (endpoint, region auto, creds)', async () => {
     await presignGet('images/y.png')
-    expect(s3ClientConfigs.length).toBeGreaterThanOrEqual(1)
+    expect(s3ClientConfigs.length).toBe(1)
     expect(s3ClientConfigs[0]).toMatchObject({
       endpoint: 'https://acct.r2.cloudflarestorage.com',
       region: 'auto',
@@ -132,5 +131,20 @@ describe('presignGet', () => {
     await presignGet('images/a.jpg')
     await presignGet('images/b.jpg')
     expect(s3ClientConfigs.length).toBe(1)
+  })
+
+  test('throws with a clear error when R2 env vars are missing', async () => {
+    // Re-reset the module so this test gets its own clean singleton state, with
+    // no cached client from the beforeEach presignGet calls above.
+    vi.resetModules()
+    // Wipe all four required vars so the guard fires.
+    vi.stubEnv('R2_ENDPOINT', '')
+    vi.stubEnv('R2_ACCESS_KEY_ID', '')
+    vi.stubEnv('R2_SECRET_ACCESS_KEY', '')
+    vi.stubEnv('R2_BUCKET', '')
+    const { presignGet: presignGetFresh } = await import('../r2')
+    // client() throws synchronously (before getSignedUrl), so we use the
+    // synchronous .toThrow form — not .rejects.toThrow.
+    expect(() => presignGetFresh('images/x.jpg')).toThrow(/R2 not configured/)
   })
 })
