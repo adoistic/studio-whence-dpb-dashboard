@@ -11,6 +11,12 @@
     "public": "out",
     "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "cleanUrls": true,
-    "trailingSlash": false
+    "trailingSlash": false,
+    "rewrites": [
+      {
+        "source": "/api/**",
+        "function": { "functionId": "dataApi", "region": "us-central1" }
+      }
+    ]
   }
 }
