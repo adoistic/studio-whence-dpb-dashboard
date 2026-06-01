@@ -1,0 +1,314 @@
+{
+  "generated_at": "2026-06-01T09:04:41.728137+00:00",
+  "source_sha": "8ae3653",
+  "headline": {
+    "figures_researched": 61,
+    "comics_in_production": 26,
+    "lines_active": 4
+  },
+  "lines": [
+    {
+      "slug": "biographies",
+      "title": "Biographies",
+      "subtitle": "Little Chanakya Presents…",
+      "comics": [
+        {
+          "title": "Sanjeev Juneja — The Boy Who Dropped the Safe Path",
+          "subject": "Sanjeev Juneja",
+          "line": "biographies",
+          "series": "Business Maharajas",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "A teenager's questions about marks, money, failure and the ‘safe path’ — answered by the real life of the boy from Baldev Nagar who was knocked to zero at 23 and built an Ayurvedic empire from a ₹2,000 loan.",
+          "time_span": "1976–2015 (Patiala childhood to the Kesh King sale)",
+          "target_length_pages": 48,
+          "target_age": "13+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-28",
+          "updated": "2026-05-28",
+          "changelog": [
+            {
+              "date": "2026-05-28",
+              "note": "Act One drafted (pp 1–17) for review; pp 18–48 scaffolded."
+            },
+            {
+              "date": "2026-05-28",
+              "note": "Full 48-page draft: Act One humanized per CLAUDE.md §4b; Acts Two–Five written."
+            }
+          ],
+          "sources_count": 2,
+          "slug": "01-the-boy-who-dropped-the-safe-path",
+          "subject_slug": "sanjeev-juneja"
+        },
+        {
+          "title": "Ratan Tata — The Man Who Built Trust",
+          "subject": "Ratan Tata",
+          "line": "biographies",
+          "series": "Business Maharajas",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "The shy heir who never bribed, never bullied, and never made the billionaires list — yet built the Tatas into a global name and became everyone's lighthouse.",
+          "time_span": "1937–2024",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "Initial 48-page draft; built act-by-act via subagent-driven development. Every quote re-verified against source file:line; speaker labels corrected by content; currency gate applied; §4b humanizer pass. Companion deliverables alongside."
+            }
+          ],
+          "sources_count": 8,
+          "slug": "01-the-man-who-built-trust",
+          "subject_slug": "ratan-tata"
+        },
+        {
+          "title": "Elon Musk — Betting on the Impossible",
+          "subject": "Elon Musk",
+          "line": "biographies",
+          "series": "The Making of Tech Legends",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "A boy who set himself five impossible problems and bet everything, again and again, to solve them — narrated by Little Chanakya, with the people who knew him.",
+          "time_span": "1971–present",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-28",
+          "updated": "2026-05-28",
+          "changelog": [
+            {
+              "date": "2026-05-28",
+              "note": "48-page scaffold; built act-by-act via subagent-driven development."
+            },
+            {
+              "date": "2026-05-28",
+              "note": "Full draft complete: 48 pages validated; every quote re-verified against source file:line; §4b humanizer pass. Companion deliverables written (concept-note, sources-and-quotes with the cross-references section, art-notes). Proof of the multi-source method."
+            }
+          ],
+          "sources_count": 3,
+          "slug": "01-betting-on-the-impossible",
+          "subject_slug": "elon-musk"
+        }
+      ],
+      "figures": [
+        {
+          "series": "01-Business-Legends",
+          "slug": "dhirubhai-ambani",
+          "sources_count": 9,
+          "words": 233531
+        },
+        {
+          "series": "02-Tech-Legends",
+          "slug": "elon-musk",
+          "sources_count": 22,
+          "words": 785236
+        },
+        {
+          "series": "03-Cricket-Legends",
+          "slug": "sachin-tendulkar",
+          "sources_count": 11,
+          "words": 273095
+        }
+      ]
+    },
+    {
+      "slug": "awareness",
+      "title": "Awareness",
+      "subtitle": "Stories that look at the world honestly.",
+      "comics": [
+        {
+          "title": "Future Shock Files: Who's Really in Charge?",
+          "subject": "AI literacy and agency for Indian teens",
+          "line": "awareness",
+          "series": "ai-awareness",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "When AI slips into every corner of their lives — school, friendships, futures, and the darkest nights — four teens learn that staying in charge is not about rejecting the machine; it is about knowing when you are the one thinking and when the machine is thinking for you.",
+          "time_span": "present day",
+          "target_length_pages": 56,
+          "target_age": "12+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-31",
+          "updated": "2026-05-31",
+          "changelog": [
+            {
+              "date": "2026-05-31",
+              "note": "Initial plan drafted. YAML front-matter complete; page-plan.md written (56 pages, 4 arcs). Script body pending — see page-plan.md for the full beat-by-beat roadmap."
+            },
+            {
+              "date": "2026-05-31",
+              "note": "First full script draft."
+            }
+          ],
+          "sources_count": 15,
+          "slug": "01-future-shock-files",
+          "subject_slug": "ai-awareness"
+        },
+        {
+          "title": "Little Chanakya and the Café of Questions",
+          "subject": "inherited bias, colourism, domestic-worker dignity — Awareness/Inclusion line",
+          "line": "awareness",
+          "series": "inclusion",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "Three fifteen-year-olds build a board of inherited biases in their own kitchen — and discover the hardest entry is one they almost walked past.",
+          "time_span": "present day",
+          "target_length_pages": 48,
+          "target_age": "12+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-31",
+          "updated": "2026-05-31",
+          "changelog": [
+            {
+              "date": "2026-05-31",
+              "note": "Front-matter filled; page-plan complete in page-plan.md; script body not yet drafted."
+            },
+            {
+              "date": "2026-05-31",
+              "note": "First full script draft."
+            }
+          ],
+          "sources_count": 13,
+          "slug": "01-cafe-of-questions",
+          "subject_slug": "inclusion"
+        }
+      ],
+      "figures": []
+    },
+    {
+      "slug": "indic",
+      "title": "Indic",
+      "subtitle": "Retellings of the epics and sacred texts.",
+      "comics": [
+        {
+          "title": "The Bhagavad Gita, Volume 1 — The Field of Dharma",
+          "subject": "Bhagavad Gita",
+          "line": "indic",
+          "series": "Bhagavad Gita",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "Arjuna drops his bow on the edge of war, and Krishna lifts his gaze from the dying self to the deathless Self, the path of action, and the vision of all worlds.",
+          "time_span": "the eve of the Kurukshetra war",
+          "target_length_pages": 64,
+          "target_age": "10+",
+          "narrator": "Sanjaya (the Gita's own frame; no Little Chanakya)",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "Volume 1 draft — 64 pages built act by act (frame · collapse · the deathless Self · karma yoga · the widening vision · the cosmic form · close). Verse spine copied verbatim from the GRETIL Sanskrit; Easwaran translation beneath; attributed notes; Gandhi and Oppenheimer interludes cited via Davis. No Little Chanakya; the Gita's own Sanjaya/Dhritarashtra frame. No Devanagari; no invented scripture or quotes."
+            }
+          ],
+          "sources_count": 12,
+          "slug": "01-the-field-of-dharma",
+          "subject_slug": "Gita"
+        },
+        {
+          "title": "The Bhagavad Gita, Volume 2 — The Return",
+          "subject": "Bhagavad Gita",
+          "line": "indic",
+          "series": "Bhagavad Gita",
+          "comic_number": 2,
+          "status": "draft",
+          "logline": "After the vision of all worlds, Krishna leads Arjuna back down into the livable — devotion, the forces that move every life, and the final surrender — until the warrior lifts his bow, transformed.",
+          "time_span": "the eve of the Kurukshetra war",
+          "target_length_pages": 64,
+          "target_age": "10+",
+          "narrator": "Sanjaya (the Gita's own frame; no Little Chanakya)",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "Volume 2 draft — 64 pages built act by act (bridge/re-entry · the way of love, Ch 12 · the field and the knower, Ch 13 · the three forces, Ch 14–15 · the two natures and faith, Ch 16–17 · the supreme secret of surrender, Ch 18 · the transformed return). No Little Chanakya; the Gita's own Sanjaya/Dhritarashtra frame closes here. No Devanagari; no invented scripture or quotes."
+            }
+          ],
+          "sources_count": 11,
+          "slug": "02-the-return",
+          "subject_slug": "Gita"
+        }
+      ],
+      "figures": []
+    },
+    {
+      "slug": "toddlers",
+      "title": "Toddlers",
+      "subtitle": "Diamond Junior — for the youngest readers.",
+      "comics": [
+        {
+          "title": "Tingaland Rhymes",
+          "subtitle": "A Diamond Junior nursery-rhyme book",
+          "line": "toddlers",
+          "ip": "tingaland",
+          "imprint": "Diamond Junior",
+          "format": "storybook",
+          "target_age": "3–5 years",
+          "target_length_pages": 56,
+          "max_text_lines_per_page": 12,
+          "status": "approved",
+          "narrator": "none (parent-read)",
+          "art_style": "Pixar 3D",
+          "language": "English",
+          "created": "2026-05-31",
+          "updated": "2026-05-31",
+          "changelog": [
+            "2026-05-31 — compiled first draft from rhyme + activity files into single script.md",
+            "2026-05-31 — Lulu renamed to Mira (Indian name fits the Indian character); all references swept across the tingaland tree",
+            "2026-05-31 — status bumped from draft → approved at Adnan's go-ahead to run /studio-whence-authoring; character library now holds 8 IP-locked Pixar 3D characters with 21 labeled reference renders"
+          ],
+          "sources_count": 7,
+          "slug": "01-tingaland-rhymes",
+          "subject_slug": "tingaland"
+        }
+      ],
+      "figures": []
+    }
+  ],
+  "activity": [
+    {
+      "sha": "59aee73",
+      "date": "2026-06-01T14:06:30+05:30",
+      "title": "plans(dpb-dashboard): implementation plan for dpb.studiowhence.com — 6 chunks, bite-sized TDD tasks"
+    },
+    {
+      "sha": "6ef558e",
+      "date": "2026-06-01T14:00:19+05:30",
+      "title": "spec(dpb-dashboard): design doc for dpb.studiowhence.com — Diamond editorial portal that replaces the Drive/Excel handoff workflow"
+    },
+    {
+      "sha": "5704e21",
+      "date": "2026-06-01T14:00:02+05:30",
+      "title": "design: vendor the Studio Whence design system into the repo (docs/design/)"
+    },
+    {
+      "sha": "b780b6e",
+      "date": "2026-06-01T13:59:50+05:30",
+      "title": "handoff(tingaland-rhymes): two-layer typography (Caveat Brush header + Fredoka One body)"
+    },
+    {
+      "sha": "1ad6b2e",
+      "date": "2026-06-01T12:05:08+05:30",
+      "title": "handoff(tingaland-rhymes): redact model/vendor names from Diamond-facing materials"
+    },
+    {
+      "sha": "e1b611c",
+      "date": "2026-06-01T11:58:22+05:30",
+      "title": "email(tingaland-rhymes): draft cover email to Diamond editorial (Manish ji + team) for the direction document attached"
+    },
+    {
+      "sha": "959d154",
+      "date": "2026-06-01T11:54:44+05:30",
+      "title": "handoff(tingaland-rhymes): Five Little Ducks v6 — Tinga rendered in full Pixar 3D quality"
+    },
+    {
+      "sha": "a15365c",
+      "date": "2026-06-01T11:34:09+05:30",
+      "title": "handoff(tingaland-rhymes): re-render Five Little Ducks v4 — Boxy now standing BESIDE Keke at proper 2/3-of-Keke proportions"
+    }
+  ],
+  "images": []
+}
