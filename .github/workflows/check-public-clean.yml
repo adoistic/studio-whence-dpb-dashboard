@@ -1,0 +1,22 @@
+name: check-public-clean
+
+# Guard: no data-bearing asset may land in this public repo.
+# All comic data/images are served gated at runtime via the R2 + Worker
+# channel; the public repo is a static app shell only.
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check-public-clean:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Check public/data stays a clean skeleton
+        run: node scripts/check-public-clean.mjs
