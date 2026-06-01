@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-06-01T09:04:41.728137+00:00",
-  "source_sha": "8ae3653",
+  "generated_at": "2026-06-01T12:13:57.151834+00:00",
+  "source_sha": "13c975c",
   "headline": {
     "figures_researched": 61,
     "comics_in_production": 26,
@@ -10,17 +10,17 @@
     {
       "slug": "biographies",
       "title": "Biographies",
-      "subtitle": "Little Chanakya Presents…",
+      "subtitle": "Little Chanakya Presents\u2026",
       "comics": [
         {
-          "title": "Sanjeev Juneja — The Boy Who Dropped the Safe Path",
+          "title": "Sanjeev Juneja \u2014 The Boy Who Dropped the Safe Path",
           "subject": "Sanjeev Juneja",
           "line": "biographies",
           "series": "Business Maharajas",
           "comic_number": 1,
           "status": "draft",
-          "logline": "A teenager's questions about marks, money, failure and the 'safe path' — answered by the real life of the boy from Baldev Nagar who was knocked to zero at 23 and built an Ayurvedic empire from a ₹2,000 loan.",
-          "time_span": "1976–2015 (Patiala childhood to the Kesh King sale)",
+          "logline": "A teenager's questions about marks, money, failure and the 'safe path' \u2014 answered by the real life of the boy from Baldev Nagar who was knocked to zero at 23 and built an Ayurvedic empire from a \u20b92,000 loan.",
+          "time_span": "1976\u20132015 (Patiala childhood to the Kesh King sale)",
           "target_length_pages": 48,
           "target_age": "13+",
           "narrator": "Little Chanakya",
@@ -29,11 +29,11 @@
           "changelog": [
             {
               "date": "2026-05-28",
-              "note": "Act One drafted (pp 1–17) for review; pp 18–48 scaffolded."
+              "note": "Act One drafted (pp 1\u201317) for review; pp 18\u201348 scaffolded."
             },
             {
               "date": "2026-05-28",
-              "note": "Full 48-page draft: Act One humanized per CLAUDE.md §4b; Acts Two–Five written."
+              "note": "Full 48-page draft: Act One humanized per CLAUDE.md \u00a74b; Acts Two\u2013Five written."
             }
           ],
           "sources_count": 2,
@@ -41,14 +41,14 @@
           "subject_slug": "sanjeev-juneja"
         },
         {
-          "title": "Ratan Tata — The Man Who Built Trust",
+          "title": "Ratan Tata \u2014 The Man Who Built Trust",
           "subject": "Ratan Tata",
           "line": "biographies",
           "series": "Business Maharajas",
           "comic_number": 1,
           "status": "draft",
-          "logline": "The shy heir who never bribed, never bullied, and never made the billionaires list — yet built the Tatas into a global name and became everyone's lighthouse.",
-          "time_span": "1937–2024",
+          "logline": "The shy heir who never bribed, never bullied, and never made the billionaires list \u2014 yet built the Tatas into a global name and became everyone's lighthouse.",
+          "time_span": "1937\u20132024",
           "target_length_pages": 48,
           "target_age": "10+",
           "narrator": "Little Chanakya",
@@ -57,7 +57,7 @@
           "changelog": [
             {
               "date": "2026-05-29",
-              "note": "Initial 48-page draft; built act-by-act via subagent-driven development. Every quote re-verified against source file:line; speaker labels corrected by content; currency gate applied; §4b humanizer pass. Companion deliverables alongside."
+              "note": "Initial 48-page draft; built act-by-act via subagent-driven development. Every quote re-verified against source file:line; speaker labels corrected by content; currency gate applied; \u00a74b humanizer pass. Companion deliverables alongside."
             }
           ],
           "sources_count": 8,
@@ -65,14 +65,238 @@
           "subject_slug": "ratan-tata"
         },
         {
-          "title": "Elon Musk — Betting on the Impossible",
+          "title": "J.R.D. Tata \u2014 The Sky-High Dreamer",
+          "subject": "J.R.D. Tata",
+          "line": "biographies",
+          "series": "Business Maharajas",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "India's first licensed pilot flew the nation's first airmail, built Air India from nothing, and chaired the Tatas for fifty-two years \u2014 never chasing wealth, setting the country's moral standard for business, and handing the torch to Ratan.",
+          "time_span": "1904\u20131993",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "Initial 48-page draft; built act-by-act via subagent-driven development. Every quote re-verified against source file:line; \u00a74b humanizer pass; currency gate and garbled-name check applied."
+            }
+          ],
+          "sources_count": 5,
+          "slug": "01-the-sky-high-dreamer",
+          "subject_slug": "jrd-tata"
+        },
+        {
+          "title": "G.D. Birla \u2014 The Swadeshi Business Maharaja",
+          "subject": "G.D. Birla",
+          "line": "biographies",
+          "series": "Business Maharajas",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "The Marwari boy barred from a lift who built an industrial empire and bankrolled India's freedom struggle \u2014 Gandhi's host, confidant, and self-described shadow \u2014 proving that business could serve the nation.",
+          "time_span": "1894\u20131983",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "48-page scaffold; built act-by-act via subagent-driven development."
+            },
+            {
+              "date": "2026-05-29",
+              "note": "Full draft complete: 48 pages validated; every quote re-verified against source file:line (Hindi quotes re-confirmed in the Devanagari OCR, rendered as Roman + gloss, never Devanagari); \u00a74b humanizer pass; Gandhi attributed throughout as recorded by G.D. Birla; dream framed as dream. Companion deliverables written (concept-note, sources-and-quotes with the cross-references section, art-notes)."
+            }
+          ],
+          "sources_count": 5,
+          "slug": "01-the-swadeshi-business-maharaja",
+          "subject_slug": "gd-birla"
+        },
+        {
+          "title": "The Tangaywala Who Became the King of Spices",
+          "subject": "Mahashay Dharampal Gulati",
+          "line": "biographies",
+          "series": "Business Maharajas",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "A Partition refugee who drove a horse-cart he couldn't handle, ground his own chillies in a Karol Bagh stall, and put his face on every MDH spice box \u2014 building a \u20b91,600-crore brand and a hospital in his mother's name along the way.",
+          "time_span": "1919\u20132020",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-31",
+          "updated": "2026-05-31",
+          "changelog": [
+            {
+              "date": "2026-05-31",
+              "note": "Initial page-plan drafted. Script body not yet written \u2014 see page-plan.md for full 48-page beat-by-beat plan."
+            },
+            {
+              "date": "2026-05-31",
+              "note": "First full script draft."
+            }
+          ],
+          "sources_count": 9,
+          "slug": "01-the-tangaywala-who-became-king-of-spices",
+          "subject_slug": "dharampal-gulati"
+        },
+        {
+          "title": "Srinivasa Ramanujan \u2014 The Boy Who Spoke to Numbers",
+          "subject": "Srinivasa Ramanujan",
+          "line": "biographies",
+          "series": "Secrets of Science Legends",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "The self-taught clerk from Kumbakonam who filled notebooks with formulas the goddess gave him in dreams, wrote one letter that stunned Cambridge, and in thirty-two years left mathematics still unfolding a century later.",
+          "time_span": "1887\u20131920",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "Initial 48-page draft + companion deliverables + render."
+            }
+          ],
+          "sources_count": 5,
+          "slug": "01-the-boy-who-spoke-to-numbers",
+          "subject_slug": "srinivasa-ramanujan"
+        },
+        {
+          "title": "A.P.J. Abdul Kalam \u2014 The Boy Who Touched the Sky",
+          "subject": "A.P.J. Abdul Kalam",
+          "line": "biographies",
+          "series": "Secrets of Science Legends",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "The Rameswaram ferryman's son who was rejected by the Air Force, took the blame for a rocket failure, launched India into space, and became its beloved 'People's President' \u2014 yet wanted to be remembered only as a teacher.",
+          "time_span": "1931\u20132015",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "Initial 48-page draft, built act by act via subagent-driven development. Every quote re-verified against source file:line; Wings of Fire attribution gate applied (Tiwari narration vs Kalam first-person); STT garbles fixed (Srinivasa Ramanujan, Sivasubramania Iyer); OCR garble fixed on the Dhirubhai cross-reference; \u00a74b humanizer pass per act. Companion deliverables (concept-note, sources-and-quotes with cross-references section, art-notes) written alongside."
+            }
+          ],
+          "sources_count": 10,
+          "slug": "01-the-boy-who-touched-the-sky",
+          "subject_slug": "apj-abdul-kalam"
+        },
+        {
+          "title": "Charles Darwin \u2014 The Explorer Who Read Nature's Code",
+          "subject": "Charles Darwin",
+          "line": "biographies",
+          "series": "Secrets of Science Legends",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "The boy who cared for nothing but beetles sailed around the world, watched the finches, and spent twenty patient years building the idea that changed how we understand every living thing.",
+          "time_span": "1809\u20131882",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "Initial 48-page draft; built act-by-act with grounding gates (validate, quote re-verify, sensitivity gate, humanizer pass) inside the loop."
+            }
+          ],
+          "sources_count": 11,
+          "slug": "01-the-explorer-who-read-natures-code",
+          "subject_slug": "charles-darwin"
+        },
+        {
+          "title": "Sachin Tendulkar \u2014 From Shivaji Park to Cricket Immortality",
+          "subject": "Sachin Tendulkar",
+          "line": "biographies",
+          "series": "The Making of Cricket Legends",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "A boy from Shivaji Park carried the hopes of a billion people for twenty-four years \u2014 with humility and discipline \u2014 and his teammates finally carried him.",
+          "time_span": "1973\u20132013",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "Initial 48-page draft \u2014 Cold open + Acts 1-5 complete. Every featured quote re-verified against source file:line. Companion deliverables written. Validated at 48 pages."
+            }
+          ],
+          "sources_count": 6,
+          "slug": "01-from-shivaji-park-to-cricket-immortality",
+          "subject_slug": "sachin-tendulkar"
+        },
+        {
+          "title": "Virat Kohli \u2014 The Delhi Boy Who Became King",
+          "subject": "Virat Kohli",
+          "line": "biographies",
+          "series": "The Making of Cricket Legends",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "A brash Delhi boy grew up the morning his father died \u2014 and batted on. What he became next changed Indian cricket forever.",
+          "time_span": "1988\u2013present",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "Initial 48-page draft + companion deliverables + render."
+            }
+          ],
+          "sources_count": 9,
+          "slug": "01-the-delhi-boy-who-became-king",
+          "subject_slug": "virat-kohli"
+        },
+        {
+          "title": "Rahul Dravid \u2014 The Wall",
+          "subject": "Rahul Dravid",
+          "line": "biographies",
+          "series": "The Making of Cricket Legends",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "The man who never made the headlines was the reason India won. A craftsman who put the team first \u2014 and spent the second half of his life building the next generation.",
+          "time_span": "1973\u2013present",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "Initial 48-page draft. All quotes re-verified verbatim against cited file:line. Chanakya drawn on exactly 8 pages (pp 1, 7, 19, 21, 35, 41, 45, 47). Humanizer pass completed. Companion deliverables written."
+            }
+          ],
+          "sources_count": 12,
+          "slug": "01-the-wall",
+          "subject_slug": "rahul-dravid"
+        },
+        {
+          "title": "Elon Musk \u2014 Betting on the Impossible",
           "subject": "Elon Musk",
           "line": "biographies",
           "series": "The Making of Tech Legends",
           "comic_number": 1,
           "status": "draft",
-          "logline": "A boy who set himself five impossible problems and bet everything, again and again, to solve them — narrated by Little Chanakya, with the people who knew him.",
-          "time_span": "1971–present",
+          "logline": "A boy who set himself five impossible problems and bet everything, again and again, to solve them \u2014 narrated by Little Chanakya, with the people who knew him.",
+          "time_span": "1971\u2013present",
           "target_length_pages": 48,
           "target_age": "10+",
           "narrator": "Little Chanakya",
@@ -85,20 +309,336 @@
             },
             {
               "date": "2026-05-28",
-              "note": "Full draft complete: 48 pages validated; every quote re-verified against source file:line; §4b humanizer pass. Companion deliverables written (concept-note, sources-and-quotes with the cross-references section, art-notes). Proof of the multi-source method."
+              "note": "Full draft complete: 48 pages validated; every quote re-verified against source file:line; \u00a74b humanizer pass. Companion deliverables written (concept-note, sources-and-quotes with the cross-references section, art-notes). Proof of the multi-source method."
             }
           ],
           "sources_count": 3,
           "slug": "01-betting-on-the-impossible",
           "subject_slug": "elon-musk"
+        },
+        {
+          "title": "Reed Hastings \u2014 Changed How the World Watches",
+          "subject": "Reed Hastings",
+          "line": "biographies",
+          "series": "The Making of Tech Legends",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "A patient, principled builder who turned a humiliating rejection into the company that beat the giant \u2014 by valuing people over process and betting on the future before it arrived.",
+          "time_span": "1960\u20132023",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "Full 48-page draft built act-by-act via subagent-driven discipline. Every featured quote re-verified verbatim against source file:line. Chanakya drawn on pp 1, 7, 19, 21, 35, 41, 45, 47; voice-over elsewhere. Outside voices (Keyes the rival, Randolph the co-founder, Hoffman) attributed in narration. \u00a74b humanizer pass per act. Companion deliverables (concept-note, sources-and-quotes, art-notes) written."
+            }
+          ],
+          "sources_count": 7,
+          "slug": "01-changed-how-the-world-watches",
+          "subject_slug": "reed-hastings"
+        },
+        {
+          "title": "Jensen Huang: How Hard Can It Be",
+          "subject": "Jensen Huang",
+          "line": "biographies",
+          "series": "The Making of Tech Legends",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "A Taiwanese immigrant cleans bathrooms at a Kentucky reform school, washes dishes at Denny's, and builds the company that becomes the engine of the AI age \u2014 surviving three near-bankruptcies by asking the same question every time: how hard can it be?",
+          "time_span": "1963\u20132024",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-31",
+          "updated": "2026-05-31",
+          "changelog": [
+            {
+              "date": "2026-05-31",
+              "note": "Front-matter populated; full 48-page script body drafted from page-plan.md. All Jensen quotes sourced from CROSS-REFERENCES-peer-corpus.md. DGX-1 price pulled per editorial call \u2014 machine described without a dollar figure."
+            }
+          ],
+          "sources_count": 17,
+          "slug": "01-how-hard-can-it-be",
+          "subject_slug": "jensen-huang"
+        },
+        {
+          "title": "Jeff Bezos: It's Always Day One",
+          "subject": "Jeff Bezos",
+          "line": "biographies",
+          "series": "The Making of Tech Legends",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "The boy who watched Apollo at five and learned from his grandfather that you can fix anything, who left a Wall Street job by asking what he'd regret at eighty, built the everything store out of a garage, then reached back toward space \u2014 narrated by Little Chanakya.",
+          "time_span": "1964\u2013present",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "48-page scaffold; built act-by-act."
+            },
+            {
+              "date": "2026-05-29",
+              "note": "Full draft complete: 48 pages validated; every quote re-verified against source file:line; financial figures stated exactly as the source gives them (currency + date, never converted); \u00a74b humanizer pass. Companion deliverables written (concept-note, sources-and-quotes with the Davenport-attribution note, art-notes)."
+            }
+          ],
+          "sources_count": 9,
+          "slug": "01-its-always-day-one",
+          "subject_slug": "jeff-bezos"
+        },
+        {
+          "title": "Bill Gates: The Code and the Cure",
+          "subject": "Bill Gates",
+          "line": "biographies",
+          "series": "The Making of Tech Legends",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "The boy who built the software industry then spent the rest of his life trying to fix the world's most preventable deaths \u2014 both stories driven by the same obsession: see the problem no one else has noticed, and go solve it.",
+          "time_span": "1955\u20132025",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-31",
+          "updated": "2026-05-31",
+          "changelog": [
+            {
+              "date": "2026-05-31",
+              "note": "Front-matter and metadata added; script body pending. See page-plan.md for the full 48-page beat sheet before drafting."
+            },
+            {
+              "date": "2026-05-31",
+              "note": "Full 48-page script body drafted. All quotes verified against CROSS-REFERENCES-peer-corpus.md. Financial figures carry currency/unit/date. Validator passed clean."
+            }
+          ],
+          "sources_count": 26,
+          "slug": "01-the-code-and-the-cure",
+          "subject_slug": "bill-gates"
+        },
+        {
+          "title": "Mark Zuckerberg \u2014 The College Coder Who Connected Billions",
+          "subject": "Mark Zuckerberg",
+          "line": "biographies",
+          "series": "The Making of Tech Legends",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "A Harvard coder built a tool to connect his classmates \u2014 and didn't stop until it connected the world. Then the world tested him.",
+          "time_span": "1984\u2013present",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "Initial 48-page draft + companion deliverables + render."
+            }
+          ],
+          "sources_count": 7,
+          "slug": "01-the-college-coder-who-connected-billions",
+          "subject_slug": "mark-zuckerberg"
+        },
+        {
+          "title": "Sam Altman: The Optimist",
+          "subject": "Sam Altman",
+          "line": "biographies",
+          "series": "The Making of Tech Legends",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "The Midwest kid who got his first computer at eight, dropped out of Stanford, grew up to lead Y Combinator and then OpenAI \u2014 survived being fired from the company he built in five sleepless days, and kept betting on a hopeful future.",
+          "time_span": "1985\u2013present",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "48-page scaffold; built act-by-act per the self-contained brief."
+            },
+            {
+              "date": "2026-05-29",
+              "note": "Full draft complete: 48 pages validated (OK); every featured quote re-verified verbatim against source file:line; \u00a74b humanizer pass (0 Devanagari, 0 em-dashes in prose). Little Chanakya drawn on 8 pages (1, 8, 16, 24, 32, 40, 45, 48). Living-subject care: the 2023 firing framed as resilience, the Musk feud as two builders who diverged. The contested 'cash cow' line attributed to Karpathy, not Musk (see sources-and-quotes.md \u00a73). Companion deliverables written (concept-note, sources-and-quotes, art-notes)."
+            }
+          ],
+          "sources_count": 8,
+          "slug": "01-the-optimist",
+          "subject_slug": "sam-altman"
+        },
+        {
+          "title": "Jack Ma \u2014 The Teacher Who Failed Many Times",
+          "subject": "Jack Ma",
+          "line": "biographies",
+          "series": "The Making of Tech Legends",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "A teacher rejected everywhere \u2014 by jobs, by KFC, by Harvard ten times \u2014 who taught himself English at a hotel at dawn, built Alibaba from his apartment, and never stopped believing that the dreams behind the technology change the world.",
+          "time_span": "1964\u2013present",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "48-page draft written act by act, all quotes verified against source file:line. Companion deliverables (concept-note, sources-and-quotes with cross-references section, art-notes) complete. Humanizer pass done."
+            }
+          ],
+          "sources_count": 13,
+          "slug": "01-the-teacher-who-failed-many-times",
+          "subject_slug": "jack-ma"
+        },
+        {
+          "title": "Steve Jobs: Think Different",
+          "subject": "Steve Jobs",
+          "line": "biographies",
+          "series": "The Making of Tech Legends",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "The adopted boy who felt he was chosen, was fired from the company he founded, came back to make the iPhone, and taught a generation to stay hungry and stay foolish \u2014 narrated by Little Chanakya, with the people who knew him.",
+          "time_span": "1955\u20132011",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-29",
+          "updated": "2026-05-29",
+          "changelog": [
+            {
+              "date": "2026-05-29",
+              "note": "48-page scaffold; built act-by-act. Full draft complete: every quote re-verified verbatim against its source file:line; \u00a74b humanizer pass per act; Gates cross-reference thread woven through. Companion deliverables (concept-note, sources-and-quotes, art-notes) written and rendered."
+            }
+          ],
+          "sources_count": 13,
+          "slug": "01-think-different",
+          "subject_slug": "steve-jobs"
+        },
+        {
+          "title": "Larry Page & Sergey Brin: Two Minds, One Search",
+          "subject": "Larry Page & Sergey Brin",
+          "line": "biographies",
+          "series": "The Making of Tech Legends",
+          "comic_number": 1,
+          "status": "draft",
+          "logline": "Two kids with nothing in common \u2014 a Michigan professor's son and a Soviet emigrant's son \u2014 collide at Stanford in 1995 and build the machine the whole world uses to think.",
+          "time_span": "1973\u20132024",
+          "target_length_pages": 48,
+          "target_age": "10+",
+          "narrator": "Little Chanakya",
+          "created": "2026-05-31",
+          "updated": "2026-05-31",
+          "changelog": [
+            {
+              "date": "2026-05-31",
+              "note": "Front-matter and full page-plan written. Script body is TODO \u2014 see page-plan.md for complete 48-page beat-by-beat plan with sourced quotes."
+            },
+            {
+              "date": "2026-05-31",
+              "note": "Full 48-page script body drafted from page-plan. All quotes sourced from CROSS-REFERENCES-peer-corpus.md, In the Plex chapters, and the Alphabet letters. sources-and-quotes.md populated."
+            }
+          ],
+          "sources_count": 15,
+          "slug": "01-two-minds-one-search",
+          "subject_slug": "larry-page-sergey-brin"
         }
       ],
       "figures": [
         {
           "series": "01-Business-Legends",
+          "slug": "alakh-pandey",
+          "sources_count": 5,
+          "words": 71601
+        },
+        {
+          "series": "01-Business-Legends",
+          "slug": "azim-premji",
+          "sources_count": 2,
+          "words": 79619
+        },
+        {
+          "series": "01-Business-Legends",
+          "slug": "deepinder-goyal",
+          "sources_count": 1,
+          "words": 8635
+        },
+        {
+          "series": "01-Business-Legends",
+          "slug": "dharampal-gulati",
+          "sources_count": 9,
+          "words": 101136
+        },
+        {
+          "series": "01-Business-Legends",
           "slug": "dhirubhai-ambani",
           "sources_count": 9,
           "words": 233531
+        },
+        {
+          "series": "01-Business-Legends",
+          "slug": "falguni-nayar",
+          "sources_count": 4,
+          "words": 20220
+        },
+        {
+          "series": "01-Business-Legends",
+          "slug": "gd-birla",
+          "sources_count": 4,
+          "words": 291925
+        },
+        {
+          "series": "01-Business-Legends",
+          "slug": "jrd-tata",
+          "sources_count": 4,
+          "words": 227499
+        },
+        {
+          "series": "01-Business-Legends",
+          "slug": "narayana-murthy",
+          "sources_count": 1,
+          "words": 7494
+        },
+        {
+          "series": "01-Business-Legends",
+          "slug": "ratan-tata",
+          "sources_count": 8,
+          "words": 130396
+        },
+        {
+          "series": "01-Business-Legends",
+          "slug": "sanjeev-juneja",
+          "sources_count": 4,
+          "words": 74983
+        },
+        {
+          "series": "01-Business-Legends",
+          "slug": "shiv-nadar",
+          "sources_count": 4,
+          "words": 8782
+        },
+        {
+          "series": "01-Business-Legends",
+          "slug": "vijay-shekhar-sharma",
+          "sources_count": 2,
+          "words": 15368
+        },
+        {
+          "series": "02-Tech-Legends",
+          "slug": "bill-gates",
+          "sources_count": 13,
+          "words": 275311
+        },
+        {
+          "series": "02-Tech-Legends",
+          "slug": "brian-chesky",
+          "sources_count": 4,
+          "words": 140635
         },
         {
           "series": "02-Tech-Legends",
@@ -107,10 +647,274 @@
           "words": 785236
         },
         {
+          "series": "02-Tech-Legends",
+          "slug": "jack-ma",
+          "sources_count": 11,
+          "words": 175693
+        },
+        {
+          "series": "02-Tech-Legends",
+          "slug": "jeff-bezos",
+          "sources_count": 12,
+          "words": 452852
+        },
+        {
+          "series": "02-Tech-Legends",
+          "slug": "jensen-huang",
+          "sources_count": 5,
+          "words": 219273
+        },
+        {
+          "series": "02-Tech-Legends",
+          "slug": "larry-page-sergey-brin",
+          "sources_count": 7,
+          "words": 225719
+        },
+        {
+          "series": "02-Tech-Legends",
+          "slug": "mark-zuckerberg",
+          "sources_count": 15,
+          "words": 460237
+        },
+        {
+          "series": "02-Tech-Legends",
+          "slug": "peter-thiel",
+          "sources_count": 5,
+          "words": 406692
+        },
+        {
+          "series": "02-Tech-Legends",
+          "slug": "reed-hastings",
+          "sources_count": 13,
+          "words": 339543
+        },
+        {
+          "series": "02-Tech-Legends",
+          "slug": "sam-altman",
+          "sources_count": 9,
+          "words": 386453
+        },
+        {
+          "series": "02-Tech-Legends",
+          "slug": "satya-nadella",
+          "sources_count": 7,
+          "words": 160977
+        },
+        {
+          "series": "02-Tech-Legends",
+          "slug": "steve-jobs",
+          "sources_count": 6,
+          "words": 320150
+        },
+        {
+          "series": "03-Cricket-Legends",
+          "slug": "hardik-pandya",
+          "sources_count": 7,
+          "words": 40012
+        },
+        {
+          "series": "03-Cricket-Legends",
+          "slug": "jasprit-bumrah",
+          "sources_count": 5,
+          "words": 66930
+        },
+        {
+          "series": "03-Cricket-Legends",
+          "slug": "kapil-dev",
+          "sources_count": 6,
+          "words": 48149
+        },
+        {
+          "series": "03-Cricket-Legends",
+          "slug": "ms-dhoni",
+          "sources_count": 6,
+          "words": 164043
+        },
+        {
+          "series": "03-Cricket-Legends",
+          "slug": "rahul-dravid",
+          "sources_count": 13,
+          "words": 347626
+        },
+        {
+          "series": "03-Cricket-Legends",
+          "slug": "rishabh-pant",
+          "sources_count": 8,
+          "words": 61059
+        },
+        {
+          "series": "03-Cricket-Legends",
+          "slug": "rohit-sharma",
+          "sources_count": 8,
+          "words": 98723
+        },
+        {
           "series": "03-Cricket-Legends",
           "slug": "sachin-tendulkar",
           "sources_count": 11,
           "words": 273095
+        },
+        {
+          "series": "03-Cricket-Legends",
+          "slug": "smriti-mandhana",
+          "sources_count": 6,
+          "words": 65421
+        },
+        {
+          "series": "03-Cricket-Legends",
+          "slug": "sourav-ganguly",
+          "sources_count": 7,
+          "words": 119826
+        },
+        {
+          "series": "03-Cricket-Legends",
+          "slug": "virat-kohli",
+          "sources_count": 12,
+          "words": 160497
+        },
+        {
+          "series": "03-Cricket-Legends",
+          "slug": "yuvraj-singh",
+          "sources_count": 9,
+          "words": 173391
+        },
+        {
+          "series": "04-Science-Legends",
+          "slug": "albert-einstein",
+          "sources_count": 1,
+          "words": 688591
+        },
+        {
+          "series": "04-Science-Legends",
+          "slug": "apj-abdul-kalam",
+          "sources_count": 8,
+          "words": 189896
+        },
+        {
+          "series": "04-Science-Legends",
+          "slug": "c-v-raman",
+          "sources_count": 1,
+          "words": 135347
+        },
+        {
+          "series": "04-Science-Legends",
+          "slug": "charles-darwin",
+          "sources_count": 17,
+          "words": 1004411
+        },
+        {
+          "series": "04-Science-Legends",
+          "slug": "galileo-galilei",
+          "sources_count": 2,
+          "words": 205912
+        },
+        {
+          "series": "04-Science-Legends",
+          "slug": "homi-bhabha",
+          "sources_count": 1,
+          "words": 132454
+        },
+        {
+          "series": "04-Science-Legends",
+          "slug": "isaac-newton",
+          "sources_count": 2,
+          "words": 363656
+        },
+        {
+          "series": "04-Science-Legends",
+          "slug": "jagadish-chandra-bose",
+          "sources_count": 0,
+          "words": 244451
+        },
+        {
+          "series": "04-Science-Legends",
+          "slug": "marie-curie",
+          "sources_count": 2,
+          "words": 163699
+        },
+        {
+          "series": "04-Science-Legends",
+          "slug": "nikola-tesla",
+          "sources_count": 2,
+          "words": 464958
+        },
+        {
+          "series": "04-Science-Legends",
+          "slug": "srinivasa-ramanujan",
+          "sources_count": 5,
+          "words": 417063
+        },
+        {
+          "series": "04-Science-Legends",
+          "slug": "vikram-sarabhai",
+          "sources_count": 0,
+          "words": 10048
+        },
+        {
+          "series": "05-Bollywood-Legends",
+          "slug": "aamir-khan",
+          "sources_count": 0,
+          "words": 104
+        },
+        {
+          "series": "05-Bollywood-Legends",
+          "slug": "akshay-kumar",
+          "sources_count": 0,
+          "words": 104
+        },
+        {
+          "series": "05-Bollywood-Legends",
+          "slug": "alia-bhatt",
+          "sources_count": 0,
+          "words": 104
+        },
+        {
+          "series": "05-Bollywood-Legends",
+          "slug": "amitabh-bachchan",
+          "sources_count": 0,
+          "words": 104
+        },
+        {
+          "series": "05-Bollywood-Legends",
+          "slug": "deepika-padukone",
+          "sources_count": 0,
+          "words": 104
+        },
+        {
+          "series": "05-Bollywood-Legends",
+          "slug": "madhuri-dixit",
+          "sources_count": 0,
+          "words": 104
+        },
+        {
+          "series": "05-Bollywood-Legends",
+          "slug": "priyanka-chopra-jonas",
+          "sources_count": 0,
+          "words": 105
+        },
+        {
+          "series": "05-Bollywood-Legends",
+          "slug": "ranbir-kapoor",
+          "sources_count": 0,
+          "words": 104
+        },
+        {
+          "series": "05-Bollywood-Legends",
+          "slug": "ranveer-singh",
+          "sources_count": 0,
+          "words": 102
+        },
+        {
+          "series": "05-Bollywood-Legends",
+          "slug": "salman-khan",
+          "sources_count": 0,
+          "words": 104
+        },
+        {
+          "series": "05-Bollywood-Legends",
+          "slug": "shah-rukh-khan",
+          "sources_count": 0,
+          "words": 107
         }
       ]
     },
@@ -126,7 +930,7 @@
           "series": "ai-awareness",
           "comic_number": 1,
           "status": "draft",
-          "logline": "When AI slips into every corner of their lives — school, friendships, futures, and the darkest nights — four teens learn that staying in charge is not about rejecting the machine; it is about knowing when you are the one thinking and when the machine is thinking for you.",
+          "logline": "When AI slips into every corner of their lives \u2014 school, friendships, futures, and the darkest nights \u2014 four teens learn that staying in charge is not about rejecting the machine; it is about knowing when you are the one thinking and when the machine is thinking for you.",
           "time_span": "present day",
           "target_length_pages": 56,
           "target_age": "12+",
@@ -136,7 +940,7 @@
           "changelog": [
             {
               "date": "2026-05-31",
-              "note": "Initial plan drafted. YAML front-matter complete; page-plan.md written (56 pages, 4 arcs). Script body pending — see page-plan.md for the full beat-by-beat roadmap."
+              "note": "Initial plan drafted. YAML front-matter complete; page-plan.md written (56 pages, 4 arcs). Script body pending \u2014 see page-plan.md for the full beat-by-beat roadmap."
             },
             {
               "date": "2026-05-31",
@@ -148,13 +952,13 @@
           "subject_slug": "ai-awareness"
         },
         {
-          "title": "Little Chanakya and the Café of Questions",
-          "subject": "inherited bias, colourism, domestic-worker dignity — Awareness/Inclusion line",
+          "title": "Little Chanakya and the Caf\u00e9 of Questions",
+          "subject": "inherited bias, colourism, domestic-worker dignity \u2014 Awareness/Inclusion line",
           "line": "awareness",
           "series": "inclusion",
           "comic_number": 1,
           "status": "draft",
-          "logline": "Three fifteen-year-olds build a board of inherited biases in their own kitchen — and discover the hardest entry is one they almost walked past.",
+          "logline": "Three fifteen-year-olds build a board of inherited biases in their own kitchen \u2014 and discover the hardest entry is one they almost walked past.",
           "time_span": "present day",
           "target_length_pages": 48,
           "target_age": "12+",
@@ -184,7 +988,7 @@
       "subtitle": "Retellings of the epics and sacred texts.",
       "comics": [
         {
-          "title": "The Bhagavad Gita, Volume 1 — The Field of Dharma",
+          "title": "The Bhagavad Gita, Volume 1 \u2014 The Field of Dharma",
           "subject": "Bhagavad Gita",
           "line": "indic",
           "series": "Bhagavad Gita",
@@ -200,7 +1004,7 @@
           "changelog": [
             {
               "date": "2026-05-29",
-              "note": "Volume 1 draft — 64 pages built act by act (frame · collapse · the deathless Self · karma yoga · the widening vision · the cosmic form · close). Verse spine copied verbatim from the GRETIL Sanskrit; Easwaran translation beneath; attributed notes; Gandhi and Oppenheimer interludes cited via Davis. No Little Chanakya; the Gita's own Sanjaya/Dhritarashtra frame. No Devanagari; no invented scripture or quotes."
+              "note": "Volume 1 draft \u2014 64 pages built act by act (frame \u00b7 collapse \u00b7 the deathless Self \u00b7 karma yoga \u00b7 the widening vision \u00b7 the cosmic form \u00b7 close). Verse spine copied verbatim from the GRETIL Sanskrit; Easwaran translation beneath; attributed notes; Gandhi and Oppenheimer interludes cited via Davis. No Little Chanakya; the Gita's own Sanjaya/Dhritarashtra frame. No Devanagari; no invented scripture or quotes."
             }
           ],
           "sources_count": 12,
@@ -208,13 +1012,13 @@
           "subject_slug": "Gita"
         },
         {
-          "title": "The Bhagavad Gita, Volume 2 — The Return",
+          "title": "The Bhagavad Gita, Volume 2 \u2014 The Return",
           "subject": "Bhagavad Gita",
           "line": "indic",
           "series": "Bhagavad Gita",
           "comic_number": 2,
           "status": "draft",
-          "logline": "After the vision of all worlds, Krishna leads Arjuna back down into the livable — devotion, the forces that move every life, and the final surrender — until the warrior lifts his bow, transformed.",
+          "logline": "After the vision of all worlds, Krishna leads Arjuna back down into the livable \u2014 devotion, the forces that move every life, and the final surrender \u2014 until the warrior lifts his bow, transformed.",
           "time_span": "the eve of the Kurukshetra war",
           "target_length_pages": 64,
           "target_age": "10+",
@@ -224,7 +1028,7 @@
           "changelog": [
             {
               "date": "2026-05-29",
-              "note": "Volume 2 draft — 64 pages built act by act (bridge/re-entry · the way of love, Ch 12 · the field and the knower, Ch 13 · the three forces, Ch 14–15 · the two natures and faith, Ch 16–17 · the supreme secret of surrender, Ch 18 · the transformed return). No Little Chanakya; the Gita's own Sanjaya/Dhritarashtra frame closes here. No Devanagari; no invented scripture or quotes."
+              "note": "Volume 2 draft \u2014 64 pages built act by act (bridge/re-entry \u00b7 the way of love, Ch 12 \u00b7 the field and the knower, Ch 13 \u00b7 the three forces, Ch 14\u201315 \u00b7 the two natures and faith, Ch 16\u201317 \u00b7 the supreme secret of surrender, Ch 18 \u00b7 the transformed return). Opens by re-entering the held breath right after Volume 1's cosmic form. Verse spine copied verbatim from the GRETIL Sanskrit; Easwaran translation beneath; attributed notes; Raghunath Cappo and the Gita's wider reception (Davis) as transformation interludes. Gandhi and Oppenheimer NOT reused (Volume 1). Krishna in his gentle form throughout. No Little Chanakya; the Gita's own Sanjaya/Dhritarashtra frame closes here. No Devanagari; no invented scripture or quotes."
             }
           ],
           "sources_count": 11,
@@ -237,7 +1041,7 @@
     {
       "slug": "toddlers",
       "title": "Toddlers",
-      "subtitle": "Diamond Junior — for the youngest readers.",
+      "subtitle": "Diamond Junior \u2014 for the youngest readers.",
       "comics": [
         {
           "title": "Tingaland Rhymes",
@@ -246,7 +1050,7 @@
           "ip": "tingaland",
           "imprint": "Diamond Junior",
           "format": "storybook",
-          "target_age": "3–5 years",
+          "target_age": "3\u20135 years",
           "target_length_pages": 56,
           "max_text_lines_per_page": 12,
           "status": "approved",
@@ -256,9 +1060,9 @@
           "created": "2026-05-31",
           "updated": "2026-05-31",
           "changelog": [
-            "2026-05-31 — compiled first draft from rhyme + activity files into single script.md",
-            "2026-05-31 — Lulu renamed to Mira (Indian name fits the Indian character); all references swept across the tingaland tree",
-            "2026-05-31 — status bumped from draft → approved at Adnan's go-ahead to run /studio-whence-authoring; character library now holds 8 IP-locked Pixar 3D characters with 21 labeled reference renders"
+            "2026-05-31 \u2014 compiled first draft from rhyme + activity files into single script.md",
+            "2026-05-31 \u2014 Lulu renamed to Mira (Indian name fits the Indian character); all references swept across the tingaland tree",
+            "2026-05-31 \u2014 status bumped from draft \u2192 approved at Adnan's go-ahead to run /studio-whence-authoring; character library now holds 8 IP-locked Pixar 3D characters with 21 labeled reference renders"
           ],
           "sources_count": 7,
           "slug": "01-tingaland-rhymes",
@@ -272,12 +1076,12 @@
     {
       "sha": "59aee73",
       "date": "2026-06-01T14:06:30+05:30",
-      "title": "plans(dpb-dashboard): implementation plan for dpb.studiowhence.com — 6 chunks, bite-sized TDD tasks"
+      "title": "plans(dpb-dashboard): implementation plan for dpb.studiowhence.com \u2014 6 chunks, bite-sized TDD tasks"
     },
     {
       "sha": "6ef558e",
       "date": "2026-06-01T14:00:19+05:30",
-      "title": "spec(dpb-dashboard): design doc for dpb.studiowhence.com — Diamond editorial portal that replaces the Drive/Excel handoff workflow"
+      "title": "spec(dpb-dashboard): design doc for dpb.studiowhence.com \u2014 Diamond editorial portal that replaces the Drive/Excel handoff workflow"
     },
     {
       "sha": "5704e21",
@@ -287,12 +1091,12 @@
     {
       "sha": "b780b6e",
       "date": "2026-06-01T13:59:50+05:30",
-      "title": "handoff(tingaland-rhymes): two-layer typography (Caveat Brush header + Fredoka One body)"
+      "title": "handoff(tingaland-rhymes): two-layer typography (Caveat Brush header + Fredoka One body) \u2014 4 sample pages re-rendered with per-rhyme decorative title treatment; Five Little Ducks v8 fixes Tinga-in-spacesuit (was drifting to the casual outfit visible in the proportions chart)"
     },
     {
       "sha": "1ad6b2e",
       "date": "2026-06-01T12:05:08+05:30",
-      "title": "handoff(tingaland-rhymes): redact model/vendor names from Diamond-facing materials"
+      "title": "handoff(tingaland-rhymes): redact model/vendor names from Diamond-facing materials \u2014 pipeline described as 'Studio Whence proprietary cloud pipeline' (was leaking Gemini/Nano-Banana/Google Fonts); rebuild DOCX/PDF"
     },
     {
       "sha": "e1b611c",
@@ -302,13 +1106,164 @@
     {
       "sha": "959d154",
       "date": "2026-06-01T11:54:44+05:30",
-      "title": "handoff(tingaland-rhymes): Five Little Ducks v6 — Tinga rendered in full Pixar 3D quality"
+      "title": "handoff(tingaland-rhymes): Five Little Ducks v6 \u2014 Tinga rendered in full Pixar 3D quality (was cartoon-flat at distance), Boxy at correct proportions beside Keke, 5 ducklings visible, text on banner with straight quotes; best-practices doc gains distant-character-quality-drop entry"
     },
     {
       "sha": "a15365c",
       "date": "2026-06-01T11:34:09+05:30",
-      "title": "handoff(tingaland-rhymes): re-render Five Little Ducks v4 — Boxy now standing BESIDE Keke at proper 2/3-of-Keke proportions"
+      "title": "handoff(tingaland-rhymes): re-render Five Little Ducks v4 \u2014 Boxy now standing BESIDE Keke at proper 2/3-of-Keke proportions (was rendering as a tiny mascot at her feet); rebuild Diamond DOCX"
+    },
+    {
+      "sha": "ac01cb2",
+      "date": "2026-06-01T11:06:33+05:30",
+      "title": "handoff(tingaland-rhymes): re-render Five Little Ducks (sample 4) with engaged-canonical Boxy + full Pixar 3D quality enforcement; rebuild Diamond direction DOCX"
+    },
+    {
+      "sha": "4faa31b",
+      "date": "2026-06-01T10:54:45+05:30",
+      "title": "handoff(tingaland-rhymes): direction document for Diamond editorial \u2014 30 pages with all 21 character refs + 7 setting backgrounds + 4 sample pages + locked specs (proportions/typography/Pixar quality); render_handoff_doc.sh now uses --resource-path for image resolution"
+    },
+    {
+      "sha": "543b0bd",
+      "date": "2026-06-01T10:37:05+05:30",
+      "title": "spec(tingaland-rhymes): add locked _pixar-quality-spec.txt (per-character render register + materials + lighting); the convention: all 3 specs (proportions/typography/pixar-quality) get appended verbatim to every page's illustrationDescription by the Phase F transformer"
+    },
+    {
+      "sha": "6f46784",
+      "date": "2026-06-01T10:25:08+05:30",
+      "title": "ip(mira/zara): lock Mira's height at 75% of Tinga (8.5cm chart units) \u2014 slightly shorter than Keke (81%), clearly taller than Boxy (55%); fix internal contradictions and add explicit pair-wise check rules to proportions spec"
+    },
+    {
+      "sha": "824deae",
+      "date": "2026-06-01T10:12:15+05:30",
+      "title": "ip(keke): rewrite the 'Bigger than Tinga in body' line \u2014 the chart says Tinga is taller; Keke is stockier and broader-built, with the bigger personality giving her the substantial presence"
+    },
+    {
+      "sha": "822cf26",
+      "date": "2026-06-01T09:30:42+05:30",
+      "title": "ip(tingaland): re-render 7 setting backgrounds at 3:4 portrait (matches book aspect ratio)"
+    },
+    {
+      "sha": "5c6a485",
+      "date": "2026-06-01T09:25:21+05:30",
+      "title": "ip(tingaland): 7 Pixar 3D setting backgrounds \u2014 landscape day/night, village, home, ship int/ext, Planet Bo (all 16:9, auto-labeled)"
+    },
+    {
+      "sha": "bbc6dd0",
+      "date": "2026-05-31T22:24:29+05:30",
+      "title": "exports(tingaland-rhymes): re-render after Mira rename (sha 01730e2)"
+    },
+    {
+      "sha": "01730e2",
+      "date": "2026-05-31T22:20:26+05:30",
+      "title": "ip(tingaland): 3 Mira variants for the rhyme book (Bo-Peep + Boy Blue + Jack Horner) \u2014 generated via workflow, auto-labeled"
+    },
+    {
+      "sha": "dba8a40",
+      "date": "2026-05-31T22:09:27+05:30",
+      "title": "ip(tingaland): rename Lulu \u2192 Mira (Indian name fits the Indian character); folder + every doc updated"
+    },
+    {
+      "sha": "9c970c7",
+      "date": "2026-05-31T22:03:55+05:30",
+      "title": "ip(tingaland): three new creatures \u2014 Moon-cow + Space-duck + Bingo (farm-dog)"
+    },
+    {
+      "sha": "3b63a47",
+      "date": "2026-05-31T21:58:05+05:30",
+      "title": "ip(tingaland): Lulu becomes Indian (Diamond's audience); existing African-American render saved as Zara for future use"
+    },
+    {
+      "sha": "1449af3",
+      "date": "2026-05-31T21:46:26+05:30",
+      "title": "ip(tingaland): 7 Boxy + Keke Pixar 3D variants \u2014 action/baker/extending-arms + friend-mode/mary/queen/mother-duck"
+    },
+    {
+      "sha": "1ddaceb",
+      "date": "2026-05-31T21:36:40+05:30",
+      "title": "ip(tingaland): Keke v3.1 \u2014 seamless premium Pixar plush (Bunny/Ducky/Lotso register), dropping the cheap-stitched look"
+    },
+    {
+      "sha": "801f0a7",
+      "date": "2026-05-31T21:31:36+05:30",
+      "title": "ip(tingaland): v3 character refs \u2014 house-standard 16:9, 3-angle multi-pose, clean neutral backdrop (better downstream image-gen input)"
+    },
+    {
+      "sha": "104a831",
+      "date": "2026-05-31T21:20:36+05:30",
+      "title": "ip(tingaland): four Tinga Pixar 3D variants \u2014 action / relax / farmer / king"
+    },
+    {
+      "sha": "3d6a003",
+      "date": "2026-05-31T21:15:56+05:30",
+      "title": "ip(tingaland): Keke v2 turnaround (stocky build, two-tooth snarl) + height spec corrected to match proportions chart"
+    },
+    {
+      "sha": "b977e1e",
+      "date": "2026-05-31T21:04:05+05:30",
+      "title": "ip(tingaland): Pixar 3D turnarounds for Tinga + Boxy + Keke (+ gen_image.py via OpenRouter Gemini)"
+    },
+    {
+      "sha": "e0c5832",
+      "date": "2026-05-31T20:26:39+05:30",
+      "title": "storybook(tooling): proper storybook reference DOCX + hard line breaks in verse"
+    },
+    {
+      "sha": "7f5f9b8",
+      "date": "2026-05-31T20:21:30+05:30",
+      "title": "storybook(tingaland-rhymes): compile + render first 56-page draft"
+    },
+    {
+      "sha": "530f493",
+      "date": "2026-05-31T20:10:14+05:30",
+      "title": "ip(tingaland): extract Keke canonical 2D turnaround from world-bible page 5"
+    },
+    {
+      "sha": "8fbf23b",
+      "date": "2026-05-31T18:49:44+05:30",
+      "title": "ip(tingaland): officiate variations registry \u2014 3D Pixar character variants + locked settings + locked props (incl. passport with brand assets)"
     }
   ],
-  "images": []
+  "images": [
+    "characters/little-chanakya/little-chanakya-turnaround.jpg",
+    "samples/01-tingaland-rhymes/sample-page-five-little-ducks.jpg",
+    "samples/01-tingaland-rhymes/sample-page-old-macdonald.jpg",
+    "samples/01-tingaland-rhymes/sample-page-pat-a-cake.jpg",
+    "samples/01-tingaland-rhymes/sample-page-twinkle.jpg",
+    "toddlers/tingaland/characters/bingo/variant-pixar-3d-turnaround.jpg",
+    "toddlers/tingaland/characters/boxy/boxy-turnaround.jpg",
+    "toddlers/tingaland/characters/boxy/variant-pixar-3d-action.jpg",
+    "toddlers/tingaland/characters/boxy/variant-pixar-3d-baker.jpg",
+    "toddlers/tingaland/characters/boxy/variant-pixar-3d-extending-arms.jpg",
+    "toddlers/tingaland/characters/boxy/variant-pixar-3d-turnaround.jpg",
+    "toddlers/tingaland/characters/keke/keke-turnaround.jpg",
+    "toddlers/tingaland/characters/keke/variant-pixar-3d-friend-mode.jpg",
+    "toddlers/tingaland/characters/keke/variant-pixar-3d-mary.jpg",
+    "toddlers/tingaland/characters/keke/variant-pixar-3d-mother-duck.jpg",
+    "toddlers/tingaland/characters/keke/variant-pixar-3d-queen.jpg",
+    "toddlers/tingaland/characters/keke/variant-pixar-3d-turnaround.jpg",
+    "toddlers/tingaland/characters/mira/variant-pixar-3d-bo-peep.jpg",
+    "toddlers/tingaland/characters/mira/variant-pixar-3d-boy-blue.jpg",
+    "toddlers/tingaland/characters/mira/variant-pixar-3d-jack-horner.jpg",
+    "toddlers/tingaland/characters/mira/variant-pixar-3d-turnaround.jpg",
+    "toddlers/tingaland/characters/moon-cow/variant-pixar-3d-turnaround.jpg",
+    "toddlers/tingaland/characters/space-duck/variant-pixar-3d-turnaround.jpg",
+    "toddlers/tingaland/characters/tinga-dojo/tinga-dojo-turnaround.jpg",
+    "toddlers/tingaland/characters/tinga-dojo/variant-pixar-3d-action.jpg",
+    "toddlers/tingaland/characters/tinga-dojo/variant-pixar-3d-farmer.jpg",
+    "toddlers/tingaland/characters/tinga-dojo/variant-pixar-3d-king.jpg",
+    "toddlers/tingaland/characters/tinga-dojo/variant-pixar-3d-relax.jpg",
+    "toddlers/tingaland/characters/tinga-dojo/variant-pixar-3d-turnaround.jpg",
+    "toddlers/tingaland/characters/tinga-dojo/variant-police-officer.jpg",
+    "toddlers/tingaland/characters/tinga-dojo/variant-relax-winking.jpg",
+    "toddlers/tingaland/characters/tinga-dojo/variant-school.jpg",
+    "toddlers/tingaland/characters/zara/variant-pixar-3d-turnaround.jpg",
+    "toddlers/tingaland/settings/planet-bo-pixar-3d-background.jpg",
+    "toddlers/tingaland/settings/tinga-ship-exterior-pixar-3d-background.jpg",
+    "toddlers/tingaland/settings/tinga-ship-interior-pixar-3d-background.jpg",
+    "toddlers/tingaland/settings/tingaland-home-pixar-3d-background.jpg",
+    "toddlers/tingaland/settings/tingaland-landscape-day-pixar-3d-background.jpg",
+    "toddlers/tingaland/settings/tingaland-landscape-night-pixar-3d-background.jpg",
+    "toddlers/tingaland/settings/tingaland-village-pixar-3d-background.jpg"
+  ]
 }

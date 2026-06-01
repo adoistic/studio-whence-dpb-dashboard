@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { Line } from '@/types/content'
+import { LINE_VISUALS, imgUrl } from '@/lib/images'
 
 interface LineCardProps {
   line: Line
@@ -7,38 +8,64 @@ interface LineCardProps {
 
 export function LineCard({ line }: LineCardProps) {
   const count = line.comics.length
-  const productionLabel = `${count} in production`
+  const visual = LINE_VISUALS[line.slug]
+  const seriesCount = new Set(
+    line.comics.map((c) => c.series).filter(Boolean)
+  ).size
 
   return (
     <Link
       href={`/${line.slug}`}
       aria-label={`View ${line.title}`}
-      className="group block rounded-brand border border-brand-pale-dusk bg-brand-threshold p-8 no-underline
+      className="group block overflow-hidden rounded-brand border border-brand-pale-dusk bg-brand-threshold no-underline
         transition duration-[400ms] ease-out
-        hover:-translate-y-1 hover:shadow-[0_30px_60px_-30px_rgba(30,26,58,0.25)]"
+        hover:-translate-y-1.5 hover:shadow-[0_40px_70px_-35px_rgba(30,26,58,0.45)]"
     >
-      <div className="flex flex-col gap-4">
-        {/* Title */}
-        <h2 className="font-serif text-2xl font-light text-brand-indigo leading-snug">
-          {line.title}
-        </h2>
+      {/* Plate — banner image, or a deep typographic plate for lines without art yet */}
+      <div className="relative h-44 overflow-hidden">
+        {visual?.image ? (
+          <img
+            src={imgUrl(visual.image)}
+            alt=""
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-105"
+          />
+        ) : (
+          <div className="surface-deep grain absolute inset-0 flex items-center justify-center">
+            <span className="font-serif font-light text-brand-pale-dusk/15 text-[5.5rem] leading-none select-none">
+              {line.title.charAt(0)}
+            </span>
+          </div>
+        )}
+        {/* Legibility scrim + title */}
+        <div className="absolute inset-0 bg-gradient-to-t from-brand-deep/85 via-brand-deep/25 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 p-5">
+          <span className="font-sans text-[0.65rem] uppercase tracking-label text-brand-gold">
+            {visual?.note}
+          </span>
+          <h2 className="font-serif font-light text-3xl leading-tight text-brand-cream">
+            {line.title}
+          </h2>
+        </div>
+      </div>
 
-        {/* Subtitle */}
-        <p className="font-serif text-base text-brand-umber leading-relaxed">
+      {/* Body */}
+      <div className="flex flex-col gap-4 p-6">
+        <p className="font-serif text-base text-brand-umber leading-relaxed line-clamp-2">
           {line.subtitle}
         </p>
 
-        {/* Footer row: count + CTA */}
-        <div className="flex items-center justify-between pt-2">
-          <span className="font-sans text-xs uppercase tracking-label text-brand-slate">
-            {productionLabel}
+        <div className="flex items-center justify-between border-t border-brand-pale-dusk pt-4">
+          <span className="font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
+            {count} in production
+            {seriesCount > 1 && <span className="text-brand-lavender"> · {seriesCount} series</span>}
           </span>
 
-          <span className="font-sans text-sm text-brand-indigo flex items-center gap-1">
-            View{' '}
+          <span className="font-sans text-xs uppercase tracking-label text-brand-indigo flex items-center gap-1.5">
+            View
             <span
               aria-hidden
-              className="font-serif inline-block transition-transform duration-[400ms] ease-out group-hover:translate-x-1"
+              className="font-serif text-base inline-block transition-transform duration-[400ms] ease-out group-hover:translate-x-1"
             >
               →
             </span>

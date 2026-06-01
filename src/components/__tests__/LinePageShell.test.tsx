@@ -68,7 +68,8 @@ describe('LinePageShell', () => {
         introMdx={<p>Test intro copy.</p>}
       />
     )
-    expect(screen.getByText('3 figures researched.')).toBeVisible()
+    expect(screen.getByText('figures researched')).toBeVisible()
+    expect(screen.getByText('3')).toBeVisible()
   })
 
   test('non-biographies line does NOT show research summary', () => {

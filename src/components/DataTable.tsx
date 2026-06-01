@@ -67,15 +67,18 @@ export function DataTable<T>({ rows, columns, filename, rowKey }: DataTableProps
         <div className="flex justify-end">
           <CsvDownloadButton rows={rows} columns={columns} filename={filename} />
         </div>
-        <p className="font-serif text-brand-slate">No entries yet.</p>
+        <p className="font-serif italic text-brand-slate">No entries yet.</p>
       </div>
     )
   }
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Chrome: CSV download button top-right */}
-      <div className="flex justify-end">
+      {/* Chrome: row count + CSV download */}
+      <div className="flex items-center justify-between">
+        <span className="font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
+          {rows.length} {rows.length === 1 ? 'entry' : 'entries'}
+        </span>
         <CsvDownloadButton rows={rows} columns={columns} filename={filename} />
       </div>
 
@@ -83,7 +86,7 @@ export function DataTable<T>({ rows, columns, filename, rowKey }: DataTableProps
       <div className="overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
-            <tr className="border-b border-brand-gold">
+            <tr className="border-b-2 border-brand-gold">
               {columns.map(col => {
                 const isSortable = col.sortable !== false
                 const isActive = sort?.key === col.key
@@ -96,21 +99,23 @@ export function DataTable<T>({ rows, columns, filename, rowKey }: DataTableProps
                   <th
                     key={col.key}
                     aria-sort={ariaSortValue}
-                    className="font-sans text-xs uppercase tracking-label text-brand-slate pb-3 text-left whitespace-nowrap"
+                    className="px-4 first:pl-1 pb-3 text-left align-bottom"
                   >
                     {isSortable ? (
                       <button
                         type="button"
                         onClick={() => handleHeaderClick(col)}
-                        className="inline-flex items-center gap-1 cursor-pointer select-none hover:text-brand-indigo transition-colors font-sans text-xs uppercase tracking-label"
+                        className="inline-flex items-center gap-1.5 cursor-pointer select-none font-sans text-[0.7rem] uppercase tracking-label text-brand-slate transition-colors hover:text-brand-indigo"
                       >
                         {col.header}
-                        {isActive && (
-                          <span aria-hidden>{sort?.dir === 'asc' ? '▲' : '▼'}</span>
-                        )}
+                        <span aria-hidden className={`text-[0.6rem] ${isActive ? 'text-brand-gold' : 'text-transparent'}`}>
+                          {sort?.dir === 'asc' ? '▲' : '▼'}
+                        </span>
                       </button>
                     ) : (
-                      col.header
+                      <span className="font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
+                        {col.header}
+                      </span>
                     )}
                   </th>
                 )
@@ -119,11 +124,18 @@ export function DataTable<T>({ rows, columns, filename, rowKey }: DataTableProps
           </thead>
           <tbody className="divide-y divide-brand-pale-dusk">
             {sortedRows.map((row, idx) => (
-              <tr key={getRowKey(row, idx)}>
-                {columns.map(col => (
+              <tr
+                key={getRowKey(row, idx)}
+                className="transition-colors duration-150 hover:bg-brand-threshold/70"
+              >
+                {columns.map((col, ci) => (
                   <td
                     key={col.key}
-                    className="font-serif text-brand-umber py-3 pr-6 text-sm align-top"
+                    className={`px-4 first:pl-1 py-4 align-top font-serif ${
+                      ci === 0
+                        ? 'text-brand-indigo text-[1.05rem] leading-snug'
+                        : 'text-brand-umber text-sm'
+                    }`}
                   >
                     {col.cell ? col.cell(row) : String(col.get(row))}
                   </td>

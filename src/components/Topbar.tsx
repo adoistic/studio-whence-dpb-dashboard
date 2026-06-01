@@ -7,8 +7,6 @@ import { BrandLockup } from '@/components/BrandLockup'
 import { auth } from '@/lib/firebase'
 import { useUser, useAllowStatus } from '@/lib/auth'
 
-// ─── Nav link config ──────────────────────────────────────────────────────────
-
 const NAV_LINKS = [
   { label: 'Home', href: '/' },
   { label: 'Biographies', href: '/biographies' },
@@ -19,14 +17,30 @@ const NAV_LINKS = [
 
 const ADMIN_LINK = { label: 'Admin', href: '/admin' }
 
-// ─── Active route detection ───────────────────────────────────────────────────
-
 function isActive(href: string, pathname: string): boolean {
   if (href === '/') return pathname === '/'
   return pathname === href || pathname.startsWith(href + '/')
 }
 
-// ─── Topbar ───────────────────────────────────────────────────────────────────
+function NavItem({ label, href, active }: { label: string; href: string; active: boolean }) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? 'page' : undefined}
+      className={`relative font-sans text-[0.7rem] uppercase tracking-label transition-colors duration-200 ${
+        active ? 'text-brand-indigo' : 'text-brand-slate hover:text-brand-indigo'
+      }`}
+    >
+      {active && (
+        <span
+          aria-hidden="true"
+          className="absolute -left-3 top-1/2 inline-block h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-brand-gold"
+        />
+      )}
+      {label}
+    </Link>
+  )
+}
 
 export function Topbar() {
   const pathname = usePathname()
@@ -40,80 +54,31 @@ export function Topbar() {
   }
 
   return (
-    <header className="w-full bg-brand-pale-dusk border-b border-brand-pale-dusk">
-      <div className="mx-auto max-w-screen-xl px-6 py-3 flex flex-wrap items-center gap-6">
-
-        {/* Left: brand lockup */}
-        <Link href="/" className="shrink-0 flex items-center">
+    <header className="sticky top-0 z-40 w-full border-b border-brand-pale-dusk bg-brand-pale-dusk/85 backdrop-blur-md">
+      <div className="mx-auto flex max-w-[1320px] flex-wrap items-center gap-x-8 gap-y-3 px-6 py-3.5">
+        <Link href="/" className="flex shrink-0 items-center">
           <BrandLockup size="sm" />
         </Link>
 
-        {/* Center/left: nav links */}
-        <nav aria-label="Main navigation" className="flex flex-wrap items-center gap-5">
-          {NAV_LINKS.map(({ label, href }) => {
-            const active = isActive(href, pathname)
-            return (
-              <Link
-                key={href}
-                href={href}
-                className={[
-                  'font-sans text-xs uppercase tracking-label',
-                  active ? 'text-brand-indigo' : 'text-brand-slate',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-                aria-current={active ? 'page' : undefined}
-              >
-                {active && (
-                  <span
-                    aria-hidden="true"
-                    className="inline-block w-2 h-2 rounded-full bg-brand-gold mr-1.5 align-middle"
-                  />
-                )}
-                {label}
-              </Link>
-            )
-          })}
-
-          {/* Admin link — only shown to admins */}
+        <nav aria-label="Main navigation" className="flex flex-wrap items-center gap-x-7 gap-y-2 pl-2">
+          {NAV_LINKS.map(({ label, href }) => (
+            <NavItem key={href} label={label} href={href} active={isActive(href, pathname)} />
+          ))}
           {allowStatus === 'admin' && (
-            <Link
-              href={ADMIN_LINK.href}
-              className={[
-                'font-sans text-xs uppercase tracking-label',
-                isActive(ADMIN_LINK.href, pathname)
-                  ? 'text-brand-indigo'
-                  : 'text-brand-slate',
-              ]
-                .filter(Boolean)
-                .join(' ')}
-              aria-current={isActive(ADMIN_LINK.href, pathname) ? 'page' : undefined}
-            >
-              {isActive(ADMIN_LINK.href, pathname) && (
-                <span
-                  aria-hidden="true"
-                  className="inline-block w-2 h-2 rounded-full bg-brand-gold mr-1.5 align-middle"
-                />
-              )}
-              {ADMIN_LINK.label}
-            </Link>
+            <NavItem label={ADMIN_LINK.label} href={ADMIN_LINK.href} active={isActive(ADMIN_LINK.href, pathname)} />
           )}
         </nav>
 
-        {/* Right: user email + sign-out — only when user is resolved */}
         {!loading && user && (
-          <div className="ml-auto flex items-center gap-4">
-            <span className="font-sans text-xs text-brand-slate flex items-center gap-1.5">
-              <span
-                aria-hidden="true"
-                className="inline-block w-2 h-2 rounded-full bg-brand-gold shrink-0"
-              />
+          <div className="ml-auto flex items-center gap-5">
+            <span className="hidden items-center gap-1.5 font-sans text-[0.7rem] text-brand-slate sm:flex">
+              <span aria-hidden="true" className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-brand-gold" />
               {user.email}
             </span>
             <button
               type="button"
               onClick={handleSignOut}
-              className="font-sans text-xs uppercase tracking-label text-brand-slate hover:text-brand-indigo transition-colors"
+              className="font-sans text-[0.7rem] uppercase tracking-label text-brand-slate transition-colors hover:text-brand-indigo"
             >
               Sign out
             </button>

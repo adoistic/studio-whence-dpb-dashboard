@@ -10,33 +10,34 @@ export function ActivityFeed({ entries, limit = 8 }: ActivityFeedProps) {
   const visible = entries.slice(0, limit)
 
   if (visible.length === 0) {
-    return (
-      <p className="font-serif text-brand-slate">No recent activity.</p>
-    )
+    return <p className="font-serif text-brand-slate">No recent activity.</p>
   }
 
   return (
-    <ul className="flex flex-col divide-y divide-brand-pale-dusk">
+    <ul className="flex flex-col border-t border-brand-pale-dusk">
       {visible.map((entry) => (
-        <li key={entry.sha} className="flex items-start gap-3 py-4">
-          {/* Gold dot bullet */}
-          <span
-            data-testid="gold-dot"
-            aria-hidden
-            className="mt-1.5 flex-shrink-0 w-2 h-2 rounded-full bg-brand-gold"
-          />
-
-          <div className="flex flex-col gap-0.5 min-w-0">
-            {/* Date stamp — Instrument Sans, uppercase, slate */}
-            <span className="font-sans text-xs uppercase tracking-label text-brand-slate">
+        <li
+          key={entry.sha}
+          className="group grid grid-cols-[auto_1fr] sm:grid-cols-[10rem_1fr] items-baseline gap-x-5 gap-y-1
+            border-b border-brand-pale-dusk py-5 transition-colors duration-200 hover:bg-brand-threshold/60"
+        >
+          {/* Left gutter: gold dot + relative date */}
+          <span className="flex items-center gap-2 whitespace-nowrap">
+            <span
+              data-testid="gold-dot"
+              aria-hidden
+              className="inline-block w-1.5 h-1.5 rounded-full bg-brand-gold
+                transition-transform duration-200 group-hover:scale-150"
+            />
+            <span className="font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
               {formatRelative(entry.date)}
             </span>
+          </span>
 
-            {/* Title — Cormorant Garamond, indigo */}
-            <span className="font-serif text-brand-indigo leading-snug">
-              {entry.title}
-            </span>
-          </div>
+          {/* Entry title */}
+          <span className="font-serif text-lg text-brand-indigo leading-snug">
+            {entry.title}
+          </span>
         </li>
       ))}
     </ul>
