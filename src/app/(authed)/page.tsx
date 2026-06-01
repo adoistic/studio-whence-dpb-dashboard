@@ -65,7 +65,7 @@ export default function Home() {
             style={{ ['--i' as string]: 2 }}
           >
             The live state of every comic Studio Whence is building for Diamond
-            Toons — four lines, page by page.
+            Toons{content ? `, across ${content.lines.length} lines` : ''}, page by page.
           </p>
 
           {kpis && (
@@ -78,10 +78,10 @@ export default function Home() {
 
       {/* ── Body ───────────────────────────────────────────────────────── */}
       <main className="mx-auto max-w-[1200px] px-6">
-        {/* The four lines */}
+        {/* The production lines */}
         {content && (
           <section className="flex flex-col gap-8 pt-16 md:pt-20">
-            <SectionHead kicker="The lines" title="Four lines in production" />
+            <SectionHead kicker="The lines" title={`${content.lines.length} lines in production`} />
             <div className="grid grid-cols-1 gap-7 md:grid-cols-2">
               {content.lines.map((line) => (
                 <LineCard key={line.slug} line={line} />
