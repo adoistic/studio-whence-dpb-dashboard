@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, test } from 'vitest'
 
 // Phase-B0 data-driven routing depends on the ORDER of hosting.rewrites in
@@ -8,9 +9,11 @@ import { describe, expect, test } from 'vitest'
 // /api/** request would be served line.html and the gated data channel would
 // break silently. This test locks that order so a regression fails CI.
 
-// Vitest runs with process.cwd() at the repo root, so firebase.json resolves
-// from there.
-const firebaseJsonPath = path.resolve(process.cwd(), 'firebase.json')
+// Anchor firebase.json to THIS test file's own location, not the working
+// directory, so the read survives whatever directory vitest is invoked from.
+// src/__tests__/firebase-config.test.ts -> repo root is two levels up.
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+const firebaseJsonPath = path.join(repoRoot, 'firebase.json')
 
 type Rewrite = {
   source: string
@@ -30,8 +33,8 @@ describe('firebase.json hosting rewrites', () => {
   })
 
   test('the gated data API (/api/**) is the FIRST rewrite', () => {
-    expect(rewrites[0].source).toBe('/api/**')
-    expect(rewrites[0].function?.functionId).toBe('dataApi')
+    expect(rewrites[0]?.source).toBe('/api/**')
+    expect(rewrites[0]?.function?.functionId).toBe('dataApi')
   })
 
   test('the line catch-all (/* -> /line.html) is the LAST rewrite', () => {
