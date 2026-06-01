@@ -1,26 +1,120 @@
 @import "tailwindcss";
 
+@theme {
+  --color-brand-indigo:       #3B3664;
+  --color-brand-lavender:     #766992;
+  --color-brand-gold:         #C4A265;
+  --color-brand-pale-dusk:    #E8E2F0;
+  --color-brand-threshold:    #F5F2F9;
+  --color-brand-cream:        #F5EFE4;
+  --color-brand-deep:         #1E1A3A;
+  --color-brand-twilight-mid: #443A70;
+  --color-brand-umber:        #7B6C5D;
+  --color-brand-slate:        #6B6B7B;
+  --color-canvas-dark:        #0F0B20;
+
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-sans:  'Instrument Sans', system-ui, sans-serif;
+
+  --tracking-eyebrow: 0.24em;
+  --tracking-label:   0.22em;
+
+  --radius-brand: 2px;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* BRAND LAYER (raw hex from design doc) */
+  --brand-indigo:        #3B3664;
+  --brand-lavender:      #766992;
+  --brand-gold:          #C4A265;
+  --brand-pale-dusk:     #E8E2F0;
+  --brand-threshold:     #F5F2F9;
+  --brand-cream:         #F5EFE4;
+  --brand-deep:          #1E1A3A;
+  --brand-twilight-mid:  #443A70;
+  --brand-umber:         #7B6C5D;
+  --brand-slate:         #6B6B7B;
+  --canvas-dark:         #0F0B20;
+
+  /* SEMANTIC LAYER — shadcn-compatible HSL triplets derived from brand */
+  --background:          232 36% 92%;   /* pale-dusk */
+  --foreground:          248 38% 17%;   /* deep */
+  --card:                260 30% 96%;   /* threshold */
+  --card-foreground:     248 38% 17%;
+  --primary:             248 29% 30%;   /* indigo */
+  --primary-foreground:  232 36% 92%;
+  --muted:               260 30% 96%;
+  --muted-foreground:    30 14% 43%;    /* umber */
+  --accent:              39 41% 58%;    /* gold — sparingly */
+  --accent-foreground:   248 38% 17%;
+  --destructive:         0 70% 45%;
+  --destructive-foreground: 0 0% 100%;
+  --border:              248 15% 80%;
+  --input:               248 15% 75%;
+  --ring:                39 41% 58%;
+  --sidebar:             260 30% 96%;
+  --sidebar-foreground:  248 38% 17%;
+  --sidebar-border:      248 15% 80%;
+  --sidebar-primary:     248 29% 30%;
+  --sidebar-primary-foreground: 232 36% 92%;
+  --sidebar-accent:      232 36% 92%;
+  --sidebar-accent-foreground: 248 38% 17%;
+  --sidebar-ring:        39 41% 58%;
+  --popover:             260 30% 96%;
+  --popover-foreground:  248 38% 17%;
+  --popover-border:      248 15% 80%;
+
+  /* EXTENSION TOKENS (app surfaces) */
+  --chart-1:             248 29% 30%;
+  --chart-2:             248 20% 47%;
+  --chart-3:             39 41% 58%;
+  --chart-4:             30 14% 43%;
+  --chart-5:             240 8% 46%;
+
+  --severity-clean:      142 71% 45%;
+  --severity-low:        48 96% 53%;
+  --severity-medium:     25 95% 53%;
+  --severity-high:       0 84% 60%;
+  --severity-mismatch:   262 83% 58%;
+
+  /* TYPE */
+  --font-serif: 'Cormorant Garamond', Georgia, serif;
+  --font-sans:  'Instrument Sans', system-ui, sans-serif;
+
+  /* RADIUS */
+  --radius: 0.125rem;
+
+  /* MOTION */
+  --ease-out: cubic-bezier(0.25, 0.1, 0.25, 1.0);
+  --ease-in:  cubic-bezier(0.5, 0, 0.75, 0);
+
+  /* ELEVATION */
+  --elevate-1: rgba(0,0,0, .03);
+  --elevate-2: rgba(0,0,0, .08);
+  --button-outline: rgba(0,0,0, .10);
+  --badge-outline: rgba(0,0,0, .05);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+@layer base {
+  body {
+    background: var(--brand-pale-dusk);
+    color: var(--brand-umber);
+    font-family: var(--font-serif);
   }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  h1, h2, h3, h4 {
+    color: var(--brand-indigo);
+    font-family: var(--font-serif);
+    font-weight: 300;
+    letter-spacing: -0.01em;
+  }
+  ::selection {
+    background: var(--brand-gold);
+    color: var(--brand-deep);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
