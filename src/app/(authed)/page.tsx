@@ -1,6 +1,5 @@
 import { ActivityFeed } from '@/components/ActivityFeed'
 import { Eyebrow } from '@/components/Eyebrow'
-import { Footer } from '@/components/Footer'
 import { KpiStrip } from '@/components/KpiStrip'
 import type { Kpi } from '@/components/KpiStrip'
 import { LineCard } from '@/components/LineCard'
@@ -23,35 +22,28 @@ export default function Home() {
   ]
 
   return (
-    <>
-      <main className="max-w-[1200px] mx-auto px-6 py-20 flex flex-col gap-12">
-        <Eyebrow>Studio status</Eyebrow>
+    <main className="max-w-[1200px] mx-auto px-6 py-20 flex flex-col gap-12">
+      <Eyebrow>Studio status</Eyebrow>
 
-        <h1 className="text-5xl font-serif font-light text-brand-indigo max-w-lg">
-          The studio, page by page.
-        </h1>
+      <h1 className="text-5xl font-serif font-light text-brand-indigo max-w-lg">
+        The studio, page by page.
+      </h1>
 
-        <KpiStrip kpis={kpis} />
+      <KpiStrip kpis={kpis} />
 
-        <section className="flex flex-col gap-6">
-          <Eyebrow>What's new</Eyebrow>
-          <ActivityFeed entries={content.activity} />
-        </section>
+      <section className="flex flex-col gap-6">
+        <Eyebrow>What's new</Eyebrow>
+        <ActivityFeed entries={content.activity} />
+      </section>
 
-        <section className="flex flex-col gap-6">
-          <Eyebrow>The lines</Eyebrow>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {content.lines.map((line) => (
-              <LineCard key={line.slug} line={line} />
-            ))}
-          </div>
-        </section>
-      </main>
-
-      <Footer
-        sha={content.source_sha}
-        lastUpdate={content.generated_at}
-      />
-    </>
+      <section className="flex flex-col gap-6">
+        <Eyebrow>The lines</Eyebrow>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {content.lines.map((line) => (
+            <LineCard key={line.slug} line={line} />
+          ))}
+        </div>
+      </section>
+    </main>
   )
 }
