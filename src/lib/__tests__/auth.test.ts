@@ -213,6 +213,40 @@ describe('useAllowStatus — hook tests', () => {
     expect(mockGetDoc).toHaveBeenCalledOnce()
   })
 
+  // ── Rule 4: uppercase email — doc key must be lowercased ────────────────────
+
+  test('mixed-case email with no domain match → doc() called with lowercased key', async () => {
+    mockDocMissing()
+    const user = fakeUser('Mixed.Case@Gmail.com')
+    const { result } = renderHook(() =>
+      useAllowStatus(user, false),
+    )
+    // The status should resolve to 'pending' (doc missing).
+    await waitFor(() => expect(result.current).toBe('pending'))
+    // The critical assertion: doc() must have been called with the lowercased
+    // key, not the raw mixed-case email.
+    const { doc: mockDoc } = await import('firebase/firestore')
+    expect(mockDoc).toHaveBeenCalledWith(
+      expect.anything(),    // db
+      'allowlist',
+      'mixed.case@gmail.com',
+    )
+    // And NOT with the original casing.
+    const calls = (mockDoc as ReturnType<typeof vi.fn>).mock.calls
+    const keys = calls.map((c: unknown[]) => c[2])
+    expect(keys).not.toContain('Mixed.Case@Gmail.com')
+  })
+
+  test('mixed-case email — allow-listed doc resolves correctly', async () => {
+    mockDocExists({ role: 'editor' })
+    const user = fakeUser('Partner@Gmail.Com')
+    const { result } = renderHook(() =>
+      useAllowStatus(user, false),
+    )
+    await waitFor(() => expect(result.current).toBe('allow'))
+    expect(mockGetDoc).toHaveBeenCalledOnce()
+  })
+
   // ── null user (signed out) → 'pending' ──────────────────────────────────────
 
   test('null user (signed out) → "pending"', async () => {

@@ -76,6 +76,11 @@ export function useAllowStatus(
 
   // Key the effect on the resolved email so it re-runs when the user changes.
   const email = user?.email ?? null
+  // Normalize for the Firestore doc-key lookup so it matches the server-side
+  // gate (dataApi Cloud Function `authorize`), which always lowercases the
+  // email before keying /allowlist/{email}.  classifyByEmail already handles
+  // its own lowercasing internally — only the doc-key path needs this.
+  const normalizedEmail = email ? email.trim().toLowerCase() : null
 
   useEffect(() => {
     // 1. Auth not yet resolved or no user object at all.
@@ -99,7 +104,7 @@ export function useAllowStatus(
     }
 
     // 4. Need a Firestore lookup (rule 4).
-    if (!email) {
+    if (!normalizedEmail) {
       // Signed-in user with no email — treat as pending.
       setStatus('pending')
       return
@@ -108,7 +113,7 @@ export function useAllowStatus(
     let cancelled = false
     setStatus('loading')
 
-    getDoc(doc(db, 'allowlist', email))
+    getDoc(doc(db, 'allowlist', normalizedEmail))
       .then((snap) => {
         if (cancelled) return
         if (!snap.exists()) {
@@ -126,12 +131,13 @@ export function useAllowStatus(
     return () => {
       cancelled = true
     }
-    // `email` is the only value the effect acts on; `user` is read only to
-    // distinguish undefined/null, and both of those map to email=null. Keying on
-    // `email` (not the `user` object) avoids re-fetching the allowlist every time
-    // Firebase hands back a fresh User instance for the same account.
+    // `normalizedEmail` is the only value the effect acts on for the Firestore
+    // path; `user` is read only to distinguish undefined/null, and both map to
+    // normalizedEmail=null. Keying on `normalizedEmail` (not the `user` object)
+    // avoids re-fetching the allowlist every time Firebase hands back a fresh
+    // User instance for the same account.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [email, authLoading])
+  }, [normalizedEmail, authLoading])
 
   return status
 }
