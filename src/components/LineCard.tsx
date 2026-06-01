@@ -12,6 +12,7 @@ export function LineCard({ line }: LineCardProps) {
   return (
     <Link
       href={`/${line.slug}`}
+      aria-label={`View ${line.title}`}
       className="group block rounded-brand border border-brand-pale-dusk bg-brand-threshold p-8 no-underline
         transition duration-[400ms] ease-out
         hover:-translate-y-1 hover:shadow-[0_30px_60px_-30px_rgba(30,26,58,0.25)]"

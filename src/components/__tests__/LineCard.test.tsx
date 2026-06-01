@@ -42,8 +42,8 @@ describe('LineCard', () => {
     expect(screen.getByText('2 in production')).toBeVisible()
   })
 
-  test('renders the View CTA text', () => {
+  test('link has accessible name "View Biographies"', () => {
     render(<LineCard line={fakeLine} />)
-    expect(screen.getByText(/View/i)).toBeVisible()
+    expect(screen.getByRole('link', { name: 'View Biographies' })).toBeInTheDocument()
   })
 })
