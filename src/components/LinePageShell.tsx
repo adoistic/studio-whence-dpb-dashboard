@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import type { Line } from '@/types/content'
 import { Eyebrow } from '@/components/Eyebrow'
+import { ComicsTable } from '@/components/ComicsTable'
 
 interface LinePageShellProps {
   line: Line
@@ -27,10 +28,10 @@ export function LinePageShell({ line, introMdx }: LinePageShellProps) {
         </p>
       )}
 
-      {/* TODO Task 3.5: comics-in-production DataTable */}
-      <p className="font-serif text-brand-slate">
-        {line.comics.length} comics in production.
-      </p>
+      <ComicsTable
+        comics={line.comics}
+        filename={`${line.slug}-comics-in-production.csv`}
+      />
 
       {/* TODO: handoff download (Chunk 4/5 — needs Storage + auth) */}
     </main>
