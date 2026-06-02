@@ -17,8 +17,13 @@ export function ResearchReader({ fileKey }: { fileKey: string | null }) {
       </p>
     )
   }
-  if (error || !text) {
-    return <p className="font-serif italic text-brand-slate">Couldn’t load this file.</p>
+  if (error) {
+    return (
+      <p role="status" className="font-serif italic text-brand-slate">Couldn’t load this file.</p>
+    )
+  }
+  if (!text) {
+    return <p className="font-serif italic text-brand-slate">This file is empty.</p>
   }
   return (
     <div className="research-prose max-w-2xl font-serif text-brand-umber leading-relaxed">

@@ -28,4 +28,10 @@ describe('ResearchReader', () => {
     render(<ResearchReader fileKey="research/x.md" />)
     expect(screen.getByText(/couldn.t load this file/i)).toBeInTheDocument()
   })
+  test('empty but loaded file → "this file is empty", not a load error', () => {
+    mockGated = () => ({ text: '', loading: false })
+    render(<ResearchReader fileKey="research/x.md" />)
+    expect(screen.getByText(/this file is empty/i)).toBeInTheDocument()
+    expect(screen.queryByText(/couldn.t load/i)).not.toBeInTheDocument()
+  })
 })
