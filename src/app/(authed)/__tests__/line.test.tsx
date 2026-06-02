@@ -118,7 +118,13 @@ describe('LinePage — data-driven /line routing', () => {
     // and must not show a real line title.
     expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
     expect(screen.queryByText('Biographies')).not.toBeInTheDocument()
-    expect(screen.getByText(/couldn.t load/i)).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toBeInTheDocument()
+    // The visible heading paragraph (the sr-only alert region also contains the
+    // phrase after its mount effect fires, so match the <p> element specifically).
+    expect(
+      screen.getByText(/couldn.t load/i, { selector: 'p' }),
+    ).toBeInTheDocument()
+    // Exactly one role="alert" — the empty-then-filled sr-only live region, which
+    // announces reliably once the mount effect populates it.
+    expect(screen.getByRole('alert')).toHaveTextContent(/couldn.t load/i)
   })
 })
