@@ -32,13 +32,13 @@ function titleCaseSlug(slug: string): string {
 }
 
 // The "furthest" comic = highest status rank; ties broken by lowest comic_number, then slug.
-function furthest(comics: Comic[]): Comic {
+export function furthestComic<T extends { status: Status; comic_number?: number; slug: string }>(comics: T[]): T | null {
+  if (!comics.length) return null
   return [...comics].sort((a, b) => {
     const r = STAGE_RANK[b.status] - STAGE_RANK[a.status]
     if (r !== 0) return r
-    const n = (a.comic_number ?? Infinity) - (b.comic_number ?? Infinity)
-    if (n !== 0) return n
-    return a.slug.localeCompare(b.slug)
+    // NaN-safe: if both comic_number are undefined the subtraction is NaN (falsy) → falls through to slug.
+    return ((a.comic_number ?? Infinity) - (b.comic_number ?? Infinity)) || a.slug.localeCompare(b.slug)
   })[0]
 }
 
@@ -50,7 +50,7 @@ export function derivePeople(figures: Figure[], comics: Comic[]): PersonRow[] {
   for (const f of figures) {
     const mine = comics.filter((c) => normalizeSubjectSlug(c.subject_slug) === f.slug)
     mine.forEach((c) => claimed.add(c))
-    const top = mine.length ? furthest(mine) : null
+    const top = mine.length ? furthestComic(mine) : null
     const stage: Stage = top ? top.status : 'researched'
     rows.push({
       slug: f.slug,
@@ -73,7 +73,7 @@ export function derivePeople(figures: Figure[], comics: Comic[]): PersonRow[] {
     byKey.set(key, [...(byKey.get(key) ?? []), c])
   }
   for (const [key, group] of byKey) {
-    const top = furthest(group)
+    const top = furthestComic(group)!
     rows.push({
       slug: key,
       name: top.subject ?? titleCaseSlug(key),

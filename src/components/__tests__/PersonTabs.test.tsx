@@ -25,6 +25,11 @@ describe('PersonTabs', () => {
     expect(screen.getByText(/no comic yet/i)).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /comics/i })).not.toBeInTheDocument()
   })
+  test('null figureSlug: Research renders as a non-link span', () => {
+    render(<PersonTabs figureSlug={null} comics={comics} active="comics" activeComicSlug="c1" />)
+    expect(screen.queryByRole('link', { name: /research/i })).toBeNull()
+    expect(screen.getByText('Research')).toBeInTheDocument()
+  })
   test('comics-active: Research links to the figure; sibling chips list the comics', () => {
     render(<PersonTabs figureSlug="jrd-tata" comics={comics} active="comics" activeComicSlug="c1" />)
     expect(screen.getByRole('link', { name: /research/i })).toHaveAttribute('href', '/figures/jrd-tata')

@@ -24,6 +24,15 @@ describe('derivePeople', () => {
     expect(p.stage).toBe('published')
     expect(p.comicCount).toBe(2)
   })
+  test('two comics, both missing comic_number, same status → no crash, deterministic by slug', () => {
+    const [p] = derivePeople([fig('jrd-tata')], [
+      comic('b-comic', 'jrd-tata', 'draft'),
+      comic('a-comic', 'jrd-tata', 'draft'),
+    ])
+    // NaN-safe tie-break: Infinity - Infinity = NaN (falsy) → falls through to slug; 'a-comic' wins.
+    expect(p.stage).toBe('draft')
+    expect(p.comicCount).toBe(2)
+  })
   test('case-insensitive subject match', () => {
     const [p] = derivePeople([fig('gita')], [comic('c1', 'Gita', 'draft')])
     expect(p.stage).toBe('draft')

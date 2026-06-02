@@ -2,18 +2,9 @@
 
 import Link from 'next/link'
 import type { Comic } from '@/types/content'
-import { STAGE_RANK } from '@/lib/people'
+import { furthestComic } from '@/lib/people'
 
 type PersonComic = { slug: string; line: string; title: string; status: Comic['status']; comic_number?: number }
-
-function furthest(comics: PersonComic[]): PersonComic | null {
-  if (!comics.length) return null
-  return [...comics].sort((a, b) => {
-    const r = STAGE_RANK[b.status] - STAGE_RANK[a.status]
-    if (r !== 0) return r
-    return (a.comic_number ?? Infinity) - (b.comic_number ?? Infinity) || a.slug.localeCompare(b.slug)
-  })[0]
-}
 
 const TAB = 'font-sans text-[0.72rem] uppercase tracking-label transition-colors'
 const ACTIVE = 'text-brand-indigo border-b-2 border-brand-gold'
@@ -27,7 +18,7 @@ export function PersonTabs({
   active: 'research' | 'comics'
   activeComicSlug?: string
 }) {
-  const top = furthest(comics)
+  const top = furthestComic(comics)
   return (
     <div className="border-b border-brand-pale-dusk">
       <nav aria-label="Person sections" className="mx-auto flex max-w-[1100px] items-end gap-7 px-6">
