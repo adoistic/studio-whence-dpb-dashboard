@@ -9,9 +9,74 @@ function titleCaseSlug(slug: string): string {
   return slug.split('-').map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(' ')
 }
 
+// A selectable research leaf (a chapter file or a podcast transcript).
+function FileItem({
+  label, active, onSelect,
+}: { label: string; active: boolean; onSelect: () => void }) {
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-current={active ? 'page' : undefined}
+        className={`block w-full rounded-sm border-l-2 py-1 pr-2 text-left font-sans text-[0.72rem] tracking-label transition-colors ${
+          active
+            ? 'border-brand-gold bg-brand-pale-dusk/60 pl-[10px] font-medium text-brand-indigo'
+            : 'border-transparent pl-3 text-brand-slate hover:bg-brand-pale-dusk/40 hover:text-brand-indigo'
+        }`}
+      >
+        {label}
+      </button>
+    </li>
+  )
+}
+
+// A collapsible group header (a book, or the "Podcasts" bucket) + its children.
+function CollapsibleGroup({
+  title, meta, open, onToggle, hasActive, children,
+}: {
+  title: string
+  meta: string
+  open: boolean
+  onToggle: () => void
+  hasActive: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <button type="button" onClick={onToggle} aria-expanded={open} className="flex items-start gap-2 text-left">
+        <span
+          aria-hidden
+          className="mt-[3px] inline-block text-[0.6rem] text-brand-slate transition-transform duration-200"
+          style={{ transform: open ? 'rotate(90deg)' : 'none' }}
+        >
+          ▶
+        </span>
+        <span className="flex flex-col gap-0.5">
+          <span className="flex items-center gap-2">
+            <span className="font-serif leading-snug text-brand-indigo">{title}</span>
+            {!open && hasActive && (
+              <span aria-hidden className="inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-brand-gold" />
+            )}
+          </span>
+          <span className="font-sans text-[0.62rem] uppercase tracking-label text-brand-slate">{meta}</span>
+        </span>
+      </button>
+      {open && (
+        <ul className="ml-[7px] flex flex-col gap-1 border-l border-brand-pale-dusk pl-1">{children}</ul>
+      )}
+    </div>
+  )
+}
+
 export function FigurePageShell({ figure }: { figure: Figure }) {
   const [selected, setSelected] = useState<string | null>(null)
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const toggle = (key: string) => setCollapsed((c) => ({ ...c, [key]: !c[key] }))
+
   const sources = figure.sources ?? []
+  const books = sources.filter((s) => s.kind === 'book')
+  const transcripts = sources.filter((s) => s.kind === 'transcript')
 
   return (
     <div>
@@ -34,44 +99,59 @@ export function FigurePageShell({ figure }: { figure: Figure }) {
 
       {/* ── Body ───────────────────────────────────────────────────── */}
       <main className="mx-auto max-w-[1100px] px-6">
-        <div className="grid gap-12 pt-12 md:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
-          {/* Sources index */}
-          <section className="flex flex-col gap-6">
+        <div className="grid gap-12 pt-12 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:items-start">
+          {/* Sources index — sticky on desktop; scrolls internally if long */}
+          <section className="flex flex-col gap-6 md:sticky md:top-24 md:max-h-[calc(100vh-7rem)] md:self-start md:overflow-y-auto md:pr-1">
             <SectionHead kicker="The dossier" title="Sources" />
             {sources.length === 0 ? (
               <p className="font-serif italic text-brand-slate">No sources indexed.</p>
             ) : (
-              <ul className="flex flex-col gap-6">
-                {sources.map((source) => (
-                  <li key={source.slug} className="flex flex-col gap-2">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="font-serif text-brand-indigo leading-snug">{source.title}</span>
-                      <span className="font-sans text-[0.62rem] uppercase tracking-label text-brand-slate">
-                        {source.kind} · {source.words.toLocaleString()} words
-                      </span>
-                    </div>
-                    <ul className="flex flex-col gap-1 border-l border-brand-pale-dusk pl-3">
-                      {source.files.map((file) => {
-                        const isActive = selected === file.path
-                        return (
-                          <li key={file.path}>
-                            <button
-                              type="button"
-                              onClick={() => setSelected(file.path)}
-                              aria-current={isActive ? 'page' : undefined}
-                              className={`text-left font-sans text-[0.72rem] tracking-label transition-colors ${
-                                isActive ? 'text-brand-indigo' : 'text-brand-slate hover:text-brand-indigo'
-                              }`}
-                            >
-                              {file.title}
-                            </button>
-                          </li>
-                        )
-                      })}
-                    </ul>
-                  </li>
+              <div className="flex flex-col gap-6">
+                {/* Books — each its own collapsible group of chapters */}
+                {books.map((book) => (
+                  <CollapsibleGroup
+                    key={book.slug}
+                    title={book.title}
+                    meta={`book · ${book.words.toLocaleString()} words`}
+                    open={!collapsed[book.slug]}
+                    onToggle={() => toggle(book.slug)}
+                    hasActive={book.files.some((f) => f.path === selected)}
+                  >
+                    {book.files.map((file) => (
+                      <FileItem
+                        key={file.path}
+                        label={file.title}
+                        active={selected === file.path}
+                        onSelect={() => setSelected(file.path)}
+                      />
+                    ))}
+                  </CollapsibleGroup>
                 ))}
-              </ul>
+
+                {/* Podcasts — all transcripts under one collapsible bucket */}
+                {transcripts.length > 0 && (
+                  <CollapsibleGroup
+                    title="Podcasts"
+                    meta={`${transcripts.length} ${transcripts.length === 1 ? 'transcript' : 'transcripts'}`}
+                    open={!collapsed['__podcasts']}
+                    onToggle={() => toggle('__podcasts')}
+                    hasActive={transcripts.some((t) => t.files.some((f) => f.path === selected))}
+                  >
+                    {transcripts.map((t) => {
+                      const file = t.files[0]
+                      if (!file) return null
+                      return (
+                        <FileItem
+                          key={t.slug}
+                          label={t.title}
+                          active={selected === file.path}
+                          onSelect={() => setSelected(file.path)}
+                        />
+                      )
+                    })}
+                  </CollapsibleGroup>
+                )}
+              </div>
             )}
           </section>
 

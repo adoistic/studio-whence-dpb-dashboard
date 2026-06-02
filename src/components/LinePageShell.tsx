@@ -87,14 +87,6 @@ export function LinePageShell({ line, introMdx }: LinePageShellProps) {
           </section>
         )}
 
-        {/* Figures researched (biographies only) */}
-        {line.slug === 'biographies' && line.figures.length > 0 && (
-          <section className="flex flex-col gap-8 pt-20">
-            <SectionHead kicker="The library" title="Figures researched" />
-            <FiguresTable figures={line.figures} filename={`${line.slug}-figures.csv`} />
-          </section>
-        )}
-
         {/* Comics in production */}
         <section className="flex flex-col gap-8 pb-24 pt-20">
           <SectionHead kicker="In production" title="Comics in production" />
@@ -103,6 +95,14 @@ export function LinePageShell({ line, introMdx }: LinePageShellProps) {
             filename={`${line.slug}-comics-in-production.csv`}
           />
         </section>
+
+        {/* Figures researched (biographies only) */}
+        {line.slug === 'biographies' && line.figures.length > 0 && (
+          <section className="flex flex-col gap-8 pt-20">
+            <SectionHead kicker="The library" title="Figures researched" />
+            <FiguresTable figures={line.figures} filename={`${line.slug}-figures.csv`} />
+          </section>
+        )}
 
         {/* TODO Chunk 5: handoff download (R2 + Worker) */}
       </main>
