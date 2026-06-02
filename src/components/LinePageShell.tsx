@@ -87,8 +87,12 @@ export function LinePageShell({ line, introMdx }: LinePageShellProps) {
           </section>
         )}
 
-        {/* Comics in production */}
-        <section className="flex flex-col gap-8 pb-24 pt-20">
+        {/* Comics in production (keeps bottom padding unless the figures section follows it) */}
+        <section
+          className={`flex flex-col gap-8 pt-20 ${
+            line.slug === 'biographies' && line.figures.length > 0 ? '' : 'pb-24'
+          }`}
+        >
           <SectionHead kicker="In production" title="Comics in production" />
           <ComicsTable
             comics={line.comics}
@@ -98,7 +102,7 @@ export function LinePageShell({ line, introMdx }: LinePageShellProps) {
 
         {/* Figures researched (biographies only) */}
         {line.slug === 'biographies' && line.figures.length > 0 && (
-          <section className="flex flex-col gap-8 pt-20">
+          <section className="flex flex-col gap-8 pb-24 pt-20">
             <SectionHead kicker="The library" title="Figures researched" />
             <FiguresTable figures={line.figures} filename={`${line.slug}-figures.csv`} />
           </section>
