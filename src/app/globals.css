@@ -231,6 +231,16 @@
 .research-prose table { border-collapse: collapse; margin: 0 0 1em; }
 .research-prose th, .research-prose td { border: 1px solid var(--brand-pale-dusk); padding: 0.3em 0.6em; }
 
+/* B2.6 — transient highlight on the cited research block. */
+.research-prose .rp-hit {
+  background: color-mix(in srgb, var(--brand-gold, #C4A265) 22%, transparent);
+  border-radius: 4px;
+  transition: background 1.4s ease-out;
+}
+@media (prefers-reduced-motion: reduce) {
+  .research-prose .rp-hit { transition: none; }
+}
+
 /* ── Comic script reader ──────────────────────────────────────────────────
    The draft reader injects sanitized HTML into .comic-script. Once the
    content pipeline re-publishes, it emits semantic cs-* markup (cs-page,
@@ -298,3 +308,34 @@
 /* generic fallback (un-republished draft: strong = panel, p = lines) */
 .comic-script p { margin: 0 0 0.7em; color: var(--brand-umber); line-height: 1.6; }
 .comic-script strong { color: var(--brand-indigo); }
+
+/* B2.6 — provenance markers inside the comic script. */
+.comic-script .cs-src,
+.comic-script .cs-src-art {
+  display: inline-block;
+  margin-left: 0.35em;
+  font-family: var(--font-sans, system-ui);
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-decoration: none;
+  vertical-align: super;
+  border-radius: 3px;
+  padding: 0 0.3em;
+  line-height: 1.5;
+}
+.comic-script .cs-src {
+  color: var(--brand-indigo, #3B3664);
+  background: var(--brand-pale-dusk, #E8E2F0);
+}
+.comic-script .cs-src:hover { background: var(--brand-gold, #C4A265); color: #fff; }
+.comic-script .cs-src-art {
+  color: var(--brand-slate, #6B6B7B);
+  opacity: 0.55;
+}
+.comic-script .cs-src-art:hover { opacity: 1; }
+.comic-script .cs-src:focus-visible,
+.comic-script .cs-src-art:focus-visible {
+  outline: 2px solid var(--brand-gold, #C4A265);
+  outline-offset: 2px;
+}
