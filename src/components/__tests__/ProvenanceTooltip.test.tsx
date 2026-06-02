@@ -13,11 +13,12 @@ const base: TooltipState = {
 
 describe('ProvenanceTooltip', () => {
   it('shows the citation with source + file + line', () => {
-    render(<ProvenanceTooltip {...base} />)
+    const { container } = render(<ProvenanceTooltip {...base} />)
     expect(screen.getByText(/Walter Isaacson, Steve Jobs/)).toBeInTheDocument()
     expect(screen.getByText(/Chapter 12/)).toBeInTheDocument()
     expect(screen.getByText(/line 83/)).toBeInTheDocument()
-    expect(screen.getByRole('tooltip')).toBeInTheDocument()
+    // Decorative card: aria-hidden (info lives on the marker), so assert by class, not role.
+    expect(container.querySelector('.prov-tip')).toBeInTheDocument()
   })
   it('shows loading then ready excerpt with the cited line emphasized', () => {
     const { rerender } = render(<ProvenanceTooltip {...base} />)

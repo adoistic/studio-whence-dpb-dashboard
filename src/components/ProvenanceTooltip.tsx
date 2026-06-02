@@ -17,7 +17,7 @@ export interface TooltipState {
 const WIDTH = 340
 
 export function ProvenanceTooltip({ rect, line, citation, fallbackLabel, excerpt }: TooltipState) {
-  const placeAbove = rect.top > 180
+  const placeAbove = rect.top > 180 // ~approx tooltip height; keep in sync with .prov-tip in globals.css
   const top = placeAbove ? rect.top - 8 : rect.bottom + 8
   const left = Math.min(
     Math.max(8, rect.left),
@@ -28,7 +28,10 @@ export function ProvenanceTooltip({ rect, line, citation, fallbackLabel, excerpt
     : `${fallbackLabel}, line ${line}`
   return (
     <div
-      role="tooltip"
+      // Decorative hover/focus preview: the citation it shows duplicates the
+      // marker's aria-label and the source is reachable via the marker's link,
+      // so the card is hidden from the a11y tree rather than given role=tooltip.
+      aria-hidden
       className="prov-tip"
       style={{ position: 'fixed', top, left, width: WIDTH, transform: placeAbove ? 'translateY(-100%)' : 'none' }}
     >
