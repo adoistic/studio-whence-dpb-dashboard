@@ -18,6 +18,12 @@ describe('ResearchReader', () => {
     expect(screen.getByRole('heading', { name: /chapter one/i })).toBeInTheDocument()
     expect(screen.getByText(/dhirubhai boarded the ship/i)).toBeInTheDocument()
   })
+  test('remaps markdown headings down one level (no second <h1>)', () => {
+    mockGated = () => ({ text: '# Big Title', loading: false })
+    render(<ResearchReader fileKey="research/x.md" />)
+    expect(screen.getByRole('heading', { level: 2, name: /big title/i })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument()
+  })
   test('loading state', () => {
     mockGated = () => ({ text: null, loading: true })
     render(<ResearchReader fileKey="research/x.md" />)

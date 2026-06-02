@@ -35,4 +35,14 @@ describe('FigurePageShell', () => {
     fireEvent.click(screen.getByRole('button', { name: /intro/i }))
     expect(screen.getByText(/^reader:research\/biographies\/.*01-intro\.md$/)).toBeInTheDocument()
   })
+  test('the active file button is marked aria-current="page"', () => {
+    render(<FigurePageShell figure={figure} />)
+    const button = screen.getByRole('button', { name: /intro/i })
+    fireEvent.click(button)
+    expect(button).toHaveAttribute('aria-current', 'page')
+  })
+  test('a figure with no sources renders the empty note', () => {
+    render(<FigurePageShell figure={{ ...figure, sources: [] }} />)
+    expect(screen.getByText(/no sources indexed/i)).toBeInTheDocument()
+  })
 })

@@ -58,7 +58,7 @@ export function FigurePageShell({ figure }: { figure: Figure }) {
                             <button
                               type="button"
                               onClick={() => setSelected(file.path)}
-                              aria-current={isActive ? 'true' : undefined}
+                              aria-current={isActive ? 'page' : undefined}
                               className={`text-left font-sans text-[0.72rem] tracking-label transition-colors ${
                                 isActive ? 'text-brand-indigo' : 'text-brand-slate hover:text-brand-indigo'
                               }`}
