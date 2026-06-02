@@ -25,4 +25,17 @@ jobs:
       - name: Test
         run: npm test
       - name: Build
+        # Dummy public Firebase config so the static export can prerender (the
+        # client shell calls getAuth() at module load, which throws on a missing
+        # apiKey). These are NOT secrets and are NOT the real project — the real
+        # public config lives in gitignored .env.local and is supplied at deploy.
+        # The build never makes a real auth call; it only needs the vars present.
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ci-build-placeholder
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ci-build.firebaseapp.com
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ci-build
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ci-build.appspot.com
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "000000000000"
+          NEXT_PUBLIC_FIREBASE_APP_ID: "1:000000000000:web:0000000000000000000000"
+          NEXT_PUBLIC_DATA_API_URL: /api
         run: npm run build
