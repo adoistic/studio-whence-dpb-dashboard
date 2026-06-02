@@ -3,7 +3,7 @@
 import type { Comic, ChangelogEntry } from '@/types/content'
 import { StatusPill } from '@/components/StatusPill'
 import { SectionHead } from '@/components/SectionHead'
-import { useDraftHtml } from '@/lib/useDraftHtml'
+import { useGatedText } from '@/lib/useGatedText'
 
 function Detail({ label, value }: { label: string; value: string | number }) {
   return (
@@ -19,7 +19,7 @@ function changelogText(entry: ChangelogEntry): { date?: string; note: string } {
 }
 
 export function ComicPageShell({ comic }: { comic: Comic }) {
-  const draft = useDraftHtml(`drafts/${comic.line}/${comic.slug}.html`)
+  const draft = useGatedText(`drafts/${comic.line}/${comic.slug}.html`)
 
   const seriesLine = [comic.series, comic.comic_number ? `Comic ${comic.comic_number}` : null]
     .filter(Boolean)
@@ -95,7 +95,7 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
             <p role="status" className="font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
               Loading the script…
             </p>
-          ) : draft.html ? (
+          ) : draft.text ? (
             // SAFE INJECTION: drafts/** bytes are produced solely by the content
             // pipeline's render_draft_html (markdown → bleach.clean strict allow-list),
             // i.e. first-party AND server-sanitized (XSS-clean). This is the only
@@ -103,7 +103,7 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
             // stops sanitizing, this injection must be revisited.
             <div
               className="comic-script max-w-2xl font-serif text-brand-umber leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: draft.html }}
+              dangerouslySetInnerHTML={{ __html: draft.text }}
             />
           ) : (
             <p className="font-serif italic text-brand-slate">Draft not available yet.</p>

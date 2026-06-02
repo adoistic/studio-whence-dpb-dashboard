@@ -3,8 +3,8 @@ import { render, screen } from '@testing-library/react'
 import type { Comic } from '@/types/content'
 import { ComicPageShell } from '../ComicPageShell'
 
-let mockDraft: () => { html: string | null; loading: boolean; error?: Error }
-vi.mock('@/lib/useDraftHtml', () => ({ useDraftHtml: () => mockDraft() }))
+let mockDraft: () => { text: string | null; loading: boolean; error?: Error }
+vi.mock('@/lib/useGatedText', () => ({ useGatedText: () => mockDraft() }))
 
 const comic: Comic = {
   title: 'The Sky-High Dreamer',
@@ -25,7 +25,7 @@ const comic: Comic = {
 }
 
 beforeEach(() => {
-  mockDraft = () => ({ html: null, loading: false })
+  mockDraft = () => ({ text: null, loading: false })
 })
 
 describe('ComicPageShell', () => {
@@ -47,19 +47,19 @@ describe('ComicPageShell', () => {
   })
 
   test('injects the fetched draft html when present', () => {
-    mockDraft = () => ({ html: '<h2>Page 1</h2><p>Open on a runway.</p>', loading: false })
+    mockDraft = () => ({ text: '<h2>Page 1</h2><p>Open on a runway.</p>', loading: false })
     render(<ComicPageShell comic={comic} />)
     expect(screen.getByText(/open on a runway/i)).toBeInTheDocument()
   })
 
   test('shows the loading note while the draft loads', () => {
-    mockDraft = () => ({ html: null, loading: true })
+    mockDraft = () => ({ text: null, loading: true })
     render(<ComicPageShell comic={comic} />)
     expect(screen.getByText(/loading the script/i)).toBeInTheDocument()
   })
 
   test('shows a graceful note when no draft is available', () => {
-    mockDraft = () => ({ html: null, loading: false, error: new Error('read failed: 404') })
+    mockDraft = () => ({ text: null, loading: false, error: new Error('read failed: 404') })
     render(<ComicPageShell comic={comic} />)
     expect(screen.getByText(/draft not available yet/i)).toBeInTheDocument()
   })
