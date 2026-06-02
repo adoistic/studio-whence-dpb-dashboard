@@ -72,8 +72,16 @@ function CollapsibleGroup({
   )
 }
 
-export function FigurePageShell({ figure }: { figure: Figure }) {
-  const [selected, setSelected] = useState<string | null>(null)
+export function FigurePageShell({
+  figure,
+  initialFile = null,
+  targetLine,
+}: {
+  figure: Figure
+  initialFile?: string | null
+  targetLine?: number
+}) {
+  const [selected, setSelected] = useState<string | null>(initialFile)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const toggle = (key: string) => setCollapsed((c) => ({ ...c, [key]: !c[key] }))
 
@@ -167,7 +175,10 @@ export function FigurePageShell({ figure }: { figure: Figure }) {
           {/* Reader panel */}
           <section className="flex flex-col gap-6 pb-24">
             <SectionHead kicker="Read" title="Research" />
-            <ResearchReader fileKey={selected ? `research/${selected}` : null} />
+            <ResearchReader
+              fileKey={selected ? `research/${selected}` : null}
+              targetLine={selected === initialFile ? targetLine : undefined}
+            />
           </section>
         </div>
       </main>

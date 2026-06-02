@@ -4,7 +4,9 @@ import type { Figure } from '@/types/content'
 import { FigurePageShell } from '../FigurePageShell'
 
 vi.mock('@/components/ResearchReader', () => ({
-  ResearchReader: ({ fileKey }: { fileKey: string | null }) => <div>reader:{fileKey ?? 'none'}</div>,
+  ResearchReader: ({ fileKey, targetLine }: { fileKey: string | null; targetLine?: number }) => (
+    <div>reader:{fileKey ?? 'none'}{targetLine != null ? `@${targetLine}` : ''}</div>
+  ),
 }))
 
 vi.mock('next/link', () => ({
@@ -49,7 +51,26 @@ const figureWithPodcasts: Figure = {
   ],
 }
 
+// A figure whose single book's first chapter sits at `path`.
+function figureWithFileAtPath(path: string): Figure {
+  return {
+    ...figure,
+    sources: [
+      {
+        slug: 'the-polyester-prince', kind: 'book', title: 'The Polyester Prince', words: 1200,
+        files: [{ path, title: 'Chapter' }],
+      },
+    ],
+  }
+}
+
 describe('FigurePageShell', () => {
+  test('preselects the research file from initialFile (reader is not the placeholder)', () => {
+    render(<FigurePageShell figure={figureWithFileAtPath('P/ch.md')} initialFile="P/ch.md" targetLine={42} />)
+    expect(screen.queryByText('Select a chapter to read.')).toBeNull()
+    expect(screen.getByText('reader:research/P/ch.md@42')).toBeInTheDocument()
+  })
+
   test('renders the masthead (title-cased name) + stats + source/file index', () => {
     render(<FigurePageShell figure={figure} />)
     expect(screen.getByRole('heading', { name: /dhirubhai ambani/i })).toBeInTheDocument()
