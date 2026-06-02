@@ -3,10 +3,11 @@
 import type { ReactNode } from 'react'
 import type { Line } from '@/types/content'
 import { ComicsTable } from '@/components/ComicsTable'
-import { FiguresTable } from '@/components/FiguresTable'
+import { PeopleTable } from '@/components/PeopleTable'
 import { SectionHead } from '@/components/SectionHead'
 import { TingalandGallery } from '@/components/TingalandGallery'
 import { LINE_VISUALS, TINGALAND_CAST } from '@/lib/images'
+import { derivePeople } from '@/lib/people'
 import { useResolved } from '@/lib/useResolved'
 
 interface LinePageShellProps {
@@ -87,24 +88,16 @@ export function LinePageShell({ line, introMdx }: LinePageShellProps) {
           </section>
         )}
 
-        {/* Comics in production (keeps bottom padding unless the figures section follows it) */}
-        <section
-          className={`flex flex-col gap-8 pt-20 ${
-            line.slug === 'biographies' && line.figures.length > 0 ? '' : 'pb-24'
-          }`}
-        >
-          <SectionHead kicker="In production" title="Comics in production" />
-          <ComicsTable
-            comics={line.comics}
-            filename={`${line.slug}-comics-in-production.csv`}
-          />
-        </section>
-
-        {/* Figures researched (biographies only) */}
-        {line.slug === 'biographies' && line.figures.length > 0 && (
+        {/* Biographies: one people/Stage table. Other lines: comics in production. */}
+        {line.slug === 'biographies' ? (
           <section className="flex flex-col gap-8 pb-24 pt-20">
-            <SectionHead kicker="The library" title="Figures researched" />
-            <FiguresTable figures={line.figures} filename={`${line.slug}-figures.csv`} />
+            <SectionHead kicker="The library" title="People" />
+            <PeopleTable people={derivePeople(line.figures, line.comics)} filename={`${line.slug}-people.csv`} />
+          </section>
+        ) : (
+          <section className="flex flex-col gap-8 pb-24 pt-20">
+            <SectionHead kicker="In production" title="Comics in production" />
+            <ComicsTable comics={line.comics} filename={`${line.slug}-comics-in-production.csv`} />
           </section>
         )}
 
