@@ -40,4 +40,12 @@ describe('ResearchReader', () => {
     expect(screen.getByText(/this file is empty/i)).toBeInTheDocument()
     expect(screen.queryByText(/couldn.t load/i)).not.toBeInTheDocument()
   })
+  test('styles transcript speaker labels and timestamps', () => {
+    mockGated = () => ({ text: '**Joe Rogan** _[00:19–00:23]_\n\nWe’re live.', loading: false })
+    render(<ResearchReader fileKey="research/x.md" />)
+    const speaker = screen.getByText('Joe Rogan')
+    expect(speaker).toBeInTheDocument()
+    expect(speaker).toHaveClass('rp-speaker')
+    expect(screen.getByText(/we.re live/i)).toBeInTheDocument()
+  })
 })

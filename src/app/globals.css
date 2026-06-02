@@ -197,7 +197,24 @@
 .research-prose h2 { font-size: 1.4rem; font-weight: 500; line-height: 1.2; margin: 1.6em 0 0.5em; }
 .research-prose h3 { font-size: 1.15rem; font-weight: 500; margin: 1.4em 0 0.4em; }
 .research-prose h4 { font-size: 1rem; font-weight: 600; margin: 1.2em 0 0.3em; }
-.research-prose p { margin: 0 0 1em; }
+.research-prose p { margin: 0 0 1.15em; max-width: 64ch; }
+
+/* Diarized-transcript hooks: speaker labels (**SPEAKER**) read as small block
+   headers; timestamps (_[tt–tt]_) recede as a quiet, non-italic tag. */
+.research-prose .rp-speaker {
+  display: inline-block;
+  margin-top: 0.4em;
+  font-weight: 600;
+  font-size: 1.02em;
+  color: var(--brand-indigo);
+  letter-spacing: 0.01em;
+}
+.research-prose .rp-time {
+  font-style: normal;
+  font-size: 0.82em;
+  color: var(--brand-slate);
+  opacity: 0.85;
+}
 .research-prose ul { list-style: disc; padding-left: 1.5em; margin: 0 0 1em; }
 .research-prose ol { list-style: decimal; padding-left: 1.5em; margin: 0 0 1em; }
 .research-prose li { margin: 0.25em 0; }
