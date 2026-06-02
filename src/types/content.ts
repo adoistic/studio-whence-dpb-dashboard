@@ -41,11 +41,25 @@ export interface Comic {
   artifacts?: Record<string, string>
 }
 
+export interface ResearchFile {
+  path: string
+  title: string
+}
+
+export interface ResearchSource {
+  slug: string
+  kind: 'book' | 'transcript'
+  title: string
+  words: number
+  files: ResearchFile[]
+}
+
 export interface Figure {
   series: string
   slug: string
   sources_count: number
   words: number
+  sources?: ResearchSource[]
 }
 
 export interface Line {
