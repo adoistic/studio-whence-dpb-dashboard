@@ -31,6 +31,12 @@ describe('FigurePage — /figures/<slug> routing', () => {
     render(<FigurePage />)
     expect(screen.getByText('figure:dhirubhai-ambani')).toBeInTheDocument()
   })
+  test('resolves a mixed-case URL segment against a lowercase figure slug', () => {
+    setPathname('/figures/Dhirubhai-Ambani')
+    mockUseContent = () => ({ content: fixture, loading: false })
+    render(<FigurePage />)
+    expect(screen.getByText('figure:dhirubhai-ambani')).toBeInTheDocument()
+  })
   test('unknown figure slug → not found', () => {
     setPathname('/figures/nobody')
     mockUseContent = () => ({ content: fixture, loading: false })

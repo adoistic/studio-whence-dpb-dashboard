@@ -3,6 +3,7 @@
 import { useContent } from '@/lib/content'
 import { FigurePageShell } from '@/components/FigurePageShell'
 import { LoadingState, ErrorState, NotFoundState } from '@/components/QuietStates'
+import { normalizeSubjectSlug } from '@/lib/slugs'
 
 // Served for every /figures/<slug> URL via the Hosting rewrite (/figures/* →
 // /figure.html); the browser URL is preserved, so window.location gives the real
@@ -14,12 +15,12 @@ function figureSlugFromPath(): string {
 
 export default function FigurePage() {
   const { content, loading, error } = useContent()
-  const slug = figureSlugFromPath()
+  const slug = normalizeSubjectSlug(figureSlugFromPath())
 
   if (loading) return <LoadingState />
   if (error || !content) return <ErrorState />
 
-  const figure = content.lines.flatMap((l) => l.figures).find((f) => f.slug === slug)
+  const figure = content.lines.flatMap((l) => l.figures).find((f) => normalizeSubjectSlug(f.slug) === slug)
   if (!figure) return <NotFoundState title="Figure not found" detail={`No figure matches “${slug}”.`} />
 
   return <FigurePageShell figure={figure} />

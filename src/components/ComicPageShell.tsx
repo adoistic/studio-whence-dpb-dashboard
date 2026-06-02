@@ -29,7 +29,7 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
   const hasFigure =
     comic.line === 'biographies' &&
     !!figureSlug &&
-    !!content?.lines.some((l) => l.figures.some((f) => f.slug === figureSlug))
+    !!content?.lines.some((l) => l.figures.some((f) => normalizeSubjectSlug(f.slug) === figureSlug))
 
   const seriesLine = [comic.series, comic.comic_number ? `Comic ${comic.comic_number}` : null]
     .filter(Boolean)
