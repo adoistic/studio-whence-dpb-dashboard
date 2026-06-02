@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import type { Comic } from '@/types/content'
 import { ComicPageShell } from '../ComicPageShell'
 
@@ -11,10 +11,22 @@ vi.mock('next/link', () => ({
 }))
 let mockContent: () => {
   content: {
-    lines: { slug: string; figures: { slug: string }[]; comics?: unknown[] }[]
+    lines: {
+      slug: string
+      figures: {
+        slug: string
+        sources?: { title: string; files: { path: string; title: string }[] }[]
+      }[]
+      comics?: unknown[]
+    }[]
   } | null
 }
 vi.mock('@/lib/content', () => ({ useContent: () => mockContent() }))
+
+// useProvenanceMarkers transitively imports dataApi → firebase; mock the leaf
+// fetch so the test tree never initializes Firebase. readMarkdown only fires on
+// hover, which this test doesn't trigger.
+vi.mock('@/lib/dataApi', () => ({ readMarkdown: async () => '' }))
 
 const comic: Comic = {
   title: 'The Sky-High Dreamer',
@@ -131,5 +143,35 @@ describe('ComicPageShell', () => {
     })
     render(<ComicPageShell comic={indicComic} />)
     expect(screen.queryByRole('navigation', { name: /person sections/i })).not.toBeInTheDocument()
+  })
+
+  test('numbers provenance markers in the injected draft', async () => {
+    const path = 'jrd-tata/the-sky-high-dreamer/chapters/01-flight.md'
+    mockDraft = () => ({
+      text:
+        '<h2>Page 1</h2>' +
+        '<p class="cs-caption">Open on a runway.' +
+        `<a class="cs-src" href="#" data-figure="jrd-tata" data-key="${path}" data-line="2"` +
+        ' aria-label="source: x, line 2">source</a></p>',
+      loading: false,
+    })
+    mockContent = () => ({
+      content: {
+        lines: [
+          {
+            slug: 'biographies',
+            figures: [
+              {
+                slug: 'jrd-tata',
+                sources: [{ title: 'The Sky-High Dreamer', files: [{ path, title: 'Flight' }] }],
+              },
+            ],
+            comics: [],
+          },
+        ],
+      },
+    })
+    const { container } = render(<ComicPageShell comic={comic} />)
+    await waitFor(() => expect(container.querySelector('.cs-src')?.textContent).toBe('1'))
   })
 })

@@ -339,3 +339,25 @@
   outline: 2px solid var(--brand-gold, #C4A265);
   outline-offset: 2px;
 }
+
+/* B2.6.1 — numbered markers render as compact superscript indices. */
+.comic-script .cs-src,
+.comic-script .cs-src-art { min-width: 1.1em; text-align: center; }
+
+/* B2.6.1 — provenance hover card (decorative; aria-hidden). */
+.prov-tip {
+  z-index: 50;
+  pointer-events: none;
+  background: var(--brand-indigo, #3B3664);
+  color: var(--brand-cream, #F5EFE4);
+  border: 1px solid var(--brand-gold, #C4A265);
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.28);
+  font-family: var(--font-sans, system-ui);
+}
+.prov-tip-cite { font-size: 0.72rem; letter-spacing: 0.02em; color: var(--brand-gold, #C4A265); margin-bottom: 6px; }
+.prov-tip-excerpt { font-family: Georgia, serif; font-size: 0.82rem; line-height: 1.5; }
+.prov-tip-ctx { opacity: 0.55; }
+.prov-tip-cited { opacity: 1; background: rgba(196,162,101,0.18); border-radius: 3px; padding: 0 3px; white-space: pre-wrap; }
+.prov-tip-muted { opacity: 0.6; font-style: italic; }

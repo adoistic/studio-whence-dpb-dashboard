@@ -1,5 +1,6 @@
 'use client'
 
+import { memo, useRef } from 'react'
 import Link from 'next/link'
 import type { Comic, ChangelogEntry } from '@/types/content'
 import { StatusPill } from '@/components/StatusPill'
@@ -9,6 +10,33 @@ import { useContent } from '@/lib/content'
 import { normalizeSubjectSlug } from '@/lib/slugs'
 import { personComics } from '@/lib/people'
 import { PersonTabs } from '@/components/PersonTabs'
+import { useProvenanceMarkers } from '@/lib/useProvenanceMarkers'
+import { ProvenanceTooltip } from '@/components/ProvenanceTooltip'
+
+// Memoized so tooltip-state re-renders of ComicPageShell don't re-parse the
+// draft. React 19 recreates dangerouslySetInnerHTML child nodes on every host
+// re-render even when __html is identical; memoizing on the HTML string keeps
+// the marker nodes stable across hovers (no re-parse, no jank).
+const DraftScript = memo(function DraftScript({
+  html,
+  innerRef,
+}: {
+  html: string
+  innerRef: React.RefObject<HTMLDivElement | null>
+}) {
+  return (
+    // SAFE INJECTION: drafts/** bytes are produced solely by the content
+    // pipeline's render_draft_html (markdown → bleach.clean strict allow-list),
+    // i.e. first-party AND server-sanitized (XSS-clean). This is the only
+    // dangerouslySetInnerHTML in the app. If the draft render pipeline ever
+    // stops sanitizing, this injection must be revisited.
+    <div
+      ref={innerRef}
+      className="comic-script max-w-2xl font-serif text-brand-umber leading-relaxed"
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
+  )
+})
 
 function Detail({ label, value }: { label: string; value: string | number }) {
   return (
@@ -27,6 +55,8 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
   const draft = useGatedText(`drafts/${comic.line}/${comic.slug}.html`)
 
   const { content } = useContent()
+  const scriptRef = useRef<HTMLDivElement>(null)
+  const tip = useProvenanceMarkers(scriptRef, content, draft.text)
   const figureSlug = normalizeSubjectSlug(comic.subject_slug)
   const hasFigure =
     comic.line === 'biographies' &&
@@ -124,15 +154,10 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
               Loading the script…
             </p>
           ) : draft.text ? (
-            // SAFE INJECTION: drafts/** bytes are produced solely by the content
-            // pipeline's render_draft_html (markdown → bleach.clean strict allow-list),
-            // i.e. first-party AND server-sanitized (XSS-clean). This is the only
-            // dangerouslySetInnerHTML in the app. If the draft render pipeline ever
-            // stops sanitizing, this injection must be revisited.
-            <div
-              className="comic-script max-w-2xl font-serif text-brand-umber leading-relaxed"
-              dangerouslySetInnerHTML={{ __html: draft.text }}
-            />
+            <>
+              <DraftScript html={draft.text} innerRef={scriptRef} />
+              {tip && <ProvenanceTooltip {...tip} />}
+            </>
           ) : (
             <p className="font-serif italic text-brand-slate">Draft not available yet.</p>
           )}
