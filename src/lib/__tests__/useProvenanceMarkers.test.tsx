@@ -60,6 +60,8 @@ describe('useProvenanceMarkers', () => {
     fireEvent.mouseOver(container.querySelector('.cs-src-art')!)
     await waitFor(() => expect(screen.getByText('l2 cited')).toBeInTheDocument())
     expect(mockRead).toHaveBeenCalledTimes(1)
+    // guard the load-bearing key contract: data-key is the bare repo path, fetched under research/
+    expect(mockRead).toHaveBeenCalledWith('research/P/18.md')
   })
 
   it('hides the tooltip on mouseout', () => {
