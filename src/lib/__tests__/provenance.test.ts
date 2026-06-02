@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildCitationMap, sliceExcerpt } from '@/lib/provenance'
+import { buildCitationMap, excerptPassage } from '@/lib/provenance'
 
 const content = {
   lines: [
@@ -24,20 +24,26 @@ describe('buildCitationMap', () => {
   })
 })
 
-describe('sliceExcerpt', () => {
-  const text = 'a\nb\nc\nd\ne'
-  it('returns ±ctx lines with the cited index (middle)', () => {
-    expect(sliceExcerpt(text, 3, 2)).toEqual({ lines: ['a', 'b', 'c', 'd', 'e'], citedIndex: 2 })
+describe('excerptPassage', () => {
+  it('returns the cited paragraph only (not a multi-line window)', () => {
+    expect(excerptPassage('para before\nThe cited paragraph\npara after', 2)).toBe('The cited paragraph')
   })
-  it('clamps at the start', () => {
-    expect(sliceExcerpt(text, 1, 2)).toEqual({ lines: ['a', 'b', 'c'], citedIndex: 0 })
+  it('unescapes markdown-escaped punctuation', () => {
+    expect(excerptPassage('x\n\\(Engineer rose\\) to be chief\ny', 2)).toBe('(Engineer rose) to be chief')
   })
-  it('clamps at the end', () => {
-    expect(sliceExcerpt(text, 5, 2)).toEqual({ lines: ['c', 'd', 'e'], citedIndex: 2 })
+  it('strips a leading blockquote/heading marker', () => {
+    expect(excerptPassage('x\n> quoted line\ny', 2)).toBe('quoted line')
   })
-  it('out-of-bounds line → citedIndex -1, slice near end', () => {
-    const r = sliceExcerpt(text, 99, 2)
-    expect(r.citedIndex).toBe(-1)
-    expect(r.lines.length).toBeGreaterThan(0)
+  it('truncates a long paragraph on a word boundary with ellipsis', () => {
+    const long = ('word '.repeat(100)).trim()
+    const out = excerptPassage('a\n' + long + '\nb', 2, 40)
+    expect(out.length).toBeLessThanOrEqual(41)
+    expect(out.endsWith('…')).toBe(true)
+  })
+  it('falls back to the nearest non-blank line when the cited line is blank', () => {
+    expect(excerptPassage('a\nreal text\n\n', 3)).toBe('real text')
+  })
+  it('returns empty string when nothing usable is near', () => {
+    expect(excerptPassage('\n\n\n\n', 2)).toBe('')
   })
 })

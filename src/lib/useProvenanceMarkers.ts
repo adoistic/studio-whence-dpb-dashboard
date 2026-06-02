@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
 import { readMarkdown } from '@/lib/dataApi'
-import { buildCitationMap, sliceExcerpt } from '@/lib/provenance'
+import { buildCitationMap, excerptPassage } from '@/lib/provenance'
 import type { TooltipState } from '@/components/ProvenanceTooltip'
 import type { Content } from '@/types/content'
 
@@ -38,8 +38,12 @@ export function useProvenanceMarkers(
       }
     }
     if (activeToken.current !== token) return
-    const { lines, citedIndex } = sliceExcerpt(text, line)
-    setTip((t) => (t ? { ...t, excerpt: { status: 'ready', lines, citedIndex } } : t))
+    const passage = excerptPassage(text, line)
+    setTip((t) =>
+      t
+        ? { ...t, excerpt: passage ? { status: 'ready', lines: [passage], citedIndex: 0 } : { status: 'error' } }
+        : t,
+    )
   }
 
   showRef.current = (m: HTMLElement) => {

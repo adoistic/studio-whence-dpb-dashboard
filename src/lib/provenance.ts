@@ -23,19 +23,37 @@ export function buildCitationMap(content: Content | null): Map<string, Citation>
   return map
 }
 
-/** Slice ±ctx lines around a 1-based source line. citedIndex is the cited line's
- * position within the returned slice, or -1 if `line` is out of file bounds. */
-export function sliceExcerpt(
-  text: string,
-  line: number,
-  ctx = 2,
-): { lines: string[]; citedIndex: number } {
+// Unescape the markdown-escaped punctuation that leaks as literal backslashes in
+// a raw-text preview (e.g. "\(" → "(", "\." → "."). Research files are markdown,
+// so the reader processes these — but the tooltip shows raw text.
+const _MD_ESCAPE = /\\([\\`*_{}[\]()#+\-.!>~|"'])/g
+
+/** Clean a raw markdown line for a plain-text preview: unescape md-escaped
+ * punctuation, drop a leading heading/blockquote marker, and trim. */
+export function cleanExcerptLine(s: string): string {
+  return s
+    .replace(_MD_ESCAPE, '$1')
+    .replace(/^\s*#{1,6}\s+/, '')
+    .replace(/^\s*>\s?/, '')
+    .trim()
+}
+
+/** End-truncate to maxChars on a word boundary, appending … when cut. */
+export function truncate(s: string, maxChars: number): string {
+  if (s.length <= maxChars) return s
+  return s.slice(0, maxChars).replace(/\s+\S*$/, '').trimEnd() + '…'
+}
+
+/** The cited passage for a hover preview. Research files store each paragraph as
+ * one line, so a multi-line window becomes a wall of text — we show the single
+ * cited paragraph (or the nearest non-blank line within ±3 if the cited line is
+ * blank), cleaned and truncated. Empty string if nothing usable is found. */
+export function excerptPassage(text: string, line: number, maxChars = 300): string {
   const all = text.split('\n')
   const idx = line - 1
-  const clamped = Math.max(0, Math.min(idx, all.length - 1))
-  const lo = Math.max(0, clamped - ctx)
-  const hi = Math.min(all.length, clamped + ctx + 1)
-  const lines = all.slice(lo, hi)
-  const citedIndex = idx >= 0 && idx < all.length ? idx - lo : -1
-  return { lines, citedIndex }
+  let raw = (all[idx] ?? '').trim()
+  for (let d = 1; d <= 3 && !raw; d++) {
+    raw = (all[idx - d] ?? '').trim() || (all[idx + d] ?? '').trim()
+  }
+  return truncate(cleanExcerptLine(raw), maxChars)
 }
