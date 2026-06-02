@@ -230,3 +230,71 @@
 .research-prose hr { border: 0; border-top: 1px solid var(--brand-pale-dusk); opacity: 0.6; margin: 2em 0; }
 .research-prose table { border-collapse: collapse; margin: 0 0 1em; }
 .research-prose th, .research-prose td { border: 1px solid var(--brand-pale-dusk); padding: 0.3em 0.6em; }
+
+/* ── Comic script reader ──────────────────────────────────────────────────
+   The draft reader injects sanitized HTML into .comic-script. Once the
+   content pipeline re-publishes, it emits semantic cs-* markup (cs-page,
+   cs-panel, cs-art, cs-caption/cs-speaker, cs-dialogue/cs-name, cs-sfx).
+   Until then the draft is generic HTML (## Page N → h2, **Panel** → strong,
+   lines → p), so the generic fallbacks below keep it readable pre-republish.
+   Every rule is scoped under .comic-script so nothing leaks. */
+.comic-script .cs-page { margin: 0 0 2.5em; }
+.comic-script .cs-page-h,
+.comic-script h2 {                 /* generic-HTML fallback: ## Page N → h2 */
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand-indigo);
+  border-bottom: 2px solid var(--brand-gold);
+  padding-bottom: 0.4em;
+  margin: 0 0 1.2em;
+}
+.comic-script .cs-panel { margin: 0 0 1.4em; }
+.comic-script .cs-panel-h {
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--brand-slate);
+  margin: 0 0 0.5em;
+}
+.comic-script .cs-art {
+  font-style: italic;
+  color: var(--brand-slate);
+  margin: 0 0 0.7em;
+}
+.comic-script .cs-caption {
+  border-left: 3px solid var(--brand-gold);
+  background: rgba(232, 226, 240, 0.35);   /* --brand-pale-dusk, translucent */
+  padding: 0.6em 0.9em;
+  margin: 0 0 0.7em;
+  color: var(--brand-umber);
+}
+.comic-script .cs-speaker {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 0.6rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brand-gold);
+  margin-bottom: 0.2em;
+}
+.comic-script .cs-dialogue { margin: 0 0 0.55em; color: var(--brand-umber); }
+.comic-script .cs-name {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  color: var(--brand-indigo);
+  margin-right: 0.5em;
+}
+.comic-script .cs-sfx {
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brand-gold);
+  margin: 0 0 0.7em;
+}
+/* generic fallback (un-republished draft: strong = panel, p = lines) */
+.comic-script p { margin: 0 0 0.7em; color: var(--brand-umber); line-height: 1.6; }
+.comic-script strong { color: var(--brand-indigo); }
