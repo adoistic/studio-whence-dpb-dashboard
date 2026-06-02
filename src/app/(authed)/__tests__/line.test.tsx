@@ -94,6 +94,7 @@ describe('LinePage — data-driven /line routing', () => {
     // No crash, and the line title for a real line must not appear.
     expect(screen.queryByText('Biographies')).not.toBeInTheDocument()
     expect(screen.getByText(/line not found/i)).toBeInTheDocument()
+    expect(screen.getByRole('status')).toBeInTheDocument()
   })
 
   test('renders a quiet loading state while content is loading', () => {
@@ -104,6 +105,7 @@ describe('LinePage — data-driven /line routing', () => {
 
     expect(screen.queryByText('Biographies')).not.toBeInTheDocument()
     expect(screen.getByText(/loading/i)).toBeInTheDocument()
+    expect(screen.getByRole('status')).toBeInTheDocument()
   })
 
   test('renders an error state when the content load finished but failed', () => {
@@ -117,5 +119,6 @@ describe('LinePage — data-driven /line routing', () => {
     expect(screen.queryByText(/loading/i)).not.toBeInTheDocument()
     expect(screen.queryByText('Biographies')).not.toBeInTheDocument()
     expect(screen.getByText(/couldn.t load/i)).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toBeInTheDocument()
   })
 })

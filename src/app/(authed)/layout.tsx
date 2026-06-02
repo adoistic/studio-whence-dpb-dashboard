@@ -21,7 +21,9 @@ export default function AuthedLayout({ children }: { children: React.ReactNode }
 
   const checkingAccessScreen = (
     <main className="min-h-screen flex items-center justify-center bg-brand-pale-dusk">
-      <Eyebrow>Checking access</Eyebrow>
+      <div role="status">
+        <Eyebrow>Checking access</Eyebrow>
+      </div>
     </main>
   )
 

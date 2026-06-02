@@ -78,8 +78,9 @@ describe('(authed)/layout — auth gate matrix', () => {
 
     renderLayout()
 
-    // The quiet placeholder should appear
+    // The quiet placeholder should appear, and announce as a status region
     expect(screen.getByText(/checking access/i)).toBeInTheDocument()
+    expect(screen.getByRole('status')).toBeInTheDocument()
     // Children and chrome must NOT be visible
     expect(screen.queryByTestId('child')).not.toBeInTheDocument()
     expect(screen.queryByTestId('topbar')).not.toBeInTheDocument()

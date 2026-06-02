@@ -35,7 +35,7 @@ export default function LinePage() {
 
 function LoadingState() {
   return (
-    <div className="flex min-h-[40vh] items-center justify-center">
+    <div role="status" className="flex min-h-[40vh] items-center justify-center">
       <p className="font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
         Loading…
       </p>
@@ -45,7 +45,7 @@ function LoadingState() {
 
 function ErrorState() {
   return (
-    <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 text-center">
+    <div role="alert" className="flex min-h-[40vh] flex-col items-center justify-center gap-2 text-center">
       <p className="font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
         Couldn’t load
       </p>
@@ -58,7 +58,7 @@ function ErrorState() {
 
 function NotFoundState({ slug }: { slug: string }) {
   return (
-    <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 text-center">
+    <div role="status" className="flex min-h-[40vh] flex-col items-center justify-center gap-2 text-center">
       <p className="font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
         Line not found
       </p>
