@@ -64,6 +64,7 @@ export function ComicsTable({ comics, filename }: ComicsTableProps) {
       columns={COMIC_COLUMNS}
       filename={filename}
       rowKey={c => c.slug}
+      rowHref={c => `/${c.line}/${c.slug}`}
     />
   )
 }

@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import type { ReactNode } from 'react'
+import Link from 'next/link'
 import { CsvDownloadButton } from '@/components/CsvDownloadButton'
 
 export type Column<T> = {
@@ -24,9 +25,10 @@ interface DataTableProps<T> {
   columns: Column<T>[]
   filename: string
   rowKey?: (row: T) => string
+  rowHref?: (row: T) => string
 }
 
-export function DataTable<T>({ rows, columns, filename, rowKey }: DataTableProps<T>) {
+export function DataTable<T>({ rows, columns, filename, rowKey, rowHref }: DataTableProps<T>) {
   const [sort, setSort] = useState<SortState | null>(null)
 
   const sortedRows = useMemo(() => {
@@ -128,18 +130,25 @@ export function DataTable<T>({ rows, columns, filename, rowKey }: DataTableProps
                 key={getRowKey(row, idx)}
                 className="transition-colors duration-150 hover:bg-brand-threshold/70"
               >
-                {columns.map((col, ci) => (
-                  <td
-                    key={col.key}
-                    className={`px-4 first:pl-1 py-4 align-top font-serif ${
-                      ci === 0
-                        ? 'text-brand-indigo text-[1.05rem] leading-snug'
-                        : 'text-brand-umber text-sm'
-                    }`}
-                  >
-                    {col.cell ? col.cell(row) : String(col.get(row))}
-                  </td>
-                ))}
+                {columns.map((col, ci) => {
+                  const content = col.cell ? col.cell(row) : String(col.get(row))
+                  return (
+                    <td
+                      key={col.key}
+                      className={`px-4 first:pl-1 py-4 align-top font-serif ${
+                        ci === 0 ? 'text-brand-indigo text-[1.05rem] leading-snug' : 'text-brand-umber text-sm'
+                      }`}
+                    >
+                      {ci === 0 && rowHref ? (
+                        <Link href={rowHref(row)} className="transition-opacity hover:opacity-70">
+                          {content}
+                        </Link>
+                      ) : (
+                        content
+                      )}
+                    </td>
+                  )
+                })}
               </tr>
             ))}
           </tbody>
