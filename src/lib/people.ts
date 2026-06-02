@@ -1,0 +1,91 @@
+import type { Figure, Comic, Status } from '@/types/content'
+import { normalizeSubjectSlug } from '@/lib/slugs'
+
+export type Stage = 'researched' | Status
+
+// researched (pre-comic) sorts below every comic status; placeholder is the
+// lowest comic status. Sourced from the data Status union + the synthetic
+// 'researched' (NOT the script validator's enum, which omits placeholder).
+export const STAGE_RANK: Record<Stage, number> = {
+  researched: 0,
+  placeholder: 1,
+  draft: 2,
+  'in-review': 3,
+  approved: 4,
+  published: 5,
+}
+
+export interface PersonRow {
+  slug: string                  // figure slug, or the comic subject_slug for an orphan
+  name: string                  // title-cased display
+  series: string
+  stage: Stage
+  stageRank: number
+  comicCount: number
+  sourcesCount: number | null
+  words: number | null
+  href: string                  // /figures/<slug> for a figure; /<line>/<comic> for an orphan
+}
+
+function titleCaseSlug(slug: string): string {
+  return slug.split('-').map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(' ')
+}
+
+// The "furthest" comic = highest status rank; ties broken by lowest comic_number, then slug.
+function furthest(comics: Comic[]): Comic {
+  return [...comics].sort((a, b) => {
+    const r = STAGE_RANK[b.status] - STAGE_RANK[a.status]
+    if (r !== 0) return r
+    const n = (a.comic_number ?? Infinity) - (b.comic_number ?? Infinity)
+    if (n !== 0) return n
+    return a.slug.localeCompare(b.slug)
+  })[0]
+}
+
+export function derivePeople(figures: Figure[], comics: Comic[]): PersonRow[] {
+  const rows: PersonRow[] = []
+  const claimed = new Set<Comic>()
+
+  // One row per figure, with its matched comics.
+  for (const f of figures) {
+    const mine = comics.filter((c) => normalizeSubjectSlug(c.subject_slug) === f.slug)
+    mine.forEach((c) => claimed.add(c))
+    const top = mine.length ? furthest(mine) : null
+    const stage: Stage = top ? top.status : 'researched'
+    rows.push({
+      slug: f.slug,
+      name: titleCaseSlug(f.slug),
+      series: f.series,
+      stage,
+      stageRank: STAGE_RANK[stage],
+      comicCount: mine.length,
+      sourcesCount: f.sources_count,
+      words: f.words,
+      href: `/figures/${f.slug}`,
+    })
+  }
+
+  // Orphan comics (no matching figure): group by subject_slug (or stand alone), each its own row.
+  const orphans = comics.filter((c) => !claimed.has(c))
+  const byKey = new Map<string, Comic[]>()
+  for (const c of orphans) {
+    const key = normalizeSubjectSlug(c.subject_slug) || c.slug
+    byKey.set(key, [...(byKey.get(key) ?? []), c])
+  }
+  for (const [key, group] of byKey) {
+    const top = furthest(group)
+    rows.push({
+      slug: key,
+      name: top.subject ?? titleCaseSlug(key),
+      series: top.series ?? '',
+      stage: top.status,
+      stageRank: STAGE_RANK[top.status],
+      comicCount: group.length,
+      sourcesCount: null,
+      words: null,
+      href: `/${top.line}/${top.slug}`,
+    })
+  }
+
+  return rows
+}
