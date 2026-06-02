@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { useContent } from '@/lib/content'
 import { LinePageShell } from '@/components/LinePageShell'
+import { LoadingState, ErrorState, NotFoundState } from '@/components/QuietStates'
 import { INTROS } from '@/lib/intros'
 
 // Read the first path segment of the browser URL as the line slug. This single
@@ -24,57 +24,10 @@ export default function LinePage() {
   if (error || !content) return <ErrorState />
 
   const line = content.lines.find((l) => l.slug === slug)
-  if (!line) return <NotFoundState slug={slug} />
+  if (!line) return <NotFoundState title="Line not found" detail={`No line matches “${slug}”.`} />
 
   // INTROS[slug] is typed non-undefined (tsconfig has no noUncheckedIndexedAccess),
   // but at runtime an unknown slug yields undefined — the guard is load-bearing.
   const Intro = INTROS[slug]
   return <LinePageShell line={line} introMdx={Intro ? <Intro /> : null} />
-}
-
-// ── Quiet states ──────────────────────────────────────────────────────────────
-
-function LoadingState() {
-  return (
-    <div role="status" className="flex min-h-[40vh] items-center justify-center">
-      <p className="font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
-        Loading…
-      </p>
-    </div>
-  )
-}
-
-function ErrorState() {
-  // A role="alert" region that mounts already-filled announces unreliably across
-  // some screen-reader/browser pairs; the region must be present-then-filled to
-  // announce reliably. So the visible text carries no role, and a separate
-  // visually-hidden live region is populated AFTER mount via this effect.
-  const [announce, setAnnounce] = useState('')
-  useEffect(() => {
-    setAnnounce('Couldn’t load. Please reload the page.')
-  }, [])
-  return (
-    <div className="flex min-h-[40vh] flex-col items-center justify-center gap-2 text-center">
-      <p className="font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
-        Couldn’t load
-      </p>
-      <p className="max-w-xs font-sans text-[0.7rem] uppercase tracking-label text-brand-pale-dusk/55">
-        Please reload the page.
-      </p>
-      <div role="alert" className="sr-only">{announce}</div>
-    </div>
-  )
-}
-
-function NotFoundState({ slug }: { slug: string }) {
-  return (
-    <div role="status" className="flex min-h-[40vh] flex-col items-center justify-center gap-2 text-center">
-      <p className="font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
-        Line not found
-      </p>
-      <p className="max-w-xs font-sans text-[0.7rem] uppercase tracking-label text-brand-pale-dusk/55">
-        No line matches “{slug}”.
-      </p>
-    </div>
-  )
 }
