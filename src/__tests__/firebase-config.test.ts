@@ -49,4 +49,13 @@ describe('firebase.json hosting rewrites', () => {
     expect(catchAllIndex).toBeGreaterThanOrEqual(0)
     expect(apiIndex).toBeLessThan(catchAllIndex)
   })
+
+  test('the comic catch-all (/*/* -> /comic.html) sits after /api/** and before /*', () => {
+    const apiIndex = rewrites.findIndex((r) => r.source === '/api/**')
+    const comicIndex = rewrites.findIndex((r) => r.source === '/*/*')
+    const lineIndex = rewrites.findIndex((r) => r.source === '/*')
+    expect(comicIndex).toBeGreaterThan(apiIndex)
+    expect(comicIndex).toBeLessThan(lineIndex)
+    expect(rewrites[comicIndex]).toEqual({ source: '/*/*', destination: '/comic.html' })
+  })
 })

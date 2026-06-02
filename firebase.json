@@ -17,6 +17,7 @@
         "source": "/api/**",
         "function": { "functionId": "dataApi", "region": "us-central1" }
       },
+      { "source": "/*/*", "destination": "/comic.html" },
       { "source": "/*", "destination": "/line.html" }
     ]
   }
