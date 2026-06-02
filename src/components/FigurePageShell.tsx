@@ -4,6 +4,9 @@ import { useState } from 'react'
 import type { Figure } from '@/types/content'
 import { SectionHead } from '@/components/SectionHead'
 import { ResearchReader } from '@/components/ResearchReader'
+import { PersonTabs } from '@/components/PersonTabs'
+import { useContent } from '@/lib/content'
+import { normalizeSubjectSlug } from '@/lib/slugs'
 
 function titleCaseSlug(slug: string): string {
   return slug.split('-').map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(' ')
@@ -74,6 +77,11 @@ export function FigurePageShell({ figure }: { figure: Figure }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const toggle = (key: string) => setCollapsed((c) => ({ ...c, [key]: !c[key] }))
 
+  const { content } = useContent()
+  const comics = (content?.lines.flatMap((l) => l.comics) ?? [])
+    .filter((c) => normalizeSubjectSlug(c.subject_slug) === figure.slug)
+    .map((c) => ({ slug: c.slug, line: c.line, title: c.title, status: c.status, comic_number: c.comic_number }))
+
   const sources = figure.sources ?? []
   const books = sources.filter((s) => s.kind === 'book')
   const transcripts = sources.filter((s) => s.kind === 'transcript')
@@ -96,6 +104,9 @@ export function FigurePageShell({ figure }: { figure: Figure }) {
           </div>
         </div>
       </section>
+
+      {/* ── Person tabs (Research ⇄ Comics) ─────────────────────────── */}
+      <PersonTabs figureSlug={figure.slug} comics={comics} active="research" />
 
       {/* ── Body ───────────────────────────────────────────────────── */}
       <main className="mx-auto max-w-[1100px] px-6">

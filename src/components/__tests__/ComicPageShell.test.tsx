@@ -9,7 +9,11 @@ vi.mock('@/lib/useGatedText', () => ({ useGatedText: () => mockDraft() }))
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
 }))
-let mockContent: () => { content: { lines: { slug: string; figures: { slug: string }[] }[] } | null }
+let mockContent: () => {
+  content: {
+    lines: { slug: string; figures: { slug: string }[]; comics?: unknown[] }[]
+  } | null
+}
 vi.mock('@/lib/content', () => ({ useContent: () => mockContent() }))
 
 const comic: Comic = {
@@ -32,7 +36,26 @@ const comic: Comic = {
 
 beforeEach(() => {
   mockDraft = () => ({ text: null, loading: false })
-  mockContent = () => ({ content: { lines: [{ slug: 'biographies', figures: [{ slug: 'jrd-tata' }] }] } })
+  mockContent = () => ({
+    content: {
+      lines: [
+        {
+          slug: 'biographies',
+          figures: [{ slug: 'jrd-tata' }],
+          comics: [
+            {
+              slug: '01-the-sky-high-dreamer',
+              line: 'biographies',
+              title: 'The Sky-High Dreamer',
+              status: 'draft',
+              comic_number: 1,
+              subject_slug: 'jrd-tata',
+            },
+          ],
+        },
+      ],
+    },
+  })
 })
 
 describe('ComicPageShell', () => {
@@ -82,5 +105,31 @@ describe('ComicPageShell', () => {
     render(<ComicPageShell comic={comic} />)
     expect(screen.queryByRole('link', { name: 'J.R.D. Tata' })).not.toBeInTheDocument()
     expect(screen.getByText('J.R.D. Tata')).toBeInTheDocument()
+  })
+
+  test('mounts the PersonTabs strip — Comics active + a Research link — for a comic with a matching figure', () => {
+    render(<ComicPageShell comic={comic} />)
+    const nav = screen.getByRole('navigation', { name: /person sections/i })
+    expect(nav).toBeInTheDocument()
+    // Comics is the active (current) tab.
+    expect(screen.getByText(/comics/i)).toHaveAttribute('aria-current', 'page')
+    // The Research tab links to the figure page.
+    const research = screen.getByRole('link', { name: /research/i })
+    expect(research).toHaveAttribute('href', '/figures/jrd-tata')
+  })
+
+  test('renders NO strip when no matching figure exists', () => {
+    mockContent = () => ({ content: { lines: [{ slug: 'biographies', figures: [] }] } })
+    render(<ComicPageShell comic={comic} />)
+    expect(screen.queryByRole('navigation', { name: /person sections/i })).not.toBeInTheDocument()
+  })
+
+  test('renders NO strip for a non-biography comic', () => {
+    const indicComic: Comic = { ...comic, line: 'indic', subject_slug: 'rama' }
+    mockContent = () => ({
+      content: { lines: [{ slug: 'indic', figures: [], comics: [] }] },
+    })
+    render(<ComicPageShell comic={indicComic} />)
+    expect(screen.queryByRole('navigation', { name: /person sections/i })).not.toBeInTheDocument()
   })
 })

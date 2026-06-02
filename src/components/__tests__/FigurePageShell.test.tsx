@@ -1,11 +1,22 @@
-import { describe, test, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { describe, test, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import type { Figure } from '@/types/content'
 import { FigurePageShell } from '../FigurePageShell'
 
 vi.mock('@/components/ResearchReader', () => ({
   ResearchReader: ({ fileKey }: { fileKey: string | null }) => <div>reader:{fileKey ?? 'none'}</div>,
 }))
+
+vi.mock('next/link', () => ({
+  default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
+}))
+
+let mockContent: () => { content: { lines: { comics: unknown[] }[] } | null }
+vi.mock('@/lib/content', () => ({ useContent: () => mockContent() }))
+
+beforeEach(() => {
+  mockContent = () => ({ content: { lines: [] } })
+})
 
 const figure: Figure = {
   series: '01-Business-Legends',
@@ -88,5 +99,35 @@ describe('FigurePageShell', () => {
     render(<FigurePageShell figure={figureWithPodcasts} />)
     fireEvent.click(screen.getByRole('button', { name: /Bush Center Forum/i }))
     expect(screen.getByText('reader:research/p/b.md')).toBeInTheDocument()
+  })
+
+  test('mounts the PersonTabs strip — Research active + a Comics affordance — for a figure with comics', () => {
+    mockContent = () => ({
+      content: {
+        lines: [
+          {
+            comics: [
+              {
+                slug: '01-the-polyester-dream',
+                line: 'biographies',
+                title: 'The Polyester Dream',
+                status: 'draft',
+                comic_number: 1,
+                subject_slug: 'dhirubhai-ambani',
+              },
+            ],
+          },
+        ],
+      },
+    })
+    render(<FigurePageShell figure={figure} />)
+    const nav = screen.getByRole('navigation', { name: /person sections/i })
+    expect(nav).toBeInTheDocument()
+    // Research is the active (current) tab (scope to the nav — "Research" also
+    // appears as the reader-panel section heading).
+    const research = within(nav).getByText('Research')
+    expect(research).toHaveAttribute('aria-current', 'page')
+    // A Comics affordance shows (links to the person's furthest comic).
+    expect(within(nav).getByRole('link', { name: /comics/i })).toBeInTheDocument()
   })
 })
