@@ -14,5 +14,10 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test-setup.ts'],
+    // Scope to the Next app's own tests. The functions/ Cloud Functions package
+    // is a separate package with its own deps and tests; including it here would
+    // try to resolve its node_modules (firebase-admin, @aws-sdk, …) which the
+    // app's install does not provide (it breaks in CI's clean checkout).
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
   },
 })
