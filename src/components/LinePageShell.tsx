@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import type { Line } from '@/types/content'
 import { ComicsTable } from '@/components/ComicsTable'
+import { FiguresTable } from '@/components/FiguresTable'
 import { SectionHead } from '@/components/SectionHead'
 import { TingalandGallery } from '@/components/TingalandGallery'
 import { LINE_VISUALS, TINGALAND_CAST } from '@/lib/images'
@@ -83,6 +84,14 @@ export function LinePageShell({ line, introMdx }: LinePageShellProps) {
           <section className="flex flex-col gap-8 pt-20">
             <SectionHead kicker="Tingaland" title="The world, drawn" />
             <TingalandGallery />
+          </section>
+        )}
+
+        {/* Figures researched (biographies only) */}
+        {line.slug === 'biographies' && line.figures.length > 0 && (
+          <section className="flex flex-col gap-8 pt-20">
+            <SectionHead kicker="The library" title="Figures researched" />
+            <FiguresTable figures={line.figures} filename={`${line.slug}-figures.csv`} />
           </section>
         )}
 
