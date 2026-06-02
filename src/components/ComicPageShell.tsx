@@ -1,9 +1,12 @@
 'use client'
 
+import Link from 'next/link'
 import type { Comic, ChangelogEntry } from '@/types/content'
 import { StatusPill } from '@/components/StatusPill'
 import { SectionHead } from '@/components/SectionHead'
 import { useGatedText } from '@/lib/useGatedText'
+import { useContent } from '@/lib/content'
+import { normalizeSubjectSlug } from '@/lib/slugs'
 
 function Detail({ label, value }: { label: string; value: string | number }) {
   return (
@@ -21,6 +24,13 @@ function changelogText(entry: ChangelogEntry): { date?: string; note: string } {
 export function ComicPageShell({ comic }: { comic: Comic }) {
   const draft = useGatedText(`drafts/${comic.line}/${comic.slug}.html`)
 
+  const { content } = useContent()
+  const figureSlug = normalizeSubjectSlug(comic.subject_slug)
+  const hasFigure =
+    comic.line === 'biographies' &&
+    !!figureSlug &&
+    !!content?.lines.some((l) => l.figures.some((f) => f.slug === figureSlug))
+
   const seriesLine = [comic.series, comic.comic_number ? `Comic ${comic.comic_number}` : null]
     .filter(Boolean)
     .join(' · ')
@@ -31,9 +41,18 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
       <section className="surface-deep grain relative overflow-hidden">
         <div className="relative mx-auto max-w-[1100px] px-6 py-14 md:py-16">
           {comic.subject && (
-            <span className="font-sans text-[0.7rem] uppercase tracking-label text-brand-gold">
-              {comic.subject}
-            </span>
+            hasFigure ? (
+              <Link
+                href={`/figures/${figureSlug}`}
+                className="font-sans text-[0.7rem] uppercase tracking-label text-brand-gold transition-opacity hover:opacity-70"
+              >
+                {comic.subject}
+              </Link>
+            ) : (
+              <span className="font-sans text-[0.7rem] uppercase tracking-label text-brand-gold">
+                {comic.subject}
+              </span>
+            )
           )}
           <h1 className="mt-4 font-serif font-light leading-[1.0] text-brand-cream text-[2.1rem] md:text-[3rem]">
             {comic.title}

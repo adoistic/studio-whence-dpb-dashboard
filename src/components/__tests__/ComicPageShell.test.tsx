@@ -6,6 +6,12 @@ import { ComicPageShell } from '../ComicPageShell'
 let mockDraft: () => { text: string | null; loading: boolean; error?: Error }
 vi.mock('@/lib/useGatedText', () => ({ useGatedText: () => mockDraft() }))
 
+vi.mock('next/link', () => ({
+  default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
+}))
+let mockContent: () => { content: { lines: { slug: string; figures: { slug: string }[] }[] } | null }
+vi.mock('@/lib/content', () => ({ useContent: () => mockContent() }))
+
 const comic: Comic = {
   title: 'The Sky-High Dreamer',
   subject: 'J.R.D. Tata',
@@ -26,6 +32,7 @@ const comic: Comic = {
 
 beforeEach(() => {
   mockDraft = () => ({ text: null, loading: false })
+  mockContent = () => ({ content: { lines: [{ slug: 'biographies', figures: [{ slug: 'jrd-tata' }] }] } })
 })
 
 describe('ComicPageShell', () => {
@@ -62,5 +69,18 @@ describe('ComicPageShell', () => {
     mockDraft = () => ({ text: null, loading: false, error: new Error('read failed: 404') })
     render(<ComicPageShell comic={comic} />)
     expect(screen.getByText(/draft not available yet/i)).toBeInTheDocument()
+  })
+
+  test('links the subject to its figure for a biographies comic with a matching figure', () => {
+    render(<ComicPageShell comic={comic} />)
+    const link = screen.getByRole('link', { name: 'J.R.D. Tata' })
+    expect(link).toHaveAttribute('href', '/figures/jrd-tata')
+  })
+
+  test('renders the subject as plain text when no matching figure exists', () => {
+    mockContent = () => ({ content: { lines: [{ slug: 'biographies', figures: [] }] } })
+    render(<ComicPageShell comic={comic} />)
+    expect(screen.queryByRole('link', { name: 'J.R.D. Tata' })).not.toBeInTheDocument()
+    expect(screen.getByText('J.R.D. Tata')).toBeInTheDocument()
   })
 })
