@@ -13,6 +13,17 @@ function figureSlugFromPath(): string {
   return window.location.pathname.replace(/^\/+/, '').split('/')[1] ?? ''
 }
 
+// Provenance deep-link params: ?file=<source path>&line=<n>. Returns the raw
+// values; the file is validated against the figure's sources by the caller.
+function paramsFromUrl(): { file: string | null; line: number | undefined } {
+  if (typeof window === 'undefined') return { file: null, line: undefined }
+  const sp = new URLSearchParams(window.location.search)
+  const file = sp.get('file')
+  const lineStr = sp.get('line')
+  const line = lineStr && /^\d+$/.test(lineStr) ? Number(lineStr) : undefined
+  return { file, line }
+}
+
 export default function FigurePage() {
   const { content, loading, error } = useContent()
   const slug = normalizeSubjectSlug(figureSlugFromPath())
@@ -23,5 +34,7 @@ export default function FigurePage() {
   const figure = content.lines.flatMap((l) => l.figures).find((f) => normalizeSubjectSlug(f.slug) === slug)
   if (!figure) return <NotFoundState title="Figure not found" detail={`No figure matches “${slug}”.`} />
 
-  return <FigurePageShell figure={figure} />
+  const { file, line } = paramsFromUrl()
+  const valid = !!file && (figure.sources ?? []).some((s) => s.files.some((f) => f.path === file))
+  return <FigurePageShell figure={figure} initialFile={valid ? file : null} targetLine={valid ? line : undefined} />
 }
