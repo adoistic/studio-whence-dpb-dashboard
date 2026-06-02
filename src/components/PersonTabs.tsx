@@ -1,10 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import type { Comic } from '@/types/content'
-import { furthestComic } from '@/lib/people'
-
-type PersonComic = { slug: string; line: string; title: string; status: Comic['status']; comic_number?: number }
+import { furthestComic, type PersonComic } from '@/lib/people'
 
 const TAB = 'font-sans text-[0.72rem] uppercase tracking-label transition-colors'
 const ACTIVE = 'text-brand-indigo border-b-2 border-brand-gold'

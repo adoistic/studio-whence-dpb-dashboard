@@ -7,6 +7,7 @@ import { SectionHead } from '@/components/SectionHead'
 import { useGatedText } from '@/lib/useGatedText'
 import { useContent } from '@/lib/content'
 import { normalizeSubjectSlug } from '@/lib/slugs'
+import { personComics } from '@/lib/people'
 import { PersonTabs } from '@/components/PersonTabs'
 
 function Detail({ label, value }: { label: string; value: string | number }) {
@@ -32,11 +33,7 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
     !!figureSlug &&
     !!content?.lines.some((l) => l.figures.some((f) => normalizeSubjectSlug(f.slug) === figureSlug))
 
-  const comics = hasFigure
-    ? (content?.lines.flatMap((l) => l.comics) ?? [])
-        .filter((c) => normalizeSubjectSlug(c.subject_slug) === figureSlug)
-        .map((c) => ({ slug: c.slug, line: c.line, title: c.title, status: c.status, comic_number: c.comic_number }))
-    : []
+  const comics = hasFigure ? personComics(content, figureSlug) : []
 
   const seriesLine = [comic.series, comic.comic_number ? `Comic ${comic.comic_number}` : null]
     .filter(Boolean)

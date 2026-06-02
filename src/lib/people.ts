@@ -1,4 +1,4 @@
-import type { Figure, Comic, Status } from '@/types/content'
+import type { Figure, Comic, Status, Content } from '@/types/content'
 import { normalizeSubjectSlug } from '@/lib/slugs'
 
 export type Stage = 'researched' | Status
@@ -29,6 +29,21 @@ export interface PersonRow {
 
 function titleCaseSlug(slug: string): string {
   return slug.split('-').map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(' ')
+}
+
+export type PersonComic = {
+  slug: string
+  line: string
+  title: string
+  status: Comic['status']
+  comic_number?: number
+}
+
+/** The comics about a figure (matched case-insensitively on subject_slug). */
+export function personComics(content: Content | null, figureSlug: string): PersonComic[] {
+  return (content?.lines.flatMap((l) => l.comics) ?? [])
+    .filter((c) => normalizeSubjectSlug(c.subject_slug) === figureSlug)
+    .map((c) => ({ slug: c.slug, line: c.line, title: c.title, status: c.status, comic_number: c.comic_number }))
 }
 
 // The "furthest" comic = highest status rank; ties broken by lowest comic_number, then slug.
