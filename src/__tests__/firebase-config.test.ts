@@ -58,4 +58,13 @@ describe('firebase.json hosting rewrites', () => {
     expect(comicIndex).toBeLessThan(lineIndex)
     expect(rewrites[comicIndex]).toEqual({ source: '/*/*', destination: '/comic.html' })
   })
+
+  test('the figures route (/figures/* -> /figure.html) sits after /api/** and before /*/*', () => {
+    const apiIndex = rewrites.findIndex((r) => r.source === '/api/**')
+    const figuresIndex = rewrites.findIndex((r) => r.source === '/figures/*')
+    const comicIndex = rewrites.findIndex((r) => r.source === '/*/*')
+    expect(figuresIndex).toBeGreaterThan(apiIndex)
+    expect(figuresIndex).toBeLessThan(comicIndex)
+    expect(rewrites[figuresIndex]).toEqual({ source: '/figures/*', destination: '/figure.html' })
+  })
 })
