@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import { ResearchReader } from '../ResearchReader'
 
 let mockGated: () => { text: string | null; loading: boolean; error?: Error }
@@ -47,5 +47,19 @@ describe('ResearchReader', () => {
     expect(speaker).toBeInTheDocument()
     expect(speaker).toHaveClass('rp-speaker')
     expect(screen.getByText(/we.re live/i)).toBeInTheDocument()
+  })
+  test('stamps source-line anchors on rendered blocks', () => {
+    mockGated = () => ({ text: 'para one\n\npara two\n', loading: false })
+    const { container } = render(<ResearchReader fileKey="research/x.md" />)
+    expect(container.querySelector('[data-sl]')).toBeTruthy()
+  })
+
+  test('scrolls to and highlights the block containing targetLine', async () => {
+    const scrollSpy = vi.fn()
+    Element.prototype.scrollIntoView = scrollSpy
+    mockGated = () => ({ text: 'a\n\nb\n\nc\n', loading: false })
+    const { container } = render(<ResearchReader fileKey="research/x.md" targetLine={3} />)
+    await waitFor(() => expect(scrollSpy).toHaveBeenCalled())
+    expect(container.querySelector('.rp-hit')).toBeTruthy()
   })
 })
