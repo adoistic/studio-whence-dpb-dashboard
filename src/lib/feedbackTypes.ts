@@ -2,11 +2,21 @@
 
 export type Status = 'open' | 'in_progress' | 'resolved' | 'deferred' | 'wont_fix'
 
+export type AnchorKind = 'page' | 'panel' | 'beat'
+
 export interface Anchor {
-  beatRef: string
+  kind: AnchorKind
+  ref: string // page: "p13" · panel: "p13.pl1" · beat: "p13.pl1.b2" | "p13.pl1.art"
   page: number
-  panel: number
-  snapshot: string
+  panel?: number // absent for page anchors
+  snapshot: string // the unit's text (or a label like "Page 13" / "Panel 1")
+}
+
+/** Short chip label for an anchor, distinct by kind. */
+export function anchorLabel(a: Anchor): string {
+  if (a.kind === 'page') return `Page ${a.page}`
+  if (a.kind === 'panel') return `Panel ${a.panel} · p${a.page}`
+  return `P${a.page}·${a.panel}`
 }
 
 export interface FeedbackNode {
@@ -77,10 +87,15 @@ export function groupThreads(nodes: FeedbackNode[]): Thread[] {
 }
 
 /**
- * Return true if any of a comment's anchored beats were changed in a version
+ * Return true if any of a comment's anchored units were changed in a version
  * that is strictly newer than the version the comment was written against.
  * General comments (no anchors) always return false.
  * Comments already on the current version return false.
+ *
+ * `changedBeatRefs` are always beat-level (`pP.plN.bK` / `pP.plN.art`). A page
+ * or panel anchor counts as changed if any beat under it changed: an anchor
+ * matches when its `ref` is exactly a changed beat ref, OR some changed beat
+ * ref starts with `ref + '.'` (the `.` guards against `p1` matching `p13…`).
  */
 export function changedSince(
   node: FeedbackNode,
@@ -94,7 +109,9 @@ export function changedSince(
       for (const r of v.changedBeatRefs ?? []) refs.add(r)
     }
   }
-  return node.anchors.some((a) => refs.has(a.beatRef))
+  return node.anchors.some(
+    (a) => refs.has(a.ref) || [...refs].some((cr) => cr.startsWith(a.ref + '.')),
+  )
 }
 
 /**

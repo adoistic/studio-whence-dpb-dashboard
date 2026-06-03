@@ -147,9 +147,11 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
             </p>
           ) : draft.text ? (
             <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
-              {/* The document "page" — a centered white paper surface */}
+              {/* The script column — each cs-page renders as its own paper
+                  sheet (styled in globals.css), so the muted app background
+                  shows between sheets and the page structure is obvious. */}
               <div className="min-w-0 flex-1">
-                <div className="mx-auto max-w-[760px] rounded-lg bg-white px-8 py-10 shadow-[0_1px_3px_rgba(30,26,58,0.08),0_12px_40px_-12px_rgba(30,26,58,0.18)] ring-1 ring-brand-pale-dusk/70 md:px-12 md:py-14">
+                <div className="mx-auto max-w-[760px]">
                   <DraftScript html={draft.text} innerRef={scriptRef} />
                   {tip && <ProvenanceTooltip {...tip} />}
                 </div>

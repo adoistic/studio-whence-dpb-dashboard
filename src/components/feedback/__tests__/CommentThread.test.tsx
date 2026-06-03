@@ -6,7 +6,7 @@ import type { Thread } from '@/lib/feedbackTypes'
 const mkThread = (over: Partial<Thread['root']> = {}): Thread => ({
   root: {
     id: 'r1', comicId: 'c', line: 'biographies', parentId: null,
-    anchors: [{ beatRef: 'p13.pl1.b1', page: 13, panel: 1, snapshot: 'old text' }],
+    anchors: [{ kind: 'beat', ref: 'p13.pl1.b1', page: 13, panel: 1, snapshot: 'old text' }],
     authorEmail: 'ankit@x.com', authorName: 'Ankit', authorRole: 'editor',
     body: 'Check this date.', status: 'open', comicVersion: 1, hidden: false, createdAt: '2026-06-03', ...over,
   },
@@ -51,4 +51,30 @@ it('renders an orphaned anchor with its snapshot when ref is unknown', () => {
   render(<CommentThread thread={mkThread()} isAdmin={false} {...base} knownRefs={new Set()} />)
   expect(screen.getByText(/no longer exists/i)).toBeInTheDocument()
   expect(screen.getByText(/old text/)).toBeInTheDocument()
+})
+
+it('labels a page anchor by its kind', () => {
+  const thread = mkThread({ anchors: [{ kind: 'page', ref: 'p13', page: 13, snapshot: 'Page 13' }] })
+  render(
+    <CommentThread
+      thread={thread}
+      isAdmin={false}
+      {...base}
+      knownRefs={new Set(['p13'])}
+    />,
+  )
+  expect(screen.getByRole('button', { name: /Page 13/ })).toBeInTheDocument()
+})
+
+it('labels a panel anchor by its kind', () => {
+  const thread = mkThread({ anchors: [{ kind: 'panel', ref: 'p13.pl1', page: 13, panel: 1, snapshot: 'Panel 1' }] })
+  render(
+    <CommentThread
+      thread={thread}
+      isAdmin={false}
+      {...base}
+      knownRefs={new Set(['p13.pl1'])}
+    />,
+  )
+  expect(screen.getByRole('button', { name: /Panel 1/ })).toBeInTheDocument()
 })

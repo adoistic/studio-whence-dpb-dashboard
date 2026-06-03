@@ -248,17 +248,44 @@
    Until then the draft is generic HTML (## Page N → h2, **Panel** → strong,
    lines → p), so the generic fallbacks below keep it readable pre-republish.
    Every rule is scoped under .comic-script so nothing leaks. */
-.comic-script .cs-page { margin: 0 0 2.5em; }
+/* Each comic PAGE is its own paper sheet: white surface, soft shadow + ring,
+   generous padding, and a clear gap between sheets so the muted app background
+   shows through. The horizontal padding (2.5rem ≈ 40px) is wider than the
+   anchored-beat margin badge's reach (it sits 1.7rem ≈ 27px into the left
+   margin), so the badge never clips against the sheet edge. We deliberately do
+   NOT set overflow:hidden here — that would clip the margin badge + the
+   on-hover comment pill, which sit outside the text flow. */
+.comic-script .cs-page {
+  background: #fff;
+  border-radius: 0.6rem;
+  padding: 2rem 2.5rem;
+  margin: 0 0 1.5rem;
+  box-shadow:
+    0 1px 3px rgba(30, 26, 58, 0.08),
+    0 12px 40px -12px rgba(30, 26, 58, 0.18);
+  border: 1px solid color-mix(in srgb, var(--brand-pale-dusk, #E8E2F0) 70%, transparent);
+}
+.comic-script .cs-page:last-child { margin-bottom: 0; }
+
+/* The "Page N" label — a small uppercase tracking-label tab at the top of each
+   sheet, in a muted brand tone, so every sheet is unmistakably "Page N".
+   (For the legacy generic-HTML fallback — a bare ## Page N → h2 with no
+   wrapping cs-page section — the same pill treatment applies so the page
+   structure still reads; only the per-sheet framing is absent there.) */
 .comic-script .cs-page-h,
-.comic-script h2 {                 /* generic-HTML fallback: ## Page N → h2 */
+.comic-script h2 {
+  display: inline-block;
   font-family: var(--font-sans);
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--brand-indigo);
-  border-bottom: 2px solid var(--brand-gold);
-  padding-bottom: 0.4em;
-  margin: 0 0 1.2em;
+  color: var(--brand-gold);
+  background: color-mix(in srgb, var(--brand-pale-dusk, #E8E2F0) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-gold, #C4A265) 35%, transparent);
+  border-radius: 999px;
+  padding: 0.35em 0.85em;
+  margin: 0 0 1.4em;
 }
 .comic-script .cs-panel { margin: 0 0 1.4em; }
 .comic-script .cs-panel-h {
@@ -510,4 +537,118 @@
   .comic-script .cs-sfx { transition: none; }
   .comic-script .cs-beat-badge { transition: none; }
   .comic-script .cs-beat-comment { transition: none; }
+}
+
+/* ── Select mode (multi-target commenting) ─────────────────────────────────
+   useCommentTargets injects a "＋ Select / ✓ Selected" toggle (.cs-unit-select)
+   onto every selectable unit — a page (.cs-page-select, beside "Page N"), a
+   panel (.cs-panel-select, beside the panel label), or a beat line
+   (.cs-beat-select, at the line's inline-end). The reader picks any number of
+   units across the comic, then attaches ONE comment to all of them. The unit
+   carries .cs-unit-selectable always, and .cs-unit-selected while picked. */
+
+/* Make pages + panels positioning contexts so their toggles can pin cleanly,
+   and give a whole-unit hover affordance like beats already have. */
+.comic-script .cs-page,
+.comic-script .cs-panel { position: relative; }
+
+.comic-script .cs-page-h,
+.comic-script .cs-panel-h { position: relative; }
+
+/* The select toggle — a clear, findable pill (not a tiny glyph). Hidden until
+   the owning unit is hovered/focused, then revealed; always shown once the
+   unit is selected, and always reachable by keyboard. */
+.comic-script .cs-unit-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  vertical-align: middle;
+  cursor: pointer;
+  font-family: var(--font-sans, system-ui);
+  font-size: 0.66rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--brand-indigo, #3B3664);
+  background: var(--brand-cream, #F5EFE4);
+  border: 1px solid var(--brand-lavender, #766992);
+  border-radius: 999px;
+  padding: 0.35em 0.7em;
+  box-shadow: 0 1px 3px rgba(30, 26, 58, 0.18);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s var(--ease-out, ease), background-color 0.12s var(--ease-out, ease),
+    color 0.12s var(--ease-out, ease), border-color 0.12s var(--ease-out, ease);
+}
+.comic-script .cs-unit-select-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05em;
+  height: 1.05em;
+  border-radius: 4px;
+  border: 1.5px solid currentColor;
+  font-size: 0.82em;
+  line-height: 1;
+}
+.comic-script .cs-unit-select:hover { background: var(--brand-pale-dusk, #E8E2F0); }
+.comic-script .cs-unit-select:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  outline: 2px solid var(--brand-gold, #C4A265);
+  outline-offset: 2px;
+}
+
+/* Reveal a unit's toggle on hover/focus of that unit. */
+.comic-script .cs-page:hover > .cs-page-h .cs-page-select,
+.comic-script .cs-page:focus-within > .cs-page-h .cs-page-select,
+.comic-script .cs-panel:hover > .cs-panel-h .cs-panel-select,
+.comic-script .cs-panel:focus-within > .cs-panel-h .cs-panel-select,
+.comic-script .cs-caption:hover .cs-beat-select,
+.comic-script .cs-caption:focus-within .cs-beat-select,
+.comic-script .cs-dialogue:hover .cs-beat-select,
+.comic-script .cs-dialogue:focus-within .cs-beat-select,
+.comic-script .cs-art:hover .cs-beat-select,
+.comic-script .cs-art:focus-within .cs-beat-select,
+.comic-script .cs-sfx:hover .cs-beat-select,
+.comic-script .cs-sfx:focus-within .cs-beat-select {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Page/panel toggles sit beside their header label. */
+.comic-script .cs-page-select,
+.comic-script .cs-panel-select { margin-left: 0.6em; }
+
+/* Beat toggle pins to the line's inline-end (shares the slot the Comment pill
+   used to own; the Comment pill is gone in select mode). */
+.comic-script .cs-beat-select {
+  position: absolute;
+  inset-inline-end: 0.4em;
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
+}
+
+/* Selected state — filled toggle + a clear selection highlight on the unit. */
+.comic-script .cs-unit-select.is-selected {
+  opacity: 1;
+  pointer-events: auto;
+  color: var(--brand-cream, #F5EFE4);
+  background: var(--brand-indigo, #3B3664);
+  border-color: var(--brand-indigo, #3B3664);
+}
+.comic-script .cs-unit-select.is-selected:hover {
+  background: var(--brand-twilight-mid, #4A4374);
+}
+.comic-script .cs-unit-selected {
+  outline: 2px solid var(--brand-indigo, #3B3664);
+  outline-offset: 2px;
+  border-radius: var(--radius-brand, 2px);
+  background-color: color-mix(in srgb, var(--brand-indigo, #3B3664) 7%, transparent);
+}
+.comic-script .cs-page.cs-unit-selected,
+.comic-script .cs-panel.cs-unit-selected { outline-offset: -2px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .comic-script .cs-unit-select { transition: none; }
 }

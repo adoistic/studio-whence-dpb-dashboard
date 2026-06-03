@@ -21,7 +21,7 @@ it('disables Post when empty, enables when text entered, submits the body', asyn
 it('renders removable anchor chips and the add-location button in comment mode', () => {
   const onRemoveAnchor = vi.fn()
   render(<CommentComposer {...baseProps}
-    anchors={[{ beatRef: 'p13.pl1.b1', page: 13, panel: 1, snapshot: 'x' }]}
+    anchors={[{ kind: 'beat', ref: 'p13.pl1.b1', page: 13, panel: 1, snapshot: 'x' }]}
     onRemoveAnchor={onRemoveAnchor} />)
   expect(screen.getByText(/P13/)).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button', { name: /remove anchor/i }))

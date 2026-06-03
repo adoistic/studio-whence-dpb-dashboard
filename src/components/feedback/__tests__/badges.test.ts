@@ -4,7 +4,7 @@ import type { Thread } from '@/lib/feedbackTypes'
 
 const root = (id: string, anchors: string[]): Thread => ({
   root: { id, comicId: 'c', line: 'l', parentId: null,
-    anchors: anchors.map((beatRef) => ({ beatRef, page: 1, panel: 1, snapshot: '' })),
+    anchors: anchors.map((ref) => ({ kind: 'beat' as const, ref, page: 1, panel: 1, snapshot: '' })),
     authorEmail: '', authorName: '', authorRole: '', body: '', comicVersion: 1, hidden: false, createdAt: 1 },
   replies: [],
 })

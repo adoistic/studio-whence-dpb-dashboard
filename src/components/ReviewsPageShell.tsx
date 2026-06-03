@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { useAllRoots } from '@/lib/feedback'
 import { useComics } from '@/lib/catalog'
 import { useUser, useAllowStatus } from '@/lib/auth'
-import { visibleTo, type Status } from '@/lib/feedbackTypes'
+import { visibleTo, anchorLabel, type Anchor, type Status } from '@/lib/feedbackTypes'
 import { CommentIcon, PinIcon } from '@/components/feedback/icons'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -49,7 +49,7 @@ function comicPath(comicId: string): string {
   return i >= 0 ? `/${comicId.slice(0, i)}/${comicId.slice(i + 2)}` : `/${comicId}`
 }
 
-function anchorSummary(anchors: { page: number; panel: number }[]) {
+function anchorSummary(anchors: Anchor[]) {
   if (anchors.length === 0)
     return (
       <>
@@ -59,7 +59,7 @@ function anchorSummary(anchors: { page: number; panel: number }[]) {
   if (anchors.length === 1)
     return (
       <>
-        <PinIcon className="h-3 w-3" /> P{anchors[0].page}·{anchors[0].panel}
+        <PinIcon className="h-3 w-3" /> {anchorLabel(anchors[0])}
       </>
     )
   return (

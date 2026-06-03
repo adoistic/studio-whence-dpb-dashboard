@@ -24,16 +24,29 @@ describe('groupThreads', () => {
 describe('changedSince', () => {
   const versions = [{ version: 2, changedBeatRefs: ['p1.pl1.b1'] }, { version: 1, changedBeatRefs: [] }]
   it('true when an anchored beat changed in a later version', () => {
-    const n = node({ comicVersion: 1, anchors: [{ beatRef: 'p1.pl1.b1', page: 1, panel: 1, snapshot: 's' }] })
+    const n = node({ comicVersion: 1, anchors: [{ kind: 'beat', ref: 'p1.pl1.b1', page: 1, panel: 1, snapshot: 's' }] })
     expect(changedSince(n, 2, versions)).toBe(true)
+  })
+  it('true for a panel anchor when a beat under it changed', () => {
+    const n = node({ comicVersion: 1, anchors: [{ kind: 'panel', ref: 'p1.pl1', page: 1, panel: 1, snapshot: 'Panel 1' }] })
+    expect(changedSince(n, 2, versions)).toBe(true)
+  })
+  it('true for a page anchor when a beat under it changed', () => {
+    const n = node({ comicVersion: 1, anchors: [{ kind: 'page', ref: 'p1', page: 1, snapshot: 'Page 1' }] })
+    expect(changedSince(n, 2, versions)).toBe(true)
+  })
+  it('false for a page anchor when only a different page changed (the "." separator guard)', () => {
+    const v = [{ version: 2, changedBeatRefs: ['p13.pl1.b1'] }, { version: 1, changedBeatRefs: [] }]
+    const n = node({ comicVersion: 1, anchors: [{ kind: 'page', ref: 'p1', page: 1, snapshot: 'Page 1' }] })
+    expect(changedSince(n, 2, v)).toBe(false)
   })
   it('false for general comments or when nothing changed', () => {
     expect(changedSince(node({ comicVersion: 1, anchors: [] }), 2, versions)).toBe(false)
-    const n = node({ comicVersion: 1, anchors: [{ beatRef: 'p9.pl9.b9', page: 9, panel: 9, snapshot: 's' }] })
+    const n = node({ comicVersion: 1, anchors: [{ kind: 'beat', ref: 'p9.pl9.b9', page: 9, panel: 9, snapshot: 's' }] })
     expect(changedSince(n, 2, versions)).toBe(false)
   })
   it('false when comment is already on the current version', () => {
-    const n = node({ comicVersion: 2, anchors: [{ beatRef: 'p1.pl1.b1', page: 1, panel: 1, snapshot: 's' }] })
+    const n = node({ comicVersion: 2, anchors: [{ kind: 'beat', ref: 'p1.pl1.b1', page: 1, panel: 1, snapshot: 's' }] })
     expect(changedSince(n, 2, versions)).toBe(false)
   })
 })

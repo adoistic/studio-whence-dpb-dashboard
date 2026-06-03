@@ -2,16 +2,20 @@
 
 import { useState } from 'react'
 import type { Anchor } from '@/lib/feedbackTypes'
+import { anchorLabel } from '@/lib/feedbackTypes'
 import { PinIcon } from '@/components/feedback/icons'
 
 export interface CommentComposerProps {
   mode: 'comment' | 'reply'
   anchors: Anchor[]
   onAddAnchor: () => void
-  onRemoveAnchor: (beatRef: string) => void
+  onRemoveAnchor: (ref: string) => void
   onSubmit: (body: string) => Promise<void>
   onCancel: () => void
   busy?: boolean
+  /** Hide the "+ add another location" button (select-mode picks units in the
+      script, not from the composer). */
+  hideAddAnchor?: boolean
 }
 
 export function CommentComposer({
@@ -22,6 +26,7 @@ export function CommentComposer({
   onSubmit,
   onCancel,
   busy = false,
+  hideAddAnchor = false,
 }: CommentComposerProps) {
   const [body, setBody] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -51,17 +56,15 @@ export function CommentComposer({
         <div className="flex flex-wrap gap-1.5">
           {anchors.map((anchor) => (
             <span
-              key={anchor.beatRef}
+              key={anchor.ref}
               className="inline-flex items-center gap-1 rounded-full border border-brand-lavender/30 bg-brand-pale-dusk px-2 py-0.5 font-sans text-[0.65rem] text-brand-indigo"
             >
               <PinIcon className="h-3 w-3" />
-              <span>
-                P{anchor.page}·{anchor.panel}
-              </span>
+              <span>{anchorLabel(anchor)}</span>
               <button
                 type="button"
                 aria-label="remove anchor"
-                onClick={() => onRemoveAnchor(anchor.beatRef)}
+                onClick={() => onRemoveAnchor(anchor.ref)}
                 className="ml-0.5 rounded-full p-0.5 leading-none text-brand-lavender transition-colors hover:bg-brand-lavender/20 hover:text-brand-indigo"
               >
                 ×
@@ -96,8 +99,8 @@ export function CommentComposer({
 
       {/* Actions row */}
       <div className="flex items-center justify-between gap-2">
-        {/* Add-location — comment mode only */}
-        {mode === 'comment' && (
+        {/* Add-location — comment mode only (hidden in select-mode) */}
+        {mode === 'comment' && !hideAddAnchor && (
           <button
             type="button"
             aria-label="add another location"
