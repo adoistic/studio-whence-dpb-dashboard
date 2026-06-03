@@ -6,6 +6,7 @@ import { useAllRoots } from '@/lib/feedback'
 import { useComics } from '@/lib/catalog'
 import { useUser, useAllowStatus } from '@/lib/auth'
 import { visibleTo, type Status } from '@/lib/feedbackTypes'
+import { CommentIcon, PinIcon } from '@/components/feedback/icons'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -48,10 +49,24 @@ function comicPath(comicId: string): string {
   return i >= 0 ? `/${comicId.slice(0, i)}/${comicId.slice(i + 2)}` : `/${comicId}`
 }
 
-function anchorSummary(anchors: { page: number; panel: number }[]): string {
-  if (anchors.length === 0) return '🗨️ general'
-  if (anchors.length === 1) return `📌 P${anchors[0].page}·${anchors[0].panel}`
-  return `📌 ${anchors.length} places`
+function anchorSummary(anchors: { page: number; panel: number }[]) {
+  if (anchors.length === 0)
+    return (
+      <>
+        <CommentIcon className="h-3 w-3" /> general
+      </>
+    )
+  if (anchors.length === 1)
+    return (
+      <>
+        <PinIcon className="h-3 w-3" /> P{anchors[0].page}·{anchors[0].panel}
+      </>
+    )
+  return (
+    <>
+      <PinIcon className="h-3 w-3" /> {anchors.length} places
+    </>
+  )
 }
 
 function truncate(text: string, max = 140): string {
@@ -173,7 +188,7 @@ export function ReviewsPageShell() {
                     <span className="font-sans text-[0.68rem] uppercase tracking-label text-brand-indigo">
                       {title}
                     </span>
-                    <span className="font-sans text-[0.65rem] text-brand-slate">
+                    <span className="inline-flex items-center gap-1 font-sans text-[0.65rem] text-brand-slate">
                       {anchorSummary(r.anchors)}
                     </span>
                     <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-brand-pale-dusk bg-brand-pale-dusk/40 px-2 py-0.5">

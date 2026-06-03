@@ -6,6 +6,7 @@ import { toMillis } from '@/lib/feedbackTypes'
 import type { Badge } from '@/components/feedback/badges'
 import { CommentComposer } from '@/components/feedback/CommentComposer'
 import { BADGE_PALETTE } from '@/components/feedback/constants'
+import { PinIcon } from '@/components/feedback/icons'
 
 const STATUS_LABELS: Record<Status, string> = {
   open: 'Open',
@@ -156,7 +157,7 @@ export function CommentThread({
                     onClick={() => onJumpToBeat(anchor.beatRef)}
                     className="inline-flex items-center gap-1 rounded-full border border-brand-lavender/30 bg-brand-pale-dusk px-2 py-0.5 font-sans text-[0.65rem] text-brand-indigo transition-colors hover:bg-brand-lavender/20"
                   >
-                    <span aria-hidden>📌</span>
+                    <PinIcon className="h-3 w-3" />
                     P{anchor.page}·{anchor.panel}
                   </button>
                 )
