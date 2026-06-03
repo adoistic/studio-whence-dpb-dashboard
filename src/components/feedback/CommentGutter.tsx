@@ -74,12 +74,18 @@ export function CommentGutter({
       if (!parsed) return
       const beatEl = scriptRef.current ? indexBeats(scriptRef.current).get(beatRef) : null
       const snapshot = beatEl?.textContent ?? ''
-      const anchor: Anchor = { beatRef, page: parsed.page, panel: parsed.panel, snapshot }
+      const anchor: Anchor = {
+        kind: 'beat',
+        ref: beatRef,
+        page: parsed.page,
+        panel: parsed.panel,
+        snapshot,
+      }
 
       if (picking) {
-        // Append anchor (deduped by beatRef)
+        // Append anchor (deduped by ref)
         setDraftAnchors((prev) =>
-          prev.some((a) => a.beatRef === beatRef) ? prev : [...prev, anchor],
+          prev.some((a) => a.ref === beatRef) ? prev : [...prev, anchor],
         )
         setPicking(false)
       } else {
@@ -94,7 +100,9 @@ export function CommentGutter({
   // ── Computed refs for CommentThread ──────────────────────────────────────
   const knownRefs = useMemo(() => {
     const s = new Set<string>()
-    if (draftText) for (const m of draftText.matchAll(/data-beat-ref="([^"]+)"/g)) s.add(m[1])
+    if (draftText)
+      for (const re of [/data-beat-ref="([^"]+)"/g, /data-panel-ref="([^"]+)"/g, /data-page-ref="([^"]+)"/g])
+        for (const m of draftText.matchAll(re)) s.add(m[1])
     return s
   }, [draftText])
 
@@ -117,14 +125,14 @@ export function CommentGutter({
     // Scroll the PAGE (window) to the anchored beat — block:center.
     el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     // Highlight the owning thread.
-    const owning = visible.find((t) => t.root.anchors.some((a) => a.beatRef === beatRef))
+    const owning = visible.find((t) => t.root.anchors.some((a) => a.ref === beatRef))
     if (owning) setActiveThreadId(owning.root.id)
   }
 
   // Jump from a comment card → its first anchored beat (page scroll + active).
   function handleSelectThread(threadId: string) {
     const owning = visible.find((t) => t.root.id === threadId)
-    const firstRef = owning?.root.anchors[0]?.beatRef
+    const firstRef = owning?.root.anchors[0]?.ref
     if (firstRef) handleJump(firstRef)
     else setActiveThreadId(threadId)
   }
@@ -134,7 +142,7 @@ export function CommentGutter({
   const refToThread = useMemo(() => {
     const m = new Map<string, string>()
     for (const t of visible) {
-      for (const a of t.root.anchors) m.set(a.beatRef, t.root.id)
+      for (const a of t.root.anchors) m.set(a.ref, t.root.id)
     }
     return m
     // `visible` is derived fresh each render; key the memo on the stable inputs.
@@ -238,7 +246,7 @@ export function CommentGutter({
             anchors={draftAnchors}
             onAddAnchor={() => setPicking(true)}
             onRemoveAnchor={(ref) =>
-              setDraftAnchors((prev) => prev.filter((a) => a.beatRef !== ref))
+              setDraftAnchors((prev) => prev.filter((a) => a.ref !== ref))
             }
             onSubmit={handleCreate}
             onCancel={handleCancel}

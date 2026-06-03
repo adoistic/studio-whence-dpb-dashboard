@@ -66,7 +66,7 @@ describe('ReviewsPageShell', () => {
       root({
         id: 't1',
         body: 'Anchored note',
-        anchors: [{ beatRef: 'p13.pl1.b1', page: 13, panel: 1, snapshot: 's' }],
+        anchors: [{ kind: 'beat', ref: 'p13.pl1.b1', page: 13, panel: 1, snapshot: 's' }],
       }),
     ]
     render(<ReviewsPageShell />)
@@ -98,7 +98,7 @@ describe('ReviewsPageShell', () => {
         id: 'r1',
         body: 'Resolved note',
         status: 'resolved',
-        anchors: [{ beatRef: 'p1.pl1.b1', page: 1, panel: 1, snapshot: 's' }],
+        anchors: [{ kind: 'beat', ref: 'p1.pl1.b1', page: 1, panel: 1, snapshot: 's' }],
       }),
     ]
     render(<ReviewsPageShell />)
@@ -116,7 +116,7 @@ describe('ReviewsPageShell', () => {
         id: 'a1',
         body: 'Anchored note',
         status: 'open',
-        anchors: [{ beatRef: 'p2.pl1.b1', page: 2, panel: 1, snapshot: 's' }],
+        anchors: [{ kind: 'beat', ref: 'p2.pl1.b1', page: 2, panel: 1, snapshot: 's' }],
       }),
     ]
     render(<ReviewsPageShell />)

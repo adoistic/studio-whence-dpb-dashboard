@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import type { Thread, FeedbackNode, Status } from '@/lib/feedbackTypes'
-import { toMillis } from '@/lib/feedbackTypes'
+import { toMillis, anchorLabel } from '@/lib/feedbackTypes'
 import type { Badge } from '@/components/feedback/badges'
 import { CommentComposer } from '@/components/feedback/CommentComposer'
 import { BADGE_PALETTE } from '@/components/feedback/constants'
@@ -147,25 +147,26 @@ export function CommentThread({
         {root.anchors.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {root.anchors.map((anchor) => {
-              const alive = knownRefs.has(anchor.beatRef)
+              const label = anchorLabel(anchor)
+              const alive = knownRefs.has(anchor.ref)
               if (alive) {
                 return (
                   <button
-                    key={anchor.beatRef}
+                    key={anchor.ref}
                     type="button"
-                    aria-label={`Jump to P${anchor.page}·${anchor.panel}`}
-                    onClick={() => onJumpToBeat(anchor.beatRef)}
+                    aria-label={`Jump to ${label}`}
+                    onClick={() => onJumpToBeat(anchor.ref)}
                     className="inline-flex items-center gap-1 rounded-full border border-brand-lavender/30 bg-brand-pale-dusk px-2 py-0.5 font-sans text-[0.65rem] text-brand-indigo transition-colors hover:bg-brand-lavender/20"
                   >
                     <PinIcon className="h-3 w-3" />
-                    P{anchor.page}·{anchor.panel}
+                    {label}
                   </button>
                 )
               }
               // Orphaned anchor
               return (
                 <span
-                  key={anchor.beatRef}
+                  key={anchor.ref}
                   className="inline-flex flex-col rounded-[2px] border border-brand-pale-dusk bg-brand-pale-dusk/40 px-2 py-1 font-sans text-[0.65rem] text-brand-slate"
                 >
                   <span className="line-through opacity-60">{anchor.snapshot}</span>

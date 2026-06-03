@@ -30,7 +30,7 @@ const thread = (id: string, refs: string[]): Thread => ({
     comicId: 'c',
     line: 'l',
     parentId: null,
-    anchors: refs.map((beatRef) => ({ beatRef, page: 1, panel: 1, snapshot: '' })),
+    anchors: refs.map((ref) => ({ kind: 'beat' as const, ref, page: 1, panel: 1, snapshot: '' })),
     authorEmail: '',
     authorName: '',
     authorRole: '',

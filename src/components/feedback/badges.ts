@@ -9,7 +9,7 @@ export function assignBadges(threads: Thread[]): Map<string, Badge> {
   for (const t of threads) {
     if (t.root.anchors.length) {
       n += 1
-      m.set(t.root.id, { num: n, refs: t.root.anchors.map((a) => a.beatRef) })
+      m.set(t.root.id, { num: n, refs: t.root.anchors.map((a) => a.ref) })
     }
   }
   return m

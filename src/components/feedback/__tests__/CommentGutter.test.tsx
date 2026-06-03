@@ -27,7 +27,7 @@ const anchored: Thread = {
     comicId: 'c',
     line: 'biographies',
     parentId: null,
-    anchors: [{ beatRef: 'p13.pl1.b1', page: 13, panel: 1, snapshot: 's' }],
+    anchors: [{ kind: 'beat', ref: 'p13.pl1.b1', page: 13, panel: 1, snapshot: 's' }],
     authorEmail: 'a@x.com',
     authorName: 'A',
     authorRole: 'allow',
