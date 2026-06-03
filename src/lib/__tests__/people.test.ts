@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest'
-import { derivePeople, STAGE_RANK } from '../people'
+import { derivePeople, STAGE_RANK, personDocToRow } from '../people'
 import type { Figure, Comic } from '@/types/content'
 
 const fig = (slug: string, extra: Partial<Figure> = {}): Figure =>
@@ -45,5 +45,19 @@ describe('derivePeople', () => {
   test('STAGE_RANK orders researched below all comic statuses', () => {
     expect(STAGE_RANK.researched).toBeLessThan(STAGE_RANK.draft)
     expect(STAGE_RANK.draft).toBeLessThan(STAGE_RANK.published)
+  })
+})
+
+describe('personDocToRow', () => {
+  test('maps a figure people-doc to a /figures/ row', () => {
+    const r = personDocToRow({ slug: 'jrd-tata', name: 'Jrd Tata', line: 'biographies', series: 'S', stage: 'approved', stage_rank: 4, comic_count: 1, sources_count: 3, words: 100, furthest_comic_slug: '01-x', is_orphan: false } as any)
+    expect(r.href).toBe('/figures/jrd-tata')
+    expect(r.comicCount).toBe(1)
+    expect(r.stageRank).toBe(4)
+  })
+  test('maps an orphan people-doc to the comic href', () => {
+    const r = personDocToRow({ slug: 'nobody', name: 'Nobody', line: 'biographies', series: 'X', stage: 'draft', stage_rank: 2, comic_count: 1, sources_count: null, words: null, furthest_comic_slug: '01-orphan', is_orphan: true } as any)
+    expect(r.href).toBe('/biographies/01-orphan')
+    expect(r.sourcesCount).toBeNull()
   })
 })

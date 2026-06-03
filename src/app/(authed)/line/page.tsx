@@ -1,6 +1,8 @@
 'use client'
 
-import { useContent } from '@/lib/content'
+import type { Line } from '@/types/content'
+import { useLines, useComics, useFigures, usePeople } from '@/lib/catalog'
+import { personDocToRow } from '@/lib/people'
 import { LinePageShell } from '@/components/LinePageShell'
 import { LoadingState, ErrorState, NotFoundState } from '@/components/QuietStates'
 import { INTROS } from '@/lib/intros'
@@ -17,17 +19,24 @@ function lineSlugFromPath(): string {
 }
 
 export default function LinePage() {
-  const { content, loading, error } = useContent()
+  const { data: lines, loading, error } = useLines()
   const slug = lineSlugFromPath()
+  const { data: comics } = useComics({ line: slug })
+  const isBio = slug === 'biographies'
+  const { data: figures } = useFigures() // all figures are biographies
+  const { data: people } = usePeople(slug)
 
   if (loading) return <LoadingState />
-  if (error || !content) return <ErrorState />
+  if (error || !lines) return <ErrorState />
 
-  const line = content.lines.find((l) => l.slug === slug)
-  if (!line) return <NotFoundState title="Line not found" detail={`No line matches “${slug}”.`} />
+  const lineDoc = lines.find((l) => l.slug === slug)
+  if (!lineDoc) return <NotFoundState title="Line not found" detail={`No line matches “${slug}”.`} />
+
+  const line: Line = { ...lineDoc, comics: comics ?? [], figures: isBio ? (figures ?? []) : [] }
+  const peopleRows = isBio ? (people ?? []).map(personDocToRow) : undefined
 
   // INTROS[slug] is typed non-undefined (tsconfig has no noUncheckedIndexedAccess),
   // but at runtime an unknown slug yields undefined — the guard is load-bearing.
   const Intro = INTROS[slug]
-  return <LinePageShell line={line} introMdx={Intro ? <Intro /> : null} />
+  return <LinePageShell line={line} introMdx={Intro ? <Intro /> : null} people={peopleRows} />
 }

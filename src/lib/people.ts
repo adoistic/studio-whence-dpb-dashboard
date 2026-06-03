@@ -1,4 +1,5 @@
 import type { Figure, Comic, Status, Content } from '@/types/content'
+import type { PersonDoc } from '@/lib/catalog'
 import { normalizeSubjectSlug } from '@/lib/slugs'
 
 export type Stage = 'researched' | Status
@@ -103,4 +104,21 @@ export function derivePeople(figures: Figure[], comics: Comic[]): PersonRow[] {
   }
 
   return rows
+}
+
+/** Map a publisher-computed people-projection doc to the PersonRow PeopleTable consumes. */
+export function personDocToRow(p: PersonDoc): PersonRow {
+  return {
+    slug: p.slug,
+    name: p.name,
+    series: p.series,
+    stage: p.stage as Stage,
+    stageRank: p.stage_rank,
+    comicCount: p.comic_count,
+    sourcesCount: p.sources_count,
+    words: p.words,
+    href: p.is_orphan && p.furthest_comic_slug
+      ? `/${p.line}/${p.furthest_comic_slug}`
+      : `/figures/${p.slug}`,
+  }
 }

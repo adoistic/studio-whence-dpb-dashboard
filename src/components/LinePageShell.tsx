@@ -7,12 +7,13 @@ import { PeopleTable } from '@/components/PeopleTable'
 import { SectionHead } from '@/components/SectionHead'
 import { TingalandGallery } from '@/components/TingalandGallery'
 import { LINE_VISUALS, TINGALAND_CAST } from '@/lib/images'
-import { derivePeople } from '@/lib/people'
+import { derivePeople, type PersonRow } from '@/lib/people'
 import { useResolved } from '@/lib/useResolved'
 
 interface LinePageShellProps {
   line: Line
   introMdx: ReactNode
+  people?: PersonRow[]
 }
 
 function Stat({ value, label }: { value: number | string; label: string }) {
@@ -24,7 +25,7 @@ function Stat({ value, label }: { value: number | string; label: string }) {
   )
 }
 
-export function LinePageShell({ line, introMdx }: LinePageShellProps) {
+export function LinePageShell({ line, introMdx, people }: LinePageShellProps) {
   const visual = LINE_VISUALS[line.slug]
   const seriesCount = new Set(line.comics.map((c) => c.series).filter(Boolean)).size
   const urls = useResolved(visual?.image ? [visual.image] : [])
@@ -92,7 +93,7 @@ export function LinePageShell({ line, introMdx }: LinePageShellProps) {
         {line.slug === 'biographies' ? (
           <section className="flex flex-col gap-8 pb-24 pt-20">
             <SectionHead kicker="The library" title="People" />
-            <PeopleTable people={derivePeople(line.figures, line.comics)} filename={`${line.slug}-people.csv`} />
+            <PeopleTable people={people ?? derivePeople(line.figures, line.comics)} filename={`${line.slug}-people.csv`} />
           </section>
         ) : (
           <section className="flex flex-col gap-8 pb-24 pt-20">

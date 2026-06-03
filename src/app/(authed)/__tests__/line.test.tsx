@@ -2,34 +2,42 @@
  * Tests for src/app/(authed)/line/page.tsx
  *
  * The single data-driven /line page reads the line slug from the browser URL
- * (window.location.pathname) and resolves it against the loaded content. These
+ * (window.location.pathname) and resolves it against the Firestore catalog. These
  * tests pin the PAGE's routing logic only:
  *
- *   1. pathname /biographies + content loaded → renders LinePageShell (line title shows)
- *   2. pathname /typo (slug absent from content) → graceful "line not found" state
- *   3. content still loading → quiet loading state
+ *   1. pathname /biographies + lines loaded → renders LinePageShell (line title shows)
+ *   2. pathname /typo (slug absent from catalog) → graceful "line not found" state
+ *   3. catalog still loading → quiet loading state
+ *   4. catalog finished-but-failed → error state
  *
  * LinePageShell is stubbed (it internally resolves images + renders tables, which
  * are out of scope here), and @/lib/intros is stubbed to keep the MDX import chain
- * out of this unit test. @/lib/content's useContent is mocked via the
- * forwarding-arrow pattern so the impl can be reassigned per test under hoisting.
+ * out of this unit test. The @/lib/catalog read hooks are mocked via the
+ * forwarding-arrow pattern so each impl can be reassigned per test under hoisting.
  */
 
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import type { Content } from '@/types/content'
+import type { Line, Comic, Figure } from '@/types/content'
+import type { Async, PersonDoc } from '@/lib/catalog'
 import LinePage from '../line/page'
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
-let mockUseContent: () => { content: Content | null; loading: boolean; error?: Error }
+let mockUseLines: () => Async<Line[]>
+let mockUseComics: () => Async<Comic[]>
+let mockUseFigures: () => Async<Figure[]>
+let mockUsePeople: () => Async<PersonDoc[]>
 
-vi.mock('@/lib/content', () => ({
-  useContent: () => mockUseContent(),
+vi.mock('@/lib/catalog', () => ({
+  useLines: () => mockUseLines(),
+  useComics: () => mockUseComics(),
+  useFigures: () => mockUseFigures(),
+  usePeople: () => mockUsePeople(),
 }))
 
 // Stub LinePageShell — renders just the line title so "line title appears" holds,
-// without dragging in image resolution / ComicsTable / TingalandGallery.
+// without dragging in image resolution / ComicsTable / PeopleTable.
 vi.mock('@/components/LinePageShell', () => ({
   LinePageShell: ({ line }: { line: { title: string } }) => <div>{line.title}</div>,
 }))
@@ -37,27 +45,23 @@ vi.mock('@/components/LinePageShell', () => ({
 // Stub the intro registry — the page guards on it, so an empty map is fine.
 vi.mock('@/lib/intros', () => ({ INTROS: {} }))
 
-// ─── Fixture ────────────────────────────────────────────────────────────────
+// ─── Fixtures ───────────────────────────────────────────────────────────────
 
-const fixture: Content = {
-  generated_at: '2026-06-01T00:00:00Z',
-  source_sha: 'test',
-  headline: { figures_researched: 0, comics_in_production: 1, lines_active: 4 },
-  lines: [
-    {
-      slug: 'biographies',
-      title: 'Biographies',
-      subtitle: 'Little Chanakya Presents…',
-      comics: [],
-      figures: [],
-    },
-    { slug: 'awareness', title: 'Awareness', subtitle: '', comics: [], figures: [] },
-    { slug: 'indic', title: 'Indic', subtitle: '', comics: [], figures: [] },
-    { slug: 'toddlers', title: 'Toddlers', subtitle: '', comics: [], figures: [] },
-  ],
-  activity: [],
-  images: [],
-}
+// Firestore line docs carry only {slug,title,subtitle}; the page reconstructs
+// comics/figures from the other hooks.
+const lineDocs = [
+  { slug: 'biographies', title: 'Biographies', subtitle: 'Little Chanakya Presents…' },
+  { slug: 'awareness', title: 'Awareness', subtitle: '' },
+  { slug: 'indic', title: 'Indic', subtitle: '' },
+  { slug: 'toddlers', title: 'Toddlers', subtitle: '' },
+] as unknown as Line[]
+
+const peopleDocs: PersonDoc[] = [
+  { slug: 'dhirubhai-ambani', name: 'Dhirubhai Ambani', line: 'biographies', series: 'Business Maharajas', stage: 'draft', stage_rank: 2, comic_count: 1, sources_count: 5, words: 120000, furthest_comic_slug: null, is_orphan: false },
+  { slug: 'ratan-tata', name: 'Ratan Tata', line: 'biographies', series: 'Business Maharajas', stage: 'researched', stage_rank: 0, comic_count: 0, sources_count: 8, words: 200000, furthest_comic_slug: null, is_orphan: false },
+]
+
+const loaded = <T,>(data: T): Async<T> => ({ data, loading: false })
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -71,6 +75,10 @@ function setPathname(pathname: string) {
 
 beforeEach(() => {
   setPathname('/')
+  // Defaults: the secondary hooks resolve empty/loaded; tests override useLines.
+  mockUseComics = () => loaded<Comic[]>([])
+  mockUseFigures = () => loaded<Figure[]>([])
+  mockUsePeople = () => loaded<PersonDoc[]>(peopleDocs)
 })
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -78,16 +86,16 @@ beforeEach(() => {
 describe('LinePage — data-driven /line routing', () => {
   test('renders LinePageShell for the line named by the URL slug', () => {
     setPathname('/biographies')
-    mockUseContent = () => ({ content: fixture, loading: false })
+    mockUseLines = () => loaded(lineDocs)
 
     render(<LinePage />)
 
     expect(screen.getByText('Biographies')).toBeInTheDocument()
   })
 
-  test('renders a graceful not-found state for a slug absent from content', () => {
+  test('renders a graceful not-found state for a slug absent from the catalog', () => {
     setPathname('/typo')
-    mockUseContent = () => ({ content: fixture, loading: false })
+    mockUseLines = () => loaded(lineDocs)
 
     render(<LinePage />)
 
@@ -97,9 +105,9 @@ describe('LinePage — data-driven /line routing', () => {
     expect(screen.getByRole('status')).toBeInTheDocument()
   })
 
-  test('renders a quiet loading state while content is loading', () => {
+  test('renders a quiet loading state while the catalog is loading', () => {
     setPathname('/biographies')
-    mockUseContent = () => ({ content: null, loading: true })
+    mockUseLines = () => ({ data: null, loading: true })
 
     render(<LinePage />)
 
@@ -108,9 +116,9 @@ describe('LinePage — data-driven /line routing', () => {
     expect(screen.getByRole('status')).toBeInTheDocument()
   })
 
-  test('renders an error state when the content load finished but failed', () => {
+  test('renders an error state when the catalog load finished but failed', () => {
     setPathname('/biographies')
-    mockUseContent = () => ({ content: null, loading: false, error: new Error('boom') })
+    mockUseLines = () => ({ data: null, loading: false, error: new Error('boom') })
 
     render(<LinePage />)
 
