@@ -127,6 +127,7 @@ export function CommentGutter({
           onClick={() => {
             setComposing(true)
             setDraftAnchors([])
+            setPicking(false)
           }}
           className="rounded-[2px] border border-brand-lavender/40 bg-brand-threshold px-2.5 py-1 font-sans text-[0.7rem] text-brand-indigo transition-colors hover:bg-brand-pale-dusk hover:text-brand-twilight-mid"
         >
