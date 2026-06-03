@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest'
+import { describe, it, beforeAll, afterAll } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
   initializeTestEnvironment, type RulesTestEnvironment,
@@ -91,6 +91,8 @@ describe('firestore.rules — feedback', () => {
     await assertFails(setDoc(doc(allowed(), 'feedback/bad'), rootDoc({ status: 'resolved' })))
   })
   it('reply (parentId set) does not require status open', async () => {
+    // omit `status` to build a reply with no status field (replies are status-less)
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { status, ...reply } = rootDoc({ parentId: 'root-ankit' })
     await assertSucceeds(setDoc(doc(allowed(), 'feedback/reply1'), reply))
   })
