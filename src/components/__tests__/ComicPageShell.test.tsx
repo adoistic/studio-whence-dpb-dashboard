@@ -25,6 +25,12 @@ vi.mock('@/lib/catalog', () => ({
 // hover, which this test doesn't trigger.
 vi.mock('@/lib/dataApi', () => ({ readMarkdown: async () => '' }))
 
+vi.mock('@/components/feedback/CommentGutter', () => ({
+  CommentGutter: (props: { comicId: string; comicVersion: number; line: string }) => (
+    <div data-testid="comment-gutter" data-comic-id={props.comicId} data-version={props.comicVersion} data-line={props.line} />
+  ),
+}))
+
 const comic: Comic = {
   title: 'The Sky-High Dreamer',
   subject: 'J.R.D. Tata',
@@ -132,6 +138,21 @@ describe('ComicPageShell', () => {
     mockComics = () => ({ data: [], loading: false })
     render(<ComicPageShell comic={indicComic} />)
     expect(screen.queryByRole('navigation', { name: /person sections/i })).not.toBeInTheDocument()
+  })
+
+  test('mounts the comment gutter with the comic id, line and version', async () => {
+    mockDraft = () => ({ text: '<h2>Page 1</h2><p>Open on a runway.</p>', loading: false })
+    render(<ComicPageShell comic={comic} />)
+    const gutter = await screen.findByTestId('comment-gutter')
+    expect(gutter).toHaveAttribute('data-comic-id', `${comic.line}__${comic.slug}`)
+    expect(gutter).toHaveAttribute('data-line', comic.line)
+    expect(gutter).toHaveAttribute('data-version', String(comic.version ?? 0))
+  })
+
+  test('does not mount the comment gutter when draft is absent', () => {
+    mockDraft = () => ({ text: null, loading: false })
+    render(<ComicPageShell comic={comic} />)
+    expect(screen.queryByTestId('comment-gutter')).not.toBeInTheDocument()
   })
 
   test('numbers provenance markers in the injected draft', async () => {

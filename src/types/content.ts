@@ -25,6 +25,7 @@ export interface Comic {
   created?: string
   updated?: string
   changelog?: ChangelogEntry[]
+  version?: number
   sources_count?: number
   slug: string
   subject_slug: string | null
