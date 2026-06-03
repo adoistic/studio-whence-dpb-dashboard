@@ -5,7 +5,11 @@
     { "collectionGroup": "comics", "queryScope": "COLLECTION", "fields": [
       { "fieldPath": "line", "order": "ASCENDING" }, { "fieldPath": "series", "order": "ASCENDING" } ] },
     { "collectionGroup": "people", "queryScope": "COLLECTION", "fields": [
-      { "fieldPath": "line", "order": "ASCENDING" }, { "fieldPath": "stage", "order": "ASCENDING" } ] }
+      { "fieldPath": "line", "order": "ASCENDING" }, { "fieldPath": "stage", "order": "ASCENDING" } ] },
+    { "collectionGroup": "feedback", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "comicId", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "feedback", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "parentId", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" } ] }
   ],
   "fieldOverrides": []
 }
