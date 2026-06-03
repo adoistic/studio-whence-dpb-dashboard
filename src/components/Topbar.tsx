@@ -8,7 +8,7 @@ import { auth } from '@/lib/firebase'
 import { useUser, useAllowStatus } from '@/lib/auth'
 import { useLines } from '@/lib/catalog'
 
-const NAV_LINKS = [{ label: 'Home', href: '/' }] as const
+const NAV_LINKS = [{ label: 'Home', href: '/' }, { label: 'Reviews', href: '/reviews' }] as const
 
 const ADMIN_LINK = { label: 'Admin', href: '/admin' }
 
