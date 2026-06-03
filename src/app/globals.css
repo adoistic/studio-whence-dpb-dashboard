@@ -248,17 +248,44 @@
    Until then the draft is generic HTML (## Page N → h2, **Panel** → strong,
    lines → p), so the generic fallbacks below keep it readable pre-republish.
    Every rule is scoped under .comic-script so nothing leaks. */
-.comic-script .cs-page { margin: 0 0 2.5em; }
+/* Each comic PAGE is its own paper sheet: white surface, soft shadow + ring,
+   generous padding, and a clear gap between sheets so the muted app background
+   shows through. The horizontal padding (2.5rem ≈ 40px) is wider than the
+   anchored-beat margin badge's reach (it sits 1.7rem ≈ 27px into the left
+   margin), so the badge never clips against the sheet edge. We deliberately do
+   NOT set overflow:hidden here — that would clip the margin badge + the
+   on-hover comment pill, which sit outside the text flow. */
+.comic-script .cs-page {
+  background: #fff;
+  border-radius: 0.6rem;
+  padding: 2rem 2.5rem;
+  margin: 0 0 1.5rem;
+  box-shadow:
+    0 1px 3px rgba(30, 26, 58, 0.08),
+    0 12px 40px -12px rgba(30, 26, 58, 0.18);
+  border: 1px solid color-mix(in srgb, var(--brand-pale-dusk, #E8E2F0) 70%, transparent);
+}
+.comic-script .cs-page:last-child { margin-bottom: 0; }
+
+/* The "Page N" label — a small uppercase tracking-label tab at the top of each
+   sheet, in a muted brand tone, so every sheet is unmistakably "Page N".
+   (For the legacy generic-HTML fallback — a bare ## Page N → h2 with no
+   wrapping cs-page section — the same pill treatment applies so the page
+   structure still reads; only the per-sheet framing is absent there.) */
 .comic-script .cs-page-h,
-.comic-script h2 {                 /* generic-HTML fallback: ## Page N → h2 */
+.comic-script h2 {
+  display: inline-block;
   font-family: var(--font-sans);
-  font-size: 0.72rem;
-  letter-spacing: 0.12em;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--brand-indigo);
-  border-bottom: 2px solid var(--brand-gold);
-  padding-bottom: 0.4em;
-  margin: 0 0 1.2em;
+  color: var(--brand-gold);
+  background: color-mix(in srgb, var(--brand-pale-dusk, #E8E2F0) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-gold, #C4A265) 35%, transparent);
+  border-radius: 999px;
+  padding: 0.35em 0.85em;
+  margin: 0 0 1.4em;
 }
 .comic-script .cs-panel { margin: 0 0 1.4em; }
 .comic-script .cs-panel-h {

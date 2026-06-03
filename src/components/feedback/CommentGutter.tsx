@@ -209,29 +209,36 @@ export function CommentGutter({
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <aside className="flex flex-col rounded-lg border border-brand-pale-dusk bg-brand-threshold/70 font-sans shadow-sm">
-      {/* Header + actions */}
-      <div className="flex items-center justify-between border-b border-brand-pale-dusk px-3.5 py-3">
-        <h2 className="font-sans text-sm font-semibold uppercase tracking-label text-brand-umber">
-          Comments
-        </h2>
-        <button
-          type="button"
-          onClick={() => {
-            setComposing(true)
-            setDraftAnchors([])
-            setPicking(false)
-          }}
-          className="rounded-[2px] border border-brand-lavender/40 bg-white px-2.5 py-1 font-sans text-[0.7rem] text-brand-indigo transition-colors hover:bg-brand-pale-dusk hover:text-brand-twilight-mid"
-        >
-          + General comment
-        </button>
-      </div>
-
-      {/* Scrollable column — scrolls independently of the page. */}
+      {/* Scrollable column — scrolls independently of the page. The header
+          lives INSIDE this scroll container and sticks to its top, so
+          "Comments" + the add-comment control stay reachable while the thread
+          list scrolls under them. */}
       <div
         ref={gutterRef}
-        className="relative flex flex-col gap-4 p-3.5 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto"
+        className="relative flex flex-col gap-4 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto"
       >
+        {/* Sticky header + actions — matching background so threads scrolling
+            under it don't show through, plus a subtle bottom divider. */}
+        <div className="sticky top-0 z-10 -mx-px flex items-center justify-between border-b border-brand-pale-dusk bg-brand-threshold px-3.5 py-3">
+          <h2 className="font-sans text-sm font-semibold uppercase tracking-label text-brand-umber">
+            Comments
+          </h2>
+          <button
+            type="button"
+            onClick={() => {
+              setComposing(true)
+              setDraftAnchors([])
+              setPicking(false)
+            }}
+            className="rounded-[2px] border border-brand-lavender/40 bg-white px-2.5 py-1 font-sans text-[0.7rem] text-brand-indigo transition-colors hover:bg-brand-pale-dusk hover:text-brand-twilight-mid"
+          >
+            + General comment
+          </button>
+        </div>
+
+        {/* Body — the pick hint, composer, and thread list (padded; the sticky
+            header above carries its own padding). */}
+        <div className="flex flex-col gap-4 px-3.5 pb-3.5">
         {/* Pick-mode hint */}
         {picking && (
           <p className="rounded-[2px] bg-brand-pale-dusk px-3 py-2 font-sans text-[0.7rem] text-brand-indigo">
@@ -305,6 +312,7 @@ export function CommentGutter({
             <p className="font-sans text-[0.75rem] text-brand-slate/60">No comments yet.</p>
           )
         )}
+        </div>
       </div>
     </aside>
   )
