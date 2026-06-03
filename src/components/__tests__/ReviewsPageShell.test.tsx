@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { FeedbackNode } from '@/lib/feedbackTypes'
 
@@ -24,9 +24,10 @@ const root = (over: Partial<FeedbackNode>): FeedbackNode => ({
 // ── mutable state so each test can set different data ──────────────────────────
 
 let rootsData: FeedbackNode[] = []
+let loadingFlag = false
 
 vi.mock('@/lib/feedback', () => ({
-  useAllRoots: () => ({ data: rootsData, loading: false }),
+  useAllRoots: () => ({ data: rootsData, loading: loadingFlag }),
 }))
 
 vi.mock('@/lib/catalog', () => ({
@@ -54,6 +55,11 @@ import { ReviewsPageShell } from '@/components/ReviewsPageShell'
 // ── tests ──────────────────────────────────────────────────────────────────────
 
 describe('ReviewsPageShell', () => {
+  beforeEach(() => {
+    rootsData = []
+    loadingFlag = false
+  })
+
   it('renders a row per root with comic title and deep-link', () => {
     rootsData = [
       root({ id: 'g1', body: 'General note', anchors: [] }),
@@ -134,21 +140,12 @@ describe('ReviewsPageShell', () => {
     expect(screen.getByText(/no feedback matches/i)).toBeInTheDocument()
   })
 
-  it('shows loading state while data is loading', async () => {
-    // Re-mock useAllRoots to return loading=true
-    const { useAllRoots: origUseAllRoots } = await import('@/lib/feedback')
-    void origUseAllRoots
-    // Use a fresh render with a custom override
-    // The vi.mock at module level returns loading:false, so we test loading via
-    // the actual shell rendering the loading state via the `loading` prop being
-    // forwarded. We verify the empty-state text does not appear when the
-    // filtered list is empty but loading is true — i.e., the component
-    // handles loading correctly. We test this indirectly: with rootsData=[] and
-    // no filters clicked, no "No feedback matches" text appears (it's guarded
-    // by !loading in the component).
+  it('shows loading state while data is loading', () => {
     rootsData = []
+    loadingFlag = true
     render(<ReviewsPageShell />)
-    // With 0 roots and loading=false from our mock, the empty state shows
-    expect(screen.getByText(/no feedback matches/i)).toBeInTheDocument()
+    expect(screen.getByText(/loading feedback/i)).toBeInTheDocument()
+    expect(screen.queryByText(/no feedback matches/i)).toBeNull()
+    loadingFlag = false
   })
 })

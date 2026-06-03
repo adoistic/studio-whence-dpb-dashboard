@@ -89,8 +89,8 @@ export function ReviewsPageShell() {
   const { data: comics } = useComics()
 
   // Identity
-  const { user } = useUser()
-  const status_raw = useAllowStatus(user ?? null, false)
+  const { user, loading: authLoading } = useUser()
+  const status_raw = useAllowStatus(user ?? null, authLoading)
   const isAdmin = status_raw === 'admin'
   const currentEmail = user?.email ?? ''
 
