@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type RefObject } from 'react'
+import { useState, useMemo, type RefObject } from 'react'
 import { useUser, useAllowStatus } from '@/lib/auth'
 import { useComicFeedback, addComment, addReply, setStatus, hideComment, deleteComment } from '@/lib/feedback'
 import { useComicVersions } from '@/lib/useComicVersions'
@@ -88,9 +88,11 @@ export function CommentGutter({
   })
 
   // ── Computed refs for CommentThread ──────────────────────────────────────
-  const knownRefs: Set<string> = scriptRef.current
-    ? new Set(indexBeats(scriptRef.current).keys())
-    : new Set<string>()
+  const knownRefs = useMemo(() => {
+    const s = new Set<string>()
+    if (draftText) for (const m of draftText.matchAll(/data-beat-ref="([^"]+)"/g)) s.add(m[1])
+    return s
+  }, [draftText])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   async function handleCreate(body: string) {

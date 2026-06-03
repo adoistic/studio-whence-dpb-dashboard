@@ -10,7 +10,7 @@ function normalizeEntry(entry: ChangelogEntry): { date?: string; note: string } 
   return typeof entry === 'string' ? { note: entry } : { date: entry.date, note: entry.note }
 }
 
-export function VersionTimeline({ changelog, version: _version }: VersionTimelineProps) {
+export function VersionTimeline({ changelog }: VersionTimelineProps) {
   if (changelog.length === 0) return null
 
   // Build numbered rows (1-based) then reverse so newest is first.

@@ -13,7 +13,6 @@ export interface Author { email: string; name: string; role: string }
 function useFeedbackQuery(constraints: QueryConstraint[], deps: unknown[]): Live<FeedbackNode[]> {
   const [s, setS] = useState<Live<FeedbackNode[]>>({ data: [], loading: true })
   useEffect(() => {
-    setS({ data: [], loading: true })
     const unsub = onSnapshot(query(collection(db, 'feedback'), ...constraints),
       (snap) => setS({ data: snap.docs.map((d) => ({ id: d.id, ...(d.data() as object) }) as FeedbackNode), loading: false }),
       (err) => setS({ data: [], loading: false, error: err as Error }))
