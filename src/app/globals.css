@@ -362,70 +362,117 @@
 .prov-tip-cited { opacity: 1; background: rgba(196,162,101,0.18); border-radius: 3px; padding: 0 3px; white-space: pre-wrap; }
 .prov-tip-muted { opacity: 0.6; font-style: italic; }
 
-/* ── Beat-marker badges + comment affordance (feedback layer) ────────────
-   Badges (.cs-beat-badge) are injected by useBeatMarkers onto each beat that
-   has an anchored comment thread. The comment affordance (.cs-beat-comment) is
-   injected on every beat and revealed on hover/focus. .cs-beat-pulse highlights
-   the active thread's beats. Beats with either decoration need position:relative
-   so the absolute affordance can escape the flow without displacing text. */
+/* ── Beat-marker badges + line highlights + comment affordance (feedback) ──────
+   Docs-style reading surface. useBeatMarkers injects:
+     • .cs-beat-badge   — a numbered margin marker on every anchored beat.
+     • .cs-beat-anchored — a persistent class on every anchored beat; the beat
+                           carries a --beat-colour custom prop (from BADGE_PALETTE)
+                           that drives a coloured left-border + soft background tint.
+     • .cs-beat-comment — a discoverable "💬 Comment" pill on every beat, revealed
+                           on the line's hover/focus-within.
+     • .cs-beat-active (+ legacy .cs-beat-pulse) — the active thread's beats.
+   Beats need position:relative so the margin badge + comment pill can sit
+   outside the text flow without displacing it. */
 
-/* Give each beat a positioning context for the affordance. */
+/* Each beat is a positioning context + a roomy left gutter for the marker, and
+   gets a whole-line hover highlight so it's obvious what you'd comment on. */
 .comic-script .cs-caption,
 .comic-script .cs-dialogue,
 .comic-script .cs-art,
 .comic-script .cs-sfx {
   position: relative;
+  border-radius: var(--radius-brand, 2px);
+  transition: background-color 0.15s var(--ease-out, ease);
 }
 
-/* Numbered badge — sits inline before the beat text (prepend). */
+/* Whole-line hover / focus highlight (non-anchored + anchored alike). */
+.comic-script .cs-caption:hover,
+.comic-script .cs-caption:focus-within,
+.comic-script .cs-dialogue:hover,
+.comic-script .cs-dialogue:focus-within,
+.comic-script .cs-art:hover,
+.comic-script .cs-art:focus-within,
+.comic-script .cs-sfx:hover,
+.comic-script .cs-sfx:focus-within {
+  background-color: rgba(118, 105, 146, 0.08); /* --brand-lavender, faint */
+}
+
+/* Anchored beat — persistent coloured left-border + soft tint in the thread's
+   colour. --beat-colour is set inline by useBeatMarkers. */
+.comic-script .cs-beat-anchored {
+  --beat-colour: var(--brand-gold, #C4A265);
+  border-left: 3px solid var(--beat-colour);
+  background-color: color-mix(in srgb, var(--beat-colour) 9%, transparent);
+  padding-inline: 0.7em;
+  padding-block: 0.45em;
+  margin-left: 1.7rem;        /* room for the margin badge */
+}
+/* The caption already owns a gold left-border/tint; let the anchor colour win. */
+.comic-script .cs-caption.cs-beat-anchored {
+  border-left-color: var(--beat-colour);
+}
+
+/* Numbered badge — a Docs-style marker pinned in the left margin of the line. */
 .comic-script .cs-beat-badge {
+  position: absolute;
+  left: -1.7rem;
+  top: 0.35em;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 1.25em;
-  height: 1.25em;
-  padding: 0 0.25em;
-  margin-inline-end: 0.45em;
+  min-width: 1.4em;
+  height: 1.4em;
+  padding: 0 0.3em;
   border-radius: 999px;
-  border: none;
+  border: 2px solid var(--brand-cream, #F5EFE4);
   cursor: pointer;
   font-family: var(--font-sans, system-ui);
-  font-size: 0.62rem;
+  font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   line-height: 1;
   color: #fff;
-  vertical-align: middle;
   /* colour set inline via JS */
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 1px 4px rgba(30, 26, 58, 0.28);
   transition: transform 0.1s var(--ease-out, ease), box-shadow 0.1s var(--ease-out, ease);
 }
 .comic-script .cs-beat-badge:hover,
 .comic-script .cs-beat-badge:focus-visible {
-  transform: scale(1.15);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  transform: scale(1.12);
+  box-shadow: 0 2px 7px rgba(30, 26, 58, 0.4);
 }
 .comic-script .cs-beat-badge:focus-visible {
   outline: 2px solid var(--brand-gold, #C4A265);
   outline-offset: 2px;
 }
 
-/* Comment affordance — hidden by default, revealed when the beat is hovered. */
+/* "💬 Comment" pill — hidden until the line is hovered/focused, then revealed
+   inline-end. Larger + clearly labelled (replaces the old bare emoji). */
 .comic-script .cs-beat-comment {
   position: absolute;
-  inset-inline-end: 0.3em;
+  inset-inline-end: 0.4em;
   top: 50%;
   transform: translateY(-50%);
-  border: none;
-  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  border: 1px solid var(--brand-lavender, #766992);
+  background: var(--brand-cream, #F5EFE4);
+  color: var(--brand-indigo, #3B3664);
   cursor: pointer;
-  font-size: 0.72rem;
+  font-family: var(--font-sans, system-ui);
+  font-size: 0.66rem;
+  font-weight: 600;
   line-height: 1;
   opacity: 0;
-  transition: opacity 0.15s var(--ease-out, ease);
-  padding: 0.2em 0.3em;
-  border-radius: 3px;
+  pointer-events: none;
+  transition: opacity 0.15s var(--ease-out, ease), background-color 0.12s var(--ease-out, ease);
+  padding: 0.35em 0.6em;
+  border-radius: 999px;
+  box-shadow: 0 1px 3px rgba(30, 26, 58, 0.18);
+  white-space: nowrap;
 }
+.comic-script .cs-beat-comment-icon { font-size: 0.82em; }
 .comic-script .cs-caption:hover .cs-beat-comment,
 .comic-script .cs-caption:focus-within .cs-beat-comment,
 .comic-script .cs-dialogue:hover .cs-beat-comment,
@@ -434,26 +481,33 @@
 .comic-script .cs-art:focus-within .cs-beat-comment,
 .comic-script .cs-sfx:hover .cs-beat-comment,
 .comic-script .cs-sfx:focus-within .cs-beat-comment {
-  opacity: 0.55;
+  opacity: 1;
+  pointer-events: auto;
 }
-.comic-script .cs-beat-comment:hover,
+/* Always reachable by keyboard even when the line isn't hovered. */
 .comic-script .cs-beat-comment:focus-visible {
-  opacity: 1 !important;
+  opacity: 1;
+  pointer-events: auto;
+  outline: 2px solid var(--brand-gold, #C4A265);
+  outline-offset: 2px;
+}
+.comic-script .cs-beat-comment:hover {
   background: var(--brand-pale-dusk, #E8E2F0);
 }
-.comic-script .cs-beat-comment:focus-visible {
-  outline: 2px solid var(--brand-gold, #C4A265);
-  outline-offset: 2px;
-}
 
-/* Active thread pulse — subtle tinted outline on the thread's beats. */
+/* Active thread — strong highlight tying the line to its highlighted card. */
+.comic-script .cs-beat-active,
 .comic-script .cs-beat-pulse {
-  outline: 2px solid var(--brand-gold, #C4A265);
+  outline: 2px solid var(--beat-colour, var(--brand-gold, #C4A265));
   outline-offset: 2px;
   border-radius: var(--radius-brand, 2px);
-  background-color: color-mix(in srgb, var(--brand-gold, #C4A265) 10%, transparent) !important;
+  background-color: color-mix(in srgb, var(--beat-colour, var(--brand-gold, #C4A265)) 16%, transparent) !important;
 }
 @media (prefers-reduced-motion: reduce) {
+  .comic-script .cs-caption,
+  .comic-script .cs-dialogue,
+  .comic-script .cs-art,
+  .comic-script .cs-sfx { transition: none; }
   .comic-script .cs-beat-badge { transition: none; }
   .comic-script .cs-beat-comment { transition: none; }
 }
