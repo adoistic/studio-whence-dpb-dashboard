@@ -6,30 +6,34 @@ import type { Kpi } from '@/components/KpiStrip'
 import { LineCard } from '@/components/LineCard'
 import { SampleStrip } from '@/components/SampleStrip'
 import { SectionHead } from '@/components/SectionHead'
-import { useContent } from '@/lib/content'
+import { useHeadline, useLines, useComics } from '@/lib/catalog'
 import { useResolved } from '@/lib/useResolved'
 import { HERO_BACKDROP, SAMPLE_PAGES } from '@/lib/images'
+import type { ActivityEntry } from '@/types/content'
 
 // "words on file" is a known library figure — ~10 million words across ~70 books
 // and ~224 transcripts. The build script will supply this dynamically later.
 const WORDS_ON_FILE = 10_000_000
 
 export default function Home() {
-  const { content } = useContent()
+  const { data: meta } = useHeadline()
+  const { data: lines } = useLines()
+  const { data: comics } = useComics() // all comics, one query, for per-line LineCard counts
 
   // Resolve the hero backdrop key to a presigned URL; render the <img> only
   // once it's present (degrades cleanly mid-load).
   const heroUrls = useResolved(HERO_BACKDROP ? [HERO_BACKDROP] : [])
   const heroUrl = heroUrls[HERO_BACKDROP]
 
-  // Content is null while the gated channel loads; the data-dependent sections
-  // (KPIs, line cards, activity) render only when content is present.
-  const kpis: Kpi[] | null = content
+  // Each catalog hook returns null while its Firestore read loads; the
+  // data-dependent sections (KPIs, line cards, activity) render only when
+  // their data is present.
+  const kpis: Kpi[] | null = meta
     ? [
-        { label: 'figures researched', value: content.headline.figures_researched },
-        { label: 'comics in production', value: content.headline.comics_in_production },
+        { label: 'figures researched', value: meta.headline.figures_researched },
+        { label: 'comics in production', value: meta.headline.comics_in_production },
         { label: 'words on file', value: WORDS_ON_FILE, formatter: 'million' },
-        { label: 'lines active', value: content.headline.lines_active },
+        { label: 'lines active', value: meta.headline.lines_active },
       ]
     : null
 
@@ -65,7 +69,7 @@ export default function Home() {
             style={{ ['--i' as string]: 2 }}
           >
             The live state of every comic Studio Whence is building for Diamond
-            Toons{content ? `, across ${content.lines.length} lines` : ''}, page by page.
+            Toons{lines ? `, across ${lines.length} lines` : ''}, page by page.
           </p>
 
           {kpis && (
@@ -79,12 +83,15 @@ export default function Home() {
       {/* ── Body ───────────────────────────────────────────────────────── */}
       <main className="mx-auto max-w-[1200px] px-6">
         {/* The production lines */}
-        {content && (
+        {lines && comics && (
           <section className="flex flex-col gap-8 pt-16 md:pt-20">
-            <SectionHead kicker="The lines" title={`${content.lines.length} lines in production`} />
+            <SectionHead kicker="The lines" title={`${lines.length} lines in production`} />
             <div className="grid grid-cols-1 gap-7 md:grid-cols-2">
-              {content.lines.map((line) => (
-                <LineCard key={line.slug} line={line} />
+              {lines.map((line) => (
+                <LineCard
+                  key={line.slug}
+                  line={{ ...line, comics: comics.filter((c) => c.line === line.slug), figures: [] }}
+                />
               ))}
             </div>
           </section>
@@ -103,10 +110,10 @@ export default function Home() {
         )}
 
         {/* What's new */}
-        {content && (
+        {meta && (
           <section className="flex flex-col gap-8 pb-24 pt-20 md:pt-28">
             <SectionHead kicker="What's new" title="Latest from the studio" />
-            <ActivityFeed entries={content.activity} />
+            <ActivityFeed entries={meta.activity as ActivityEntry[]} />
           </section>
         )}
       </main>

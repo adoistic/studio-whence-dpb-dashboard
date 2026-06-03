@@ -16,7 +16,7 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import type { User } from 'firebase/auth'
-import type { Content, Line } from '@/types/content'
+import type { Line } from '@/types/content'
 import { Topbar } from '../Topbar'
 
 // ─── Mocks ────────────────────────────────────────────────────────────────────
@@ -27,7 +27,7 @@ import { Topbar } from '../Topbar'
 
 let mockUseUser: () => { user: User | null; loading: boolean }
 let mockUseAllowStatus: () => 'admin' | 'allow' | 'pending' | 'loading'
-let mockUseContent: () => { content: Content | null; loading: boolean }
+let mockUseLines: () => { data: Line[] | null; loading: boolean }
 let mockPathname: () => string
 
 vi.mock('@/lib/auth', () => ({
@@ -35,8 +35,8 @@ vi.mock('@/lib/auth', () => ({
   useAllowStatus: () => mockUseAllowStatus(),
 }))
 
-vi.mock('@/lib/content', () => ({
-  useContent: () => mockUseContent(),
+vi.mock('@/lib/catalog', () => ({
+  useLines: () => mockUseLines(),
 }))
 
 vi.mock('@/lib/firebase', () => ({
@@ -66,21 +66,6 @@ function fakeLine(slug: string, title: string): Line {
   return { slug, title, subtitle: '', comics: [], figures: [] }
 }
 
-// A minimal Content fixture carrying just the two lines Topbar reads from.
-function fakeContent(lines: Line[]): Content {
-  return {
-    generated_at: '2026-06-01',
-    source_sha: 'deadbeef',
-    headline: {
-      figures_researched: 0,
-      comics_in_production: 0,
-      lines_active: lines.length,
-    },
-    lines,
-    activity: [],
-  }
-}
-
 const TWO_LINES: Line[] = [
   fakeLine('biographies', 'Business Legends'),
   fakeLine('bollywood-legends', 'Bollywood Legends'),
@@ -97,7 +82,7 @@ describe('Topbar — nav links and user email', () => {
     // Default: signed in as allow user, content loaded with two lines, at '/'
     mockUseUser = () => ({ user: fakeUser('x@thothica.com'), loading: false })
     mockUseAllowStatus = () => 'allow'
-    mockUseContent = () => ({ content: fakeContent(TWO_LINES), loading: false })
+    mockUseLines = () => ({ data: TWO_LINES, loading: false })
     mockPathname = () => '/'
   })
 
@@ -119,7 +104,7 @@ describe('Topbar — nav links and user email', () => {
   })
 
   test('renders only non-line entries (Home) when content is null — no crash', () => {
-    mockUseContent = () => ({ content: null, loading: false })
+    mockUseLines = () => ({ data: null, loading: false })
     render(<Topbar />)
 
     expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
@@ -160,7 +145,7 @@ describe('Topbar — nav links and user email', () => {
 describe('Topbar — Admin link visibility', () => {
   beforeEach(() => {
     mockUseUser = () => ({ user: fakeUser('x@thothica.com'), loading: false })
-    mockUseContent = () => ({ content: fakeContent(TWO_LINES), loading: false })
+    mockUseLines = () => ({ data: TWO_LINES, loading: false })
     mockPathname = () => '/'
   })
 
@@ -178,7 +163,7 @@ describe('Topbar — Admin link visibility', () => {
 
   test('Admin link still renders when content is null and status is "admin"', () => {
     mockUseAllowStatus = () => 'admin'
-    mockUseContent = () => ({ content: null, loading: false })
+    mockUseLines = () => ({ data: null, loading: false })
     render(<Topbar />)
     expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /admin/i })).toBeInTheDocument()
@@ -193,7 +178,7 @@ describe('Topbar — Sign out', () => {
     mockSignOut.mockResolvedValue(undefined)
     mockUseUser = () => ({ user: fakeUser('x@thothica.com'), loading: false })
     mockUseAllowStatus = () => 'allow'
-    mockUseContent = () => ({ content: fakeContent(TWO_LINES), loading: false })
+    mockUseLines = () => ({ data: TWO_LINES, loading: false })
     mockPathname = () => '/'
   })
 

@@ -6,7 +6,7 @@ import { signOut } from 'firebase/auth'
 import { BrandLockup } from '@/components/BrandLockup'
 import { auth } from '@/lib/firebase'
 import { useUser, useAllowStatus } from '@/lib/auth'
-import { useContent } from '@/lib/content'
+import { useLines } from '@/lib/catalog'
 
 const NAV_LINKS = [{ label: 'Home', href: '/' }] as const
 
@@ -42,7 +42,7 @@ export function Topbar() {
   const router = useRouter()
   const { user, loading } = useUser()
   const allowStatus = useAllowStatus(user, loading)
-  const { content } = useContent()
+  const { data: lines } = useLines()
 
   async function handleSignOut() {
     await signOut(auth)
@@ -60,7 +60,7 @@ export function Topbar() {
           {NAV_LINKS.map(({ label, href }) => (
             <NavItem key={href} label={label} href={href} active={isActive(href, pathname)} />
           ))}
-          {(content?.lines ?? []).map((line) => (
+          {(lines ?? []).map((line) => (
             <NavItem
               key={line.slug}
               label={line.title}
