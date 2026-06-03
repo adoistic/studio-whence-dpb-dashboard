@@ -2,6 +2,7 @@
 import { useEffect, type RefObject } from 'react'
 import type { Thread } from '@/lib/feedbackTypes'
 import { assignBadges } from '@/components/feedback/badges'
+import { BADGE_PALETTE } from '@/components/feedback/constants'
 
 export function indexBeats(el: HTMLElement): Map<string, HTMLElement> {
   const m = new Map<string, HTMLElement>()
@@ -11,8 +12,6 @@ export function indexBeats(el: HTMLElement): Map<string, HTMLElement> {
   })
   return m
 }
-
-const PALETTE = ['#1fb6a6', '#7c5cff', '#e0a000', '#e0608a', '#4c8dff', '#5fae3c']
 
 // Inject per-beat number badges + a hover "comment" affordance into the rendered
 // draft. Re-runs every render because dangerouslySetInnerHTML recreates the beat
@@ -33,7 +32,7 @@ export function useBeatMarkers(
     el.querySelectorAll('.cs-beat-pulse').forEach((n) => n.classList.remove('cs-beat-pulse'))
 
     badges.forEach((badge, threadId) => {
-      const colour = PALETTE[(badge.num - 1) % PALETTE.length]
+      const colour = BADGE_PALETTE[(badge.num - 1) % BADGE_PALETTE.length]
       for (const ref of badge.refs) {
         const beat = beats.get(ref)
         if (!beat) continue

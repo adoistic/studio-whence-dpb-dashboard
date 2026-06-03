@@ -5,9 +5,7 @@ import type { Thread, FeedbackNode, Status } from '@/lib/feedbackTypes'
 import { toMillis } from '@/lib/feedbackTypes'
 import type { Badge } from '@/components/feedback/badges'
 import { CommentComposer } from '@/components/feedback/CommentComposer'
-
-// Mirrors the PALETTE in useBeatMarkers so badge colours are consistent.
-const PALETTE = ['#1fb6a6', '#7c5cff', '#e0a000', '#e0608a', '#4c8dff', '#5fae3c']
+import { BADGE_PALETTE } from '@/components/feedback/constants'
 
 const STATUS_LABELS: Record<Status, string> = {
   open: 'Open',
@@ -106,7 +104,7 @@ export function CommentThread({
   const [replying, setReplying] = useState(false)
   const { root, replies } = thread
 
-  const badgeColour = badge ? PALETTE[(badge.num - 1) % PALETTE.length] : undefined
+  const badgeColour = badge ? BADGE_PALETTE[(badge.num - 1) % BADGE_PALETTE.length] : undefined
   const canDeleteRoot = isAdmin || root.authorEmail === currentEmail
 
   async function handleReply(body: string) {
@@ -195,6 +193,7 @@ export function CommentThread({
           <div className="mt-1 flex flex-wrap items-center gap-2 border-t border-brand-pale-dusk pt-2">
             {/* Status select */}
             <select
+              aria-label="comment status"
               value={root.status ?? 'open'}
               onChange={(e) => onSetStatus(e.target.value as Status)}
               className="rounded-[2px] border border-brand-pale-dusk bg-white px-2 py-0.5 font-sans text-[0.7rem] text-brand-deep focus:border-brand-lavender focus:outline-none"
