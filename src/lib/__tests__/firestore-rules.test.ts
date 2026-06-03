@@ -29,6 +29,12 @@ beforeAll(async () => {
     await setDoc(doc(db, 'comics/biographies__01-x/versions/1'), { version: 1, date: '2026-05-29', note: 'init' })
     // mr.ankitgzb@gmail.com is a gmail (not domain-allowed): allowlist it so editor() tests are authorized.
     await setDoc(doc(db, 'allowlist/mr.ankitgzb@gmail.com'), { role: 'editor' })
+    await setDoc(doc(db, 'feedback/stranger-doc'), {
+      comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'nope@gmail.com', authorName: 'Nope', authorRole: 'allow',
+      body: 'x', status: 'open', comicVersion: 1, hidden: false,
+      createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
+    })
   })
 })
 afterAll(async () => { await env.cleanup() })
@@ -108,5 +114,12 @@ describe('firestore.rules — feedback', () => {
   it('versions subcollection: allowlisted reads, nobody writes via client', async () => {
     await assertSucceeds(getDoc(doc(allowed(), 'comics/biographies__01-x/versions/1')))
     await assertFails(setDoc(doc(allowed(), 'comics/biographies__01-x/versions/1'), { version: 1 }))
+  })
+  it('author cannot flip hidden on own doc', async () => {
+    await assertFails(setDoc(doc(editor(), 'feedback/root-ankit'),
+      { ...rootDoc({ authorEmail: 'mr.ankitgzb@gmail.com', authorRole: 'editor' }), hidden: true }))
+  })
+  it('non-allowlisted author cannot delete own doc', async () => {
+    await assertFails(deleteDoc(doc(stranger(), 'feedback/stranger-doc')))
   })
 })

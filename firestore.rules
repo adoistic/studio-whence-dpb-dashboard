@@ -62,7 +62,7 @@ service cloud.firestore {
             && request.resource.data.createdAt == resource.data.createdAt
             && request.resource.data.status == resource.data.status
             && request.resource.data.hidden == resource.data.hidden);
-      allow delete: if isAdmin() || (isSignedIn() && resource.data.authorEmail == userEmail());
+      allow delete: if isAdmin() || (isAllowlisted() && resource.data.authorEmail == userEmail());
     }
 
     match /_internal/{d} { allow read, write: if false; }
