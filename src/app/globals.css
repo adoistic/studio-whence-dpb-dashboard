@@ -361,3 +361,99 @@
 .prov-tip-ctx { opacity: 0.55; }
 .prov-tip-cited { opacity: 1; background: rgba(196,162,101,0.18); border-radius: 3px; padding: 0 3px; white-space: pre-wrap; }
 .prov-tip-muted { opacity: 0.6; font-style: italic; }
+
+/* ── Beat-marker badges + comment affordance (feedback layer) ────────────
+   Badges (.cs-beat-badge) are injected by useBeatMarkers onto each beat that
+   has an anchored comment thread. The comment affordance (.cs-beat-comment) is
+   injected on every beat and revealed on hover/focus. .cs-beat-pulse highlights
+   the active thread's beats. Beats with either decoration need position:relative
+   so the absolute affordance can escape the flow without displacing text. */
+
+/* Give each beat a positioning context for the affordance. */
+.comic-script .cs-caption,
+.comic-script .cs-dialogue,
+.comic-script .cs-art,
+.comic-script .cs-sfx {
+  position: relative;
+}
+
+/* Numbered badge — sits inline before the beat text (prepend). */
+.comic-script .cs-beat-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25em;
+  height: 1.25em;
+  padding: 0 0.25em;
+  margin-inline-end: 0.45em;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-family: var(--font-sans, system-ui);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: #fff;
+  vertical-align: middle;
+  /* colour set inline via JS */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  transition: transform 0.1s var(--ease-out, ease), box-shadow 0.1s var(--ease-out, ease);
+}
+.comic-script .cs-beat-badge:hover,
+.comic-script .cs-beat-badge:focus-visible {
+  transform: scale(1.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+.comic-script .cs-beat-badge:focus-visible {
+  outline: 2px solid var(--brand-gold, #C4A265);
+  outline-offset: 2px;
+}
+
+/* Comment affordance — hidden by default, revealed when the beat is hovered. */
+.comic-script .cs-beat-comment {
+  position: absolute;
+  inset-inline-end: 0.3em;
+  top: 50%;
+  transform: translateY(-50%);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.72rem;
+  line-height: 1;
+  opacity: 0;
+  transition: opacity 0.15s var(--ease-out, ease);
+  padding: 0.2em 0.3em;
+  border-radius: 3px;
+}
+.comic-script .cs-caption:hover .cs-beat-comment,
+.comic-script .cs-caption:focus-within .cs-beat-comment,
+.comic-script .cs-dialogue:hover .cs-beat-comment,
+.comic-script .cs-dialogue:focus-within .cs-beat-comment,
+.comic-script .cs-art:hover .cs-beat-comment,
+.comic-script .cs-art:focus-within .cs-beat-comment,
+.comic-script .cs-sfx:hover .cs-beat-comment,
+.comic-script .cs-sfx:focus-within .cs-beat-comment {
+  opacity: 0.55;
+}
+.comic-script .cs-beat-comment:hover,
+.comic-script .cs-beat-comment:focus-visible {
+  opacity: 1 !important;
+  background: var(--brand-pale-dusk, #E8E2F0);
+}
+.comic-script .cs-beat-comment:focus-visible {
+  outline: 2px solid var(--brand-gold, #C4A265);
+  outline-offset: 2px;
+}
+
+/* Active thread pulse — subtle tinted outline on the thread's beats. */
+.comic-script .cs-beat-pulse {
+  outline: 2px solid var(--brand-gold, #C4A265);
+  outline-offset: 2px;
+  border-radius: var(--radius-brand, 2px);
+  background-color: color-mix(in srgb, var(--brand-gold, #C4A265) 10%, transparent) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .comic-script .cs-beat-badge { transition: none; }
+  .comic-script .cs-beat-comment { transition: none; }
+}
