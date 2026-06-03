@@ -13,6 +13,7 @@ import { citationMapFromSources } from '@/lib/provenance'
 import { PersonTabs } from '@/components/PersonTabs'
 import { useProvenanceMarkers } from '@/lib/useProvenanceMarkers'
 import { ProvenanceTooltip } from '@/components/ProvenanceTooltip'
+import { CommentGutter } from '@/components/feedback/CommentGutter'
 
 // Memoized so tooltip-state re-renders of ComicPageShell don't re-parse the
 // draft. React 19 recreates dangerouslySetInnerHTML child nodes on every host
@@ -145,10 +146,21 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
               Loading the script…
             </p>
           ) : draft.text ? (
-            <>
-              <DraftScript html={draft.text} innerRef={scriptRef} />
-              {tip && <ProvenanceTooltip {...tip} />}
-            </>
+            <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+              <div className="min-w-0 flex-1">
+                <DraftScript html={draft.text} innerRef={scriptRef} />
+                {tip && <ProvenanceTooltip {...tip} />}
+              </div>
+              <aside className="lg:w-80 lg:shrink-0 lg:sticky lg:top-6">
+                <CommentGutter
+                  comicId={`${comic.line}__${comic.slug}`}
+                  line={comic.line}
+                  comicVersion={comic.version ?? 0}
+                  scriptRef={scriptRef}
+                  draftText={draft.text}
+                />
+              </aside>
+            </div>
           ) : (
             <p className="font-serif italic text-brand-slate">Draft not available yet.</p>
           )}
