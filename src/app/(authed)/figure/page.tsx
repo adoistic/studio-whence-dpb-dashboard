@@ -1,6 +1,6 @@
 'use client'
 
-import { useContent } from '@/lib/content'
+import { useFigure } from '@/lib/catalog'
 import { FigurePageShell } from '@/components/FigurePageShell'
 import { LoadingState, ErrorState, NotFoundState } from '@/components/QuietStates'
 import { normalizeSubjectSlug } from '@/lib/slugs'
@@ -25,15 +25,14 @@ function paramsFromUrl(): { file: string | null; line: number | undefined } {
 }
 
 export default function FigurePage() {
-  const { content, loading, error } = useContent()
   const slug = normalizeSubjectSlug(figureSlugFromPath())
+  const { data, loading, error } = useFigure(slug)
 
   if (loading) return <LoadingState />
-  if (error || !content) return <ErrorState />
+  if (error) return <ErrorState />
+  if (!data) return <NotFoundState title="Figure not found" detail={`No figure matches “${slug}”.`} />
 
-  const figure = content.lines.flatMap((l) => l.figures).find((f) => normalizeSubjectSlug(f.slug) === slug)
-  if (!figure) return <NotFoundState title="Figure not found" detail={`No figure matches “${slug}”.`} />
-
+  const figure = data.figure
   const { file, line } = paramsFromUrl()
   const valid = !!file && (figure.sources ?? []).some((s) => s.files.some((f) => f.path === file))
   return <FigurePageShell figure={figure} initialFile={valid ? file : null} targetLine={valid ? line : undefined} />

@@ -13,11 +13,11 @@ vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
 }))
 
-let mockContent: () => { content: { lines: { comics: unknown[] }[] } | null }
-vi.mock('@/lib/content', () => ({ useContent: () => mockContent() }))
+let mockComics: () => { data: unknown[] | null }
+vi.mock('@/lib/catalog', () => ({ useComics: () => mockComics() }))
 
 beforeEach(() => {
-  mockContent = () => ({ content: { lines: [] } })
+  mockComics = () => ({ data: [] })
 })
 
 const figure: Figure = {
@@ -123,23 +123,17 @@ describe('FigurePageShell', () => {
   })
 
   test('mounts the PersonTabs strip — Research active + a Comics affordance — for a figure with comics', () => {
-    mockContent = () => ({
-      content: {
-        lines: [
-          {
-            comics: [
-              {
-                slug: '01-the-polyester-dream',
-                line: 'biographies',
-                title: 'The Polyester Dream',
-                status: 'draft',
-                comic_number: 1,
-                subject_slug: 'dhirubhai-ambani',
-              },
-            ],
-          },
-        ],
-      },
+    mockComics = () => ({
+      data: [
+        {
+          slug: '01-the-polyester-dream',
+          line: 'biographies',
+          title: 'The Polyester Dream',
+          status: 'draft',
+          comic_number: 1,
+          subject_slug: 'dhirubhai-ambani',
+        },
+      ],
     })
     render(<FigurePageShell figure={figure} />)
     const nav = screen.getByRole('navigation', { name: /person sections/i })

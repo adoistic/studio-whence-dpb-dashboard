@@ -5,8 +5,7 @@ import type { Figure } from '@/types/content'
 import { SectionHead } from '@/components/SectionHead'
 import { ResearchReader } from '@/components/ResearchReader'
 import { PersonTabs } from '@/components/PersonTabs'
-import { useContent } from '@/lib/content'
-import { personComics } from '@/lib/people'
+import { useComics } from '@/lib/catalog'
 
 function titleCaseSlug(slug: string): string {
   return slug.split('-').map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(' ')
@@ -85,8 +84,10 @@ export function FigurePageShell({
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const toggle = (key: string) => setCollapsed((c) => ({ ...c, [key]: !c[key] }))
 
-  const { content } = useContent()
-  const comics = personComics(content, figure.slug)
+  const peopleComics = useComics({ subject_slug: figure.slug })
+  const comics = (peopleComics.data ?? []).map((c) => ({
+    slug: c.slug, line: c.line, title: c.title, status: c.status, comic_number: c.comic_number,
+  }))
 
   const sources = figure.sources ?? []
   const books = sources.filter((s) => s.kind === 'book')
