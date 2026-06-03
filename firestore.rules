@@ -38,8 +38,33 @@ service cloud.firestore {
       allow read: if isAllowlisted(); allow write: if false;
       match /sources/{s} { allow read: if isAllowlisted(); allow write: if false; }
     }
-    match /comics/{c}    { allow read: if isAllowlisted(); allow write: if false; }
+    match /comics/{c} {
+      allow read: if isAllowlisted(); allow write: if false;
+      match /versions/{v} { allow read: if isAllowlisted(); allow write: if false; }
+    }
     match /people/{p}    { allow read: if isAllowlisted(); allow write: if false; }
+
+    // ── Feedback (live source of truth; client-written under these rules) ──
+    match /feedback/{id} {
+      allow read: if isAllowlisted();
+      allow create: if isAllowlisted()
+        && request.resource.data.authorEmail == userEmail()
+        && request.resource.data.hidden == false
+        && (request.resource.data.parentId == null
+              ? request.resource.data.status == 'open' : true);
+      allow update: if isAdmin()
+        || (isSignedIn()
+            && resource.data.authorEmail == userEmail()
+            && request.resource.data.authorEmail == resource.data.authorEmail
+            && request.resource.data.parentId == resource.data.parentId
+            && request.resource.data.comicId == resource.data.comicId
+            && request.resource.data.comicVersion == resource.data.comicVersion
+            && request.resource.data.createdAt == resource.data.createdAt
+            && request.resource.data.status == resource.data.status
+            && request.resource.data.hidden == resource.data.hidden);
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.authorEmail == userEmail());
+    }
+
     match /_internal/{d} { allow read, write: if false; }
   }
 }
