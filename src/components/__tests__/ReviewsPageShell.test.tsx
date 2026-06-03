@@ -82,6 +82,15 @@ describe('ReviewsPageShell', () => {
     expect(link).toHaveAttribute('href', '/biographies/01-x#feedback-t1')
   })
 
+  it('builds the deep-link from comicId even when line is empty (no protocol-relative URL)', () => {
+    // regression: an empty `line` previously produced `//comicId` → browser read it
+    // as a hostname (NXDOMAIN). The href must derive line+slug from comicId.
+    rootsData = [root({ id: 'r9', line: '', comicId: 'biographies__01-x', body: 'No-line note' })]
+    render(<ReviewsPageShell />)
+    const link = screen.getByText('No-line note').closest('a')
+    expect(link).toHaveAttribute('href', '/biographies/01-x#feedback-r9')
+  })
+
   it('Open filter shows only open roots', () => {
     rootsData = [
       root({ id: 'g1', body: 'General note', status: 'open', anchors: [] }),

@@ -40,8 +40,12 @@ const STATUS_LABEL: Record<Status, string> = {
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
-function slugOf(comicId: string, line: string): string {
-  return comicId.startsWith(line + '__') ? comicId.slice(line.length + 2) : comicId
+// comicId is `{line}__{slug}` — derive the comic path from it directly so the
+// deep-link never depends on the stored `line` field (an empty line would make
+// the URL protocol-relative, `//comicId`, which the browser reads as a hostname).
+function comicPath(comicId: string): string {
+  const i = comicId.indexOf('__')
+  return i >= 0 ? `/${comicId.slice(0, i)}/${comicId.slice(i + 2)}` : `/${comicId}`
 }
 
 function anchorSummary(anchors: { page: number; panel: number }[]): string {
@@ -154,8 +158,7 @@ export function ReviewsPageShell() {
       ) : (
         <ol className="flex flex-col gap-3">
           {filtered.map((r) => {
-            const comicSlug = slugOf(r.comicId, r.line)
-            const href = `/${r.line}/${comicSlug}#feedback-${r.id}`
+            const href = `${comicPath(r.comicId)}#feedback-${r.id}`
             const title = titleByComicId.get(r.comicId) ?? r.comicId
             const nodeStatus = r.status ?? 'open'
 
