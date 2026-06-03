@@ -30,6 +30,14 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# firebase emulator artifacts
+firestore-debug.log
+firebase-debug.log
+ui-debug.log
+
+# nested deps (e.g. src/node_modules from stray installs)
+**/node_modules/
+
 # env files (can opt-in for committing if needed)
 .env*
 !.env.local.example

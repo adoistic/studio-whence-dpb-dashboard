@@ -8,7 +8,8 @@
     "start": "next start -p 5509",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-dpb \"RULES_TEST=1 vitest run src/lib/__tests__/firestore-rules.test.ts\""
   },
   "dependencies": {
     "@mdx-js/loader": "^3.1.1",
@@ -22,6 +23,7 @@
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

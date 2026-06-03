@@ -29,5 +29,17 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow read: if isAdmin();
     }
+
+    // ── B2.7 catalog (read-only for allowlisted clients; written only by the
+    //    publish Action's Admin SDK, which bypasses rules) ──
+    match /meta/{d}      { allow read: if isAllowlisted(); allow write: if false; }
+    match /lines/{d}     { allow read: if isAllowlisted(); allow write: if false; }
+    match /figures/{f}   {
+      allow read: if isAllowlisted(); allow write: if false;
+      match /sources/{s} { allow read: if isAllowlisted(); allow write: if false; }
+    }
+    match /comics/{c}    { allow read: if isAllowlisted(); allow write: if false; }
+    match /people/{p}    { allow read: if isAllowlisted(); allow write: if false; }
+    match /_internal/{d} { allow read, write: if false; }
   }
 }
