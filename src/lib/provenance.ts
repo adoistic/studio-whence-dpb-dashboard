@@ -1,24 +1,17 @@
-import type { Content } from '@/types/content'
+import type { ResearchSource } from '@/types/content'
 
 export interface Citation {
   sourceTitle: string
   fileTitle: string
 }
 
-/** Map every research file path → its human source + file title, for instant
- * (synchronous) citation lookup on hover. Keyed by the bare repo path, which is
- * exactly what a marker's data-key carries. */
-export function buildCitationMap(content: Content | null): Map<string, Citation> {
+/** Build the path→citation map from a single figure's sources (the subject's).
+ * Same-figure cites resolve to full titles; cross-figure cites fall back to the
+ * path-stem label the tooltip already handles. */
+export function citationMapFromSources(sources: ResearchSource[]): Map<string, Citation> {
   const map = new Map<string, Citation>()
-  if (!content) return map
-  for (const line of content.lines) {
-    for (const fig of line.figures ?? []) {
-      for (const src of fig.sources ?? []) {
-        for (const f of src.files ?? []) {
-          map.set(f.path, { sourceTitle: src.title, fileTitle: f.title })
-        }
-      }
-    }
+  for (const src of sources) {
+    for (const f of src.files) map.set(f.path, { sourceTitle: src.title, fileTitle: f.title })
   }
   return map
 }

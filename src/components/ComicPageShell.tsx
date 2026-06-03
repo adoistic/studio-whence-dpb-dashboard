@@ -1,14 +1,14 @@
 'use client'
 
-import { memo, useRef } from 'react'
+import { memo, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import type { Comic, ChangelogEntry } from '@/types/content'
 import { StatusPill } from '@/components/StatusPill'
 import { SectionHead } from '@/components/SectionHead'
 import { useGatedText } from '@/lib/useGatedText'
-import { useContent } from '@/lib/content'
+import { useFigure, useComics } from '@/lib/catalog'
 import { normalizeSubjectSlug } from '@/lib/slugs'
-import { personComics } from '@/lib/people'
+import { citationMapFromSources } from '@/lib/provenance'
 import { PersonTabs } from '@/components/PersonTabs'
 import { useProvenanceMarkers } from '@/lib/useProvenanceMarkers'
 import { ProvenanceTooltip } from '@/components/ProvenanceTooltip'
@@ -54,16 +54,24 @@ function changelogText(entry: ChangelogEntry): { date?: string; note: string } {
 export function ComicPageShell({ comic }: { comic: Comic }) {
   const draft = useGatedText(`drafts/${comic.line}/${comic.slug}.html`)
 
-  const { content } = useContent()
   const scriptRef = useRef<HTMLDivElement>(null)
-  const tip = useProvenanceMarkers(scriptRef, content, draft.text)
   const figureSlug = normalizeSubjectSlug(comic.subject_slug)
-  const hasFigure =
-    comic.line === 'biographies' &&
-    !!figureSlug &&
-    !!content?.lines.some((l) => l.figures.some((f) => normalizeSubjectSlug(f.slug) === figureSlug))
+  const fig = useFigure(figureSlug)
+  const peopleComics = useComics({ subject_slug: figureSlug })
+  const citationMap = useMemo(
+    () => citationMapFromSources(fig.data?.sources ?? []),
+    [fig.data],
+  )
+  const tip = useProvenanceMarkers(scriptRef, citationMap, draft.text)
+  const hasFigure = comic.line === 'biographies' && !!figureSlug && !!fig.data
 
-  const comics = hasFigure ? personComics(content, figureSlug) : []
+  const comics = (peopleComics.data ?? []).map((c) => ({
+    slug: c.slug,
+    line: c.line,
+    title: c.title,
+    status: c.status,
+    comic_number: c.comic_number,
+  }))
 
   const seriesLine = [comic.series, comic.comic_number ? `Comic ${comic.comic_number}` : null]
     .filter(Boolean)

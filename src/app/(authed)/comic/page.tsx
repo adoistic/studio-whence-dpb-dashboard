@@ -1,8 +1,8 @@
 'use client'
 
-import { useContent } from '@/lib/content'
+import { useComic } from '@/lib/catalog'
 import { ComicPageShell } from '@/components/ComicPageShell'
-import { LoadingState, ErrorState, NotFoundState } from '@/components/QuietStates'
+import { LoadingState, NotFoundState } from '@/components/QuietStates'
 
 // Read the first two path segments of the browser URL as <line>/<comic-slug>.
 // This single page is served for every /<line>/<comic> URL via the Firebase
@@ -16,15 +16,14 @@ function segmentsFromPath(): { lineSlug: string; comicSlug: string } {
 }
 
 export default function ComicPage() {
-  const { content, loading, error } = useContent()
   const { lineSlug, comicSlug } = segmentsFromPath()
+  const { data: comic, loading, error } = useComic(lineSlug, comicSlug)
 
   if (loading) return <LoadingState />
-  if (error || !content) return <ErrorState />
-
-  const line = content.lines.find((l) => l.slug === lineSlug)
-  const comic = line?.comics.find((c) => c.slug === comicSlug)
-  if (!comic) return <NotFoundState title="Comic not found" detail={`No comic matches “${lineSlug}/${comicSlug}”.`} />
+  // useComic sets `error` ("comic not found") on a missing doc; treat any
+  // failure as not-found to preserve the not-found UX for a bad /<line>/<slug>.
+  if (error || !comic)
+    return <NotFoundState title="Comic not found" detail={`No comic matches “${lineSlug}/${comicSlug}”.`} />
 
   return <ComicPageShell comic={comic} />
 }

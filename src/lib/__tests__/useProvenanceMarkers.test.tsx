@@ -7,12 +7,9 @@ import { ProvenanceTooltip } from '@/components/ProvenanceTooltip'
 let mockRead: (key: string) => Promise<string>
 vi.mock('@/lib/dataApi', () => ({ readMarkdown: (k: string) => mockRead(k) }))
 
-const content = {
-  lines: [{ figures: [{ slug: 'steve-jobs', sources: [
-    { slug: 'isaacson', title: 'Walter Isaacson, Steve Jobs', kind: 'book',
-      files: [{ path: 'P/18.md', title: 'Chapter 12' }] },
-  ] }] }],
-} as any
+const citationMap = new Map([
+  ['P/18.md', { sourceTitle: 'Walter Isaacson, Steve Jobs', fileTitle: 'Chapter 12' }],
+])
 
 const DRAFT =
   '<section class="cs-page"><div class="cs-panel">' +
@@ -22,7 +19,7 @@ const DRAFT =
 
 function Harness() {
   const ref = useRef<HTMLDivElement>(null)
-  const tip = useProvenanceMarkers(ref, content, DRAFT)
+  const tip = useProvenanceMarkers(ref, citationMap, DRAFT)
   return (
     <div>
       <div ref={ref} className="comic-script" dangerouslySetInnerHTML={{ __html: DRAFT }} />

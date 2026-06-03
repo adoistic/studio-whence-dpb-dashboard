@@ -9,19 +9,16 @@ vi.mock('@/lib/useGatedText', () => ({ useGatedText: () => mockDraft() }))
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
 }))
-let mockContent: () => {
-  content: {
-    lines: {
-      slug: string
-      figures: {
-        slug: string
-        sources?: { title: string; files: { path: string; title: string }[] }[]
-      }[]
-      comics?: unknown[]
-    }[]
-  } | null
-}
-vi.mock('@/lib/content', () => ({ useContent: () => mockContent() }))
+// Firestore catalog hooks: useFigure(slug) → { data: {figure,sources}|null }, and
+// useComics(filters) → { data: Comic[]|null }. The citation map (provenance) is
+// built from the subject figure's sources, and PersonTabs comes from useComics.
+type FigData = { figure: { slug: string }; sources: { title: string; files: { path: string; title: string }[] }[] } | null
+let mockFigure: () => { data: FigData; loading: boolean }
+let mockComics: () => { data: { slug: string; line: string; title: string; status: string; comic_number?: number }[] | null; loading: boolean }
+vi.mock('@/lib/catalog', () => ({
+  useFigure: () => mockFigure(),
+  useComics: () => mockComics(),
+}))
 
 // useProvenanceMarkers transitively imports dataApi → firebase; mock the leaf
 // fetch so the test tree never initializes Firebase. readMarkdown only fires on
@@ -48,25 +45,18 @@ const comic: Comic = {
 
 beforeEach(() => {
   mockDraft = () => ({ text: null, loading: false })
-  mockContent = () => ({
-    content: {
-      lines: [
-        {
-          slug: 'biographies',
-          figures: [{ slug: 'jrd-tata' }],
-          comics: [
-            {
-              slug: '01-the-sky-high-dreamer',
-              line: 'biographies',
-              title: 'The Sky-High Dreamer',
-              status: 'draft',
-              comic_number: 1,
-              subject_slug: 'jrd-tata',
-            },
-          ],
-        },
-      ],
-    },
+  mockFigure = () => ({ data: { figure: { slug: 'jrd-tata' }, sources: [] }, loading: false })
+  mockComics = () => ({
+    data: [
+      {
+        slug: '01-the-sky-high-dreamer',
+        line: 'biographies',
+        title: 'The Sky-High Dreamer',
+        status: 'draft',
+        comic_number: 1,
+      },
+    ],
+    loading: false,
   })
 })
 
@@ -113,7 +103,7 @@ describe('ComicPageShell', () => {
   })
 
   test('renders the subject as plain text when no matching figure exists', () => {
-    mockContent = () => ({ content: { lines: [{ slug: 'biographies', figures: [] }] } })
+    mockFigure = () => ({ data: null, loading: false })
     render(<ComicPageShell comic={comic} />)
     expect(screen.queryByRole('link', { name: 'J.R.D. Tata' })).not.toBeInTheDocument()
     expect(screen.getByText('J.R.D. Tata')).toBeInTheDocument()
@@ -131,16 +121,15 @@ describe('ComicPageShell', () => {
   })
 
   test('renders NO strip when no matching figure exists', () => {
-    mockContent = () => ({ content: { lines: [{ slug: 'biographies', figures: [] }] } })
+    mockFigure = () => ({ data: null, loading: false })
     render(<ComicPageShell comic={comic} />)
     expect(screen.queryByRole('navigation', { name: /person sections/i })).not.toBeInTheDocument()
   })
 
   test('renders NO strip for a non-biography comic', () => {
     const indicComic: Comic = { ...comic, line: 'indic', subject_slug: 'rama' }
-    mockContent = () => ({
-      content: { lines: [{ slug: 'indic', figures: [], comics: [] }] },
-    })
+    mockFigure = () => ({ data: null, loading: false })
+    mockComics = () => ({ data: [], loading: false })
     render(<ComicPageShell comic={indicComic} />)
     expect(screen.queryByRole('navigation', { name: /person sections/i })).not.toBeInTheDocument()
   })
@@ -155,21 +144,12 @@ describe('ComicPageShell', () => {
         ' aria-label="source: x, line 2">source</a></p>',
       loading: false,
     })
-    mockContent = () => ({
-      content: {
-        lines: [
-          {
-            slug: 'biographies',
-            figures: [
-              {
-                slug: 'jrd-tata',
-                sources: [{ title: 'The Sky-High Dreamer', files: [{ path, title: 'Flight' }] }],
-              },
-            ],
-            comics: [],
-          },
-        ],
+    mockFigure = () => ({
+      data: {
+        figure: { slug: 'jrd-tata' },
+        sources: [{ title: 'The Sky-High Dreamer', files: [{ path, title: 'Flight' }] }],
       },
+      loading: false,
     })
     const { container } = render(<ComicPageShell comic={comic} />)
     await waitFor(() => expect(container.querySelector('.cs-src')?.textContent).toBe('1'))

@@ -1,26 +1,20 @@
 import { describe, it, expect } from 'vitest'
-import { buildCitationMap, excerptPassage } from '@/lib/provenance'
+import { citationMapFromSources, excerptPassage } from '@/lib/provenance'
 
-const content = {
-  lines: [
-    { figures: [
-      { slug: 'steve-jobs', sources: [
-        { slug: 'isaacson', title: 'Walter Isaacson, Steve Jobs', kind: 'book',
-          files: [{ path: 'biographies/02/_books/steve-jobs/isaacson/ch/18.md', title: 'Chapter 12' }] },
-      ] },
-    ] },
-  ],
-} as any
+const sources = [
+  { slug: 'isaacson', title: 'Walter Isaacson, Steve Jobs', kind: 'book', words: 0,
+    files: [{ path: 'biographies/02/_books/steve-jobs/isaacson/ch/18.md', title: 'Chapter 12' }] },
+] as any
 
-describe('buildCitationMap', () => {
+describe('citationMapFromSources', () => {
   it('maps a file path to its source + file title', () => {
-    const m = buildCitationMap(content)
+    const m = citationMapFromSources(sources)
     expect(m.get('biographies/02/_books/steve-jobs/isaacson/ch/18.md')).toEqual({
       sourceTitle: 'Walter Isaacson, Steve Jobs', fileTitle: 'Chapter 12',
     })
   })
-  it('returns an empty map for null content', () => {
-    expect(buildCitationMap(null).size).toBe(0)
+  it('returns an empty map for no sources', () => {
+    expect(citationMapFromSources([]).size).toBe(0)
   })
 })
 

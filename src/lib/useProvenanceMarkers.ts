@@ -1,20 +1,18 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react'
+import { useEffect, useRef, useState, type RefObject } from 'react'
 import { readMarkdown } from '@/lib/dataApi'
-import { buildCitationMap, excerptPassage } from '@/lib/provenance'
+import { excerptPassage, type Citation } from '@/lib/provenance'
 import type { TooltipState } from '@/components/ProvenanceTooltip'
-import type { Content } from '@/types/content'
 
 const MARKER_SEL = '.cs-src, .cs-src-art'
 
 export function useProvenanceMarkers(
   containerRef: RefObject<HTMLElement | null>,
-  content: Content | null,
+  citationMap: Map<string, Citation>,
   draftText: string | null | undefined,
 ): TooltipState | null {
   const [tip, setTip] = useState<TooltipState | null>(null)
-  const citationMap = useMemo(() => buildCitationMap(content), [content])
   const cache = useRef<Map<string, string>>(new Map())
   const activeToken = useRef<string | null>(null)
   // Markers we've already wired listeners onto. A WeakSet so detached nodes (the
