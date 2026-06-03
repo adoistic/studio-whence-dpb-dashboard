@@ -52,7 +52,7 @@ export function useBeatMarkers(
       const c = document.createElement('button')
       c.className = 'cs-beat-comment'
       c.textContent = '💬'
-      c.setAttribute('aria-label', 'comment on this beat')
+      c.setAttribute('aria-label', `comment on beat ${ref}`)
       c.addEventListener('click', () => handlers.onStartComment(ref))
       beat.appendChild(c)
     })
