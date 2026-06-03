@@ -34,7 +34,7 @@ const DraftScript = memo(function DraftScript({
     // stops sanitizing, this injection must be revisited.
     <div
       ref={innerRef}
-      className="comic-script max-w-2xl font-serif text-brand-umber leading-relaxed"
+      className="comic-script font-serif text-brand-umber leading-relaxed"
       dangerouslySetInnerHTML={{ __html: html }}
     />
   )
@@ -147,11 +147,15 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
             </p>
           ) : draft.text ? (
             <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+              {/* The document "page" — a centered white paper surface */}
               <div className="min-w-0 flex-1">
-                <DraftScript html={draft.text} innerRef={scriptRef} />
-                {tip && <ProvenanceTooltip {...tip} />}
+                <div className="mx-auto max-w-[760px] rounded-lg bg-white px-8 py-10 shadow-[0_1px_3px_rgba(30,26,58,0.08),0_12px_40px_-12px_rgba(30,26,58,0.18)] ring-1 ring-brand-pale-dusk/70 md:px-12 md:py-14">
+                  <DraftScript html={draft.text} innerRef={scriptRef} />
+                  {tip && <ProvenanceTooltip {...tip} />}
+                </div>
               </div>
-              <aside className="lg:w-80 lg:shrink-0 lg:sticky lg:top-6">
+              {/* The comment margin — sticky beside the page, scrolls on its own */}
+              <aside className="lg:sticky lg:top-6 lg:w-[22rem] lg:shrink-0">
                 <CommentGutter
                   comicId={`${comic.line}__${comic.slug}`}
                   line={comic.line}
