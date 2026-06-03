@@ -13,6 +13,9 @@ export interface CommentComposerProps {
   onSubmit: (body: string) => Promise<void>
   onCancel: () => void
   busy?: boolean
+  /** Hide the "+ add another location" button (select-mode picks units in the
+      script, not from the composer). */
+  hideAddAnchor?: boolean
 }
 
 export function CommentComposer({
@@ -23,6 +26,7 @@ export function CommentComposer({
   onSubmit,
   onCancel,
   busy = false,
+  hideAddAnchor = false,
 }: CommentComposerProps) {
   const [body, setBody] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -95,8 +99,8 @@ export function CommentComposer({
 
       {/* Actions row */}
       <div className="flex items-center justify-between gap-2">
-        {/* Add-location — comment mode only */}
-        {mode === 'comment' && (
+        {/* Add-location — comment mode only (hidden in select-mode) */}
+        {mode === 'comment' && !hideAddAnchor && (
           <button
             type="button"
             aria-label="add another location"

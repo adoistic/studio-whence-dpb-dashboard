@@ -6,7 +6,8 @@ import { useComicFeedback, addComment, addReply, setStatus, hideComment, deleteC
 import { useComicVersions } from '@/lib/useComicVersions'
 import { visibleTo, changedSince, type Anchor } from '@/lib/feedbackTypes'
 import { assignBadges } from '@/components/feedback/badges'
-import { useBeatMarkers, indexBeats } from '@/components/feedback/useBeatMarkers'
+import { useCommentTargets } from '@/components/feedback/useCommentTargets'
+import { indexUnits } from '@/components/feedback/anchorRef'
 import { BADGE_PALETTE } from '@/components/feedback/constants'
 import { CommentComposer } from '@/components/feedback/CommentComposer'
 import { CommentThread } from '@/components/feedback/CommentThread'
@@ -17,13 +18,6 @@ export interface CommentGutterProps {
   comicVersion: number
   scriptRef: RefObject<HTMLElement | null>
   draftText: string | null
-}
-
-// Parse a beatRef like "p13.pl1.b2" → { page: 13, panel: 1 }
-function parseBeatRef(beatRef: string): { page: number; panel: number } | null {
-  const m = /^p(\d+)\.pl(\d+)\.b\d+$/.exec(beatRef)
-  if (!m) return null
-  return { page: parseInt(m[1], 10), panel: parseInt(m[2], 10) }
 }
 
 export function CommentGutter({
@@ -53,49 +47,37 @@ export function CommentGutter({
   const badges = assignBadges(visible)
 
   // ── Local state ───────────────────────────────────────────────────────────
+  // Select-mode: the reader toggles any number of units (page/panel/beat) in
+  // the script, then attaches ONE comment to the whole selection.
+  const [selection, setSelection] = useState<Anchor[]>([])
   const [composing, setComposing] = useState(false)
-  const [draftAnchors, setDraftAnchors] = useState<Anchor[]>([])
-  const [picking, setPicking] = useState(false)
+  const [generalComment, setGeneralComment] = useState(false)
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
+
+  const selectedRefs = useMemo(() => new Set(selection.map((a) => a.ref)), [selection])
 
   // The scrollable comment column (independently scrollable from the page).
   const gutterRef = useRef<HTMLDivElement>(null)
 
-  // ── Beat markers ─────────────────────────────────────────────────────────
-  useBeatMarkers(scriptRef, visible, draftText, {
-    onSelectThread(id) {
-      setActiveThreadId(id)
-      // Optional: scroll the thread card into view (best-effort)
-      const card = document.getElementById(`thread-card-${id}`)
-      card?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  // ── Marker + select affordances on the rendered draft ─────────────────────
+  useCommentTargets(scriptRef, visible, draftText, {
+    selectedRefs,
+    onToggleSelect(anchor) {
+      setSelection((prev) =>
+        prev.some((a) => a.ref === anchor.ref)
+          ? prev.filter((a) => a.ref !== anchor.ref)
+          : [...prev, anchor],
+      )
     },
-    onStartComment(beatRef) {
-      const parsed = parseBeatRef(beatRef)
-      if (!parsed) return
-      const beatEl = scriptRef.current ? indexBeats(scriptRef.current).get(beatRef) : null
-      const snapshot = beatEl?.textContent ?? ''
-      const anchor: Anchor = {
-        kind: 'beat',
-        ref: beatRef,
-        page: parsed.page,
-        panel: parsed.panel,
-        snapshot,
-      }
-
-      if (picking) {
-        // Append anchor (deduped by ref)
-        setDraftAnchors((prev) =>
-          prev.some((a) => a.ref === beatRef) ? prev : [...prev, anchor],
-        )
-        setPicking(false)
-      } else {
-        // Open fresh composer anchored to this beat
-        setComposing(true)
-        setDraftAnchors([anchor])
-      }
+    onSelectThread(id) {
+      handleSelectThread(id)
     },
     activeThreadId,
   })
+
+  // The anchors handed to the composer: a selection comment carries the picked
+  // units; a general comment carries none.
+  const composerAnchors = generalComment ? [] : selection
 
   // ── Computed refs for CommentThread ──────────────────────────────────────
   const knownRefs = useMemo(() => {
@@ -108,20 +90,29 @@ export function CommentGutter({
 
   // ── Handlers ─────────────────────────────────────────────────────────────
   async function handleCreate(body: string) {
-    await addComment({ comicId, line, anchors: draftAnchors, body, comicVersion }, author)
+    await addComment({ comicId, line, anchors: composerAnchors, body, comicVersion }, author)
     setComposing(false)
-    setDraftAnchors([])
-    setPicking(false)
+    setGeneralComment(false)
+    setSelection([])
   }
 
   function handleCancel() {
     setComposing(false)
-    setDraftAnchors([])
-    setPicking(false)
+    setGeneralComment(false)
+  }
+
+  function handleClearSelection() {
+    setSelection([])
+    setComposing(false)
+    setGeneralComment(false)
+  }
+
+  function handleRemoveAnchor(ref: string) {
+    setSelection((prev) => prev.filter((a) => a.ref !== ref))
   }
 
   function handleJump(beatRef: string) {
-    const el = scriptRef.current ? indexBeats(scriptRef.current).get(beatRef) : null
+    const el = scriptRef.current ? indexUnits(scriptRef.current).get(beatRef) : null
     // Scroll the PAGE (window) to the anchored beat — block:center.
     el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
     // Highlight the owning thread.
@@ -153,7 +144,7 @@ export function CommentGutter({
     const container = scriptRef.current
     if (!container || refToThread.size === 0) return
 
-    const beats = indexBeats(container)
+    const beats = indexUnits(container)
     const observed: HTMLElement[] = []
     const elToRef = new Map<Element, string>()
     for (const ref of refToThread.keys()) {
@@ -219,30 +210,62 @@ export function CommentGutter({
       >
         {/* Sticky header + actions — matching background so threads scrolling
             under it don't show through, plus a subtle bottom divider. */}
-        <div className="sticky top-0 z-10 -mx-px flex items-center justify-between border-b border-brand-pale-dusk bg-brand-threshold px-3.5 py-3">
-          <h2 className="font-sans text-sm font-semibold uppercase tracking-label text-brand-umber">
-            Comments
-          </h2>
-          <button
-            type="button"
-            onClick={() => {
-              setComposing(true)
-              setDraftAnchors([])
-              setPicking(false)
-            }}
-            className="rounded-[2px] border border-brand-lavender/40 bg-white px-2.5 py-1 font-sans text-[0.7rem] text-brand-indigo transition-colors hover:bg-brand-pale-dusk hover:text-brand-twilight-mid"
-          >
-            + General comment
-          </button>
+        <div className="sticky top-0 z-10 -mx-px flex flex-col border-b border-brand-pale-dusk bg-brand-threshold">
+          <div className="flex items-center justify-between px-3.5 py-3">
+            <h2 className="font-sans text-sm font-semibold uppercase tracking-label text-brand-umber">
+              Comments
+            </h2>
+            <button
+              type="button"
+              onClick={() => {
+                setGeneralComment(true)
+                setComposing(true)
+              }}
+              className="rounded-[2px] border border-brand-lavender/40 bg-white px-2.5 py-1 font-sans text-[0.7rem] text-brand-indigo transition-colors hover:bg-brand-pale-dusk hover:text-brand-twilight-mid"
+            >
+              + General comment
+            </button>
+          </div>
+
+          {/* Selection action bar — appears once any unit is selected in the
+              script. One unified comment attaches to the whole selection. */}
+          {selection.length > 0 && (
+            <div className="flex items-center justify-between gap-2 border-t border-brand-pale-dusk bg-brand-pale-dusk/60 px-3.5 py-2">
+              <span className="font-sans text-[0.7rem] font-semibold text-brand-indigo">
+                {selection.length} selected
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleClearSelection}
+                  className="rounded-[2px] px-2 py-1 font-sans text-[0.7rem] text-brand-slate transition-colors hover:bg-white hover:text-brand-deep"
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGeneralComment(false)
+                    setComposing(true)
+                  }}
+                  className="rounded-[2px] bg-brand-indigo px-3 py-1 font-sans text-[0.7rem] font-semibold text-brand-pale-dusk transition-colors hover:bg-brand-twilight-mid"
+                >
+                  Comment
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Body — the pick hint, composer, and thread list (padded; the sticky
-            header above carries its own padding). */}
+        {/* Body — the composer + thread list (padded; the sticky header above
+            carries its own padding). */}
         <div className="flex flex-col gap-4 px-3.5 pb-3.5">
-        {/* Pick-mode hint */}
-        {picking && (
-          <p className="rounded-[2px] bg-brand-pale-dusk px-3 py-2 font-sans text-[0.7rem] text-brand-indigo">
-            Click a beat in the script to add it as a location.
+        {/* Selection hint when nothing is picked yet and no composer is open */}
+        {selection.length === 0 && !composing && (
+          <p className="rounded-[2px] bg-brand-pale-dusk/50 px-3 py-2 font-sans text-[0.7rem] text-brand-slate">
+            Hover a page, panel, or line in the script and hit{' '}
+            <span className="font-semibold text-brand-indigo">＋ Select</span> to attach a comment —
+            pick as many as you like for one comment.
           </p>
         )}
 
@@ -250,11 +273,10 @@ export function CommentGutter({
         {composing && (
           <CommentComposer
             mode="comment"
-            anchors={draftAnchors}
-            onAddAnchor={() => setPicking(true)}
-            onRemoveAnchor={(ref) =>
-              setDraftAnchors((prev) => prev.filter((a) => a.ref !== ref))
-            }
+            anchors={composerAnchors}
+            onAddAnchor={() => {}}
+            hideAddAnchor
+            onRemoveAnchor={handleRemoveAnchor}
             onSubmit={handleCreate}
             onCancel={handleCancel}
           />
