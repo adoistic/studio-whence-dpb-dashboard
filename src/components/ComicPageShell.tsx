@@ -2,9 +2,10 @@
 
 import { memo, useMemo, useRef } from 'react'
 import Link from 'next/link'
-import type { Comic, ChangelogEntry } from '@/types/content'
+import type { Comic } from '@/types/content'
 import { StatusPill } from '@/components/StatusPill'
 import { SectionHead } from '@/components/SectionHead'
+import { VersionTimeline } from '@/components/feedback/VersionTimeline'
 import { useGatedText } from '@/lib/useGatedText'
 import { useFigure, useComics } from '@/lib/catalog'
 import { normalizeSubjectSlug } from '@/lib/slugs'
@@ -47,9 +48,6 @@ function Detail({ label, value }: { label: string; value: string | number }) {
   )
 }
 
-function changelogText(entry: ChangelogEntry): { date?: string; note: string } {
-  return typeof entry === 'string' ? { note: entry } : { date: entry.date, note: entry.note }
-}
 
 export function ComicPageShell({ comic }: { comic: Comic }) {
   const draft = useGatedText(`drafts/${comic.line}/${comic.slug}.html`)
@@ -136,23 +134,8 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
           {comic.language && <Detail label="language" value={comic.language} />}
         </div>
 
-        {/* Changelog timeline */}
-        {comic.changelog && comic.changelog.length > 0 && (
-          <section className="flex flex-col gap-6 pt-16">
-            <SectionHead kicker="History" title="Changelog" />
-            <ul className="flex flex-col gap-3">
-              {comic.changelog.map((entry, i) => {
-                const { date, note } = changelogText(entry)
-                return (
-                  <li key={i} className="flex gap-3 font-serif text-brand-umber leading-relaxed">
-                    {date && <span className="shrink-0 tabular-nums text-brand-slate text-sm">{date}</span>}
-                    <span>{note}</span>
-                  </li>
-                )
-              })}
-            </ul>
-          </section>
-        )}
+        {/* Version history timeline */}
+        <VersionTimeline changelog={comic.changelog ?? []} version={comic.version} />
 
         {/* Script reader */}
         <section className="flex flex-col gap-6 pb-24 pt-16">
