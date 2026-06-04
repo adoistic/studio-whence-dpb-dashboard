@@ -18,16 +18,21 @@ function node(over: Partial<FeedbackNode>): FeedbackNode {
     createdAt: 1000, ...over,
   }
 }
-const threadData: Thread[] = [{ root: node({ id: 'g1', anchors: [], body: 'general note' }), replies: [] }]
+// `published: true` → an approved comment, included in the default copy.
+let threadData: Thread[] = [
+  { root: node({ id: 'g1', anchors: [], body: 'general note', published: true }), replies: [] },
+]
 
 vi.mock('@/lib/feedback', () => ({
   useComicFeedback: () => ({ data: threadData, loading: false }),
 }))
 
-// The toolbar now reads the viewer's role to scope the gated feedback read.
+// The toolbar reads the viewer's role to scope the gated read AND to decide
+// whether to show the "Include drafts" toggle. Driven per-test via `allowStatus`.
+let allowStatus = 'allow'
 vi.mock('@/lib/auth', () => ({
   useUser: () => ({ user: { email: 'me@x.com' }, loading: false }),
-  useAllowStatus: () => 'allow',
+  useAllowStatus: () => allowStatus,
   canModerate: (s: string) => s === 'admin' || s === 'sub_admin',
 }))
 
@@ -37,6 +42,10 @@ const writeText = vi.fn().mockResolvedValue(undefined)
 
 beforeEach(() => {
   writeText.mockClear()
+  allowStatus = 'allow'
+  threadData = [
+    { root: node({ id: 'g1', anchors: [], body: 'general note', published: true }), replies: [] },
+  ]
   Object.assign(navigator, { clipboard: { writeText } })
 })
 
@@ -65,6 +74,35 @@ describe('CopyScriptToolbar', () => {
     const btn = screen.getByRole('button', { name: /copy the script as plain text/i })
     fireEvent.click(btn)
     await waitFor(() => expect(btn.textContent).toMatch(/Copied/))
+  })
+
+  it('shows the "Include drafts" checkbox for a moderator, not for a member', () => {
+    const { unmount } = render(<CopyScriptToolbar comicId="c" comicTitle="Demo" draftText={DRAFT} />)
+    expect(screen.queryByLabelText(/include drafts/i)).toBeNull()
+    unmount()
+    allowStatus = 'sub_admin'
+    render(<CopyScriptToolbar comicId="c" comicTitle="Demo" draftText={DRAFT} />)
+    expect(screen.getByLabelText(/include drafts/i)).toBeInTheDocument()
+  })
+
+  it('a moderator toggling "Include drafts" includes draft comments in the copy', async () => {
+    allowStatus = 'sub_admin'
+    threadData = [
+      { root: node({ id: 'd1', anchors: [], body: 'draft note', published: false }), replies: [] },
+    ]
+    render(<CopyScriptToolbar comicId="c" comicTitle="Demo" draftText={DRAFT} />)
+
+    // Default OFF → the draft note is excluded.
+    fireEvent.click(screen.getByRole('button', { name: /copy the script with editorial comments/i }))
+    await waitFor(() => expect(writeText).toHaveBeenCalled())
+    expect(writeText.mock.calls[0][0] as string).not.toContain('draft note')
+
+    // Toggle ON → the draft note is included.
+    fireEvent.click(screen.getByLabelText(/include drafts/i))
+    fireEvent.click(screen.getByRole('button', { name: /copy the script with editorial comments/i }))
+    await waitFor(() => expect(writeText.mock.calls.length).toBeGreaterThan(1))
+    const last = writeText.mock.calls[writeText.mock.calls.length - 1][0] as string
+    expect(last).toContain('draft note')
   })
 
   it('disables both buttons when draftText is null', () => {

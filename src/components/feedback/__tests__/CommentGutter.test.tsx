@@ -55,6 +55,7 @@ let threadData: Thread[] = []
 let lastViewerCanModerate: boolean | undefined
 
 const addComment = vi.fn().mockResolvedValue(undefined)
+const setPublished = vi.fn()
 
 vi.mock('@/lib/feedback', () => ({
   useComicFeedback: (_comicId: string, viewerCanModerate: boolean) => {
@@ -64,6 +65,8 @@ vi.mock('@/lib/feedback', () => ({
   addComment: (...args: unknown[]) => addComment(...args),
   addReply: vi.fn().mockResolvedValue(undefined),
   setStatus: vi.fn(),
+  setPublished: (...args: unknown[]) => setPublished(...args),
+  editComment: vi.fn().mockResolvedValue(undefined),
   hideComment: vi.fn(),
   deleteComment: vi.fn(),
 }))
@@ -119,6 +122,7 @@ beforeEach(() => {
   allowStatus = 'allow'
   lastViewerCanModerate = undefined
   addComment.mockClear()
+  setPublished.mockClear()
   scrollIntoView.mockClear()
   // jsdom has no IntersectionObserver; the scroll-spy effect needs one when a
   // non-null scriptRef is supplied.
@@ -278,5 +282,24 @@ describe('CommentGutter', () => {
     threadData = [general]
     render(<CommentGutter {...props} />)
     expect(screen.queryByRole('combobox', { name: /comment status/i })).toBeNull()
+  })
+
+  it('a moderator posting a comment threads the chosen published value into addComment', async () => {
+    allowStatus = 'sub_admin'
+    render(<CommentGutter {...props} />)
+    fireEvent.click(screen.getByRole('button', { name: /general comment/i }))
+    // Default "Publish directly" → published === true.
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'mod note' } })
+    fireEvent.click(screen.getByRole('button', { name: /post/i }))
+    await vi.waitFor(() => expect(addComment).toHaveBeenCalled())
+    expect(addComment.mock.calls[0][0].published).toBe(true)
+  })
+
+  it('a moderator approving a draft calls setPublished(id, true, approver)', () => {
+    allowStatus = 'sub_admin'
+    threadData = [{ root: { ...general.root, id: 'd1', published: false }, replies: [] }]
+    render(<CommentGutter {...props} />)
+    fireEvent.click(screen.getByRole('button', { name: /approve/i }))
+    expect(setPublished).toHaveBeenCalledWith('d1', true, { email: 'me@x.com', name: 'Me' })
   })
 })

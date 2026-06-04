@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import type { Thread, FeedbackNode, Status } from '@/lib/feedbackTypes'
-import { toMillis, anchorLabel, STATUS_COLOR, CATEGORY_LABELS } from '@/lib/feedbackTypes'
+import type { Thread, FeedbackNode, Status, Category } from '@/lib/feedbackTypes'
+import { toMillis, anchorLabel, isDraft, STATUS_COLOR, CATEGORY_LABELS } from '@/lib/feedbackTypes'
 import type { Badge } from '@/components/feedback/badges'
 import { CommentComposer } from '@/components/feedback/CommentComposer'
 import { PinIcon } from '@/components/feedback/icons'
@@ -40,11 +40,15 @@ export interface CommentThreadProps {
   currentEmail: string
   changedSince: boolean
   knownRefs: Set<string>
-  onReply: (body: string) => Promise<void>
+  onReply: (body: string, published?: boolean) => Promise<void>
   onSetStatus: (status: Status) => void
   onHide: (hidden: boolean) => void
   onDelete: (nodeId: string) => void
   onJumpToBeat: (beatRef: string) => void
+  /** Approve (publish) a draft — moderators only. */
+  onApprove: () => void
+  /** Edit the root comment body — moderator or the comment's author. */
+  onEdit: (body: string) => Promise<void>
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -101,18 +105,42 @@ export function CommentThread({
   onHide,
   onDelete,
   onJumpToBeat,
+  onApprove,
+  onEdit,
 }: CommentThreadProps) {
   const [replying, setReplying] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editText, setEditText] = useState('')
+  const [savingEdit, setSavingEdit] = useState(false)
   const { root, replies } = thread
 
   // Status drives the comment colour everywhere (badge bg, card accent, pill).
   const statusColour = STATUS_COLOR[root.status ?? 'open'].hex
   const categoryLabel = CATEGORY_LABELS[root.category ?? 'other']
   const canDeleteRoot = canModerate || root.authorEmail === currentEmail
+  const canEditRoot = canModerate || root.authorEmail === currentEmail
+  const rootIsDraft = isDraft(root)
 
-  async function handleReply(body: string) {
-    await onReply(body)
+  async function handleReply(body: string, _category?: Category, published?: boolean) {
+    await onReply(body, published)
     setReplying(false)
+  }
+
+  function startEdit() {
+    setEditText(root.body)
+    setEditing(true)
+  }
+
+  async function handleSaveEdit() {
+    const trimmed = editText.trim()
+    if (!trimmed || savingEdit) return
+    setSavingEdit(true)
+    try {
+      await onEdit(trimmed)
+      setEditing(false)
+    } finally {
+      setSavingEdit(false)
+    }
   }
 
   return (
@@ -144,6 +172,14 @@ export function CommentThread({
 
           {/* Status pill */}
           {root.status && <StatusPillFeedback status={root.status} />}
+
+          {/* Draft pill — only moderators ever receive draft docs, so this
+              simply follows the data (no extra gating). */}
+          {rootIsDraft && (
+            <span className="inline-flex items-center rounded-full border border-brand-gold/50 bg-brand-gold/10 px-2 py-0.5 font-sans text-[0.6rem] uppercase tracking-label text-brand-gold">
+              Draft
+            </span>
+          )}
 
           {/* Hidden indicator (moderators only) */}
           {canModerate && root.hidden && (
@@ -197,8 +233,40 @@ export function CommentThread({
           </p>
         )}
 
-        {/* Body */}
-        <p className="font-sans text-sm leading-relaxed text-brand-deep">{root.body}</p>
+        {/* Body — inline editable for a moderator or the author. */}
+        {editing ? (
+          <div className="flex flex-col gap-2">
+            <label className="sr-only" htmlFor={`edit-comment-${root.id}`}>
+              Edit comment
+            </label>
+            <textarea
+              id={`edit-comment-${root.id}`}
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              rows={3}
+              className="w-full resize-none rounded-[2px] border border-brand-pale-dusk bg-white px-2.5 py-2 font-sans text-sm text-brand-deep placeholder:text-brand-slate/60 focus:border-brand-lavender focus:outline-none focus:ring-1 focus:ring-brand-lavender/40"
+            />
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                className="rounded-[2px] px-3 py-1 font-sans text-xs text-brand-slate transition-colors hover:bg-brand-pale-dusk hover:text-brand-deep"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEdit}
+                disabled={!editText.trim() || savingEdit}
+                className="rounded-[2px] bg-brand-indigo px-3 py-1 font-sans text-xs text-brand-pale-dusk transition-colors hover:bg-brand-twilight-mid disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {savingEdit ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <p className="font-sans text-sm leading-relaxed text-brand-deep">{root.body}</p>
+        )}
 
         {/* Moderation controls */}
         {canModerate && (
@@ -216,6 +284,28 @@ export function CommentThread({
                 </option>
               ))}
             </select>
+
+            {/* Approve — only while still a draft. */}
+            {rootIsDraft && (
+              <button
+                type="button"
+                onClick={onApprove}
+                className="rounded-[2px] px-2 py-0.5 font-sans text-[0.7rem] font-semibold text-brand-indigo transition-colors hover:bg-brand-pale-dusk"
+              >
+                Approve
+              </button>
+            )}
+
+            {/* Edit root body */}
+            {!editing && (
+              <button
+                type="button"
+                onClick={startEdit}
+                className="rounded-[2px] px-2 py-0.5 font-sans text-[0.7rem] text-brand-slate transition-colors hover:bg-brand-pale-dusk hover:text-brand-deep"
+              >
+                Edit
+              </button>
+            )}
 
             {/* Hide/unhide toggle */}
             <button
@@ -238,17 +328,28 @@ export function CommentThread({
           </div>
         )}
 
-        {/* Author-only delete (non-moderator, own root) */}
-        {!canModerate && canDeleteRoot && (
+        {/* Author-only controls (non-moderator, own root): edit + delete. */}
+        {!canModerate && (canDeleteRoot || canEditRoot) && (
           <div className="mt-1 flex items-center gap-2 border-t border-brand-pale-dusk pt-2">
-            <button
-              type="button"
-              aria-label="delete comment"
-              onClick={() => onDelete(root.id)}
-              className="rounded-[2px] px-2 py-0.5 font-sans text-[0.7rem] text-red-600 transition-colors hover:bg-red-50"
-            >
-              Delete
-            </button>
+            {canEditRoot && !editing && (
+              <button
+                type="button"
+                onClick={startEdit}
+                className="rounded-[2px] px-2 py-0.5 font-sans text-[0.7rem] text-brand-slate transition-colors hover:bg-brand-pale-dusk hover:text-brand-deep"
+              >
+                Edit
+              </button>
+            )}
+            {canDeleteRoot && (
+              <button
+                type="button"
+                aria-label="delete comment"
+                onClick={() => onDelete(root.id)}
+                className="rounded-[2px] px-2 py-0.5 font-sans text-[0.7rem] text-red-600 transition-colors hover:bg-red-50"
+              >
+                Delete
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -291,6 +392,7 @@ export function CommentThread({
             onRemoveAnchor={() => {}}
             onSubmit={handleReply}
             onCancel={() => setReplying(false)}
+            canPublishDirectly={canModerate}
           />
         ) : (
           <button

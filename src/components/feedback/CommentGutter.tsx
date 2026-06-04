@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, type RefObject } from 'react'
 import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
-import { useComicFeedback, addComment, addReply, setStatus, hideComment, deleteComment } from '@/lib/feedback'
+import { useComicFeedback, addComment, addReply, setStatus, setPublished, editComment, hideComment, deleteComment } from '@/lib/feedback'
 import { useComicVersions } from '@/lib/useComicVersions'
 import { visibleTo, changedSince, STATUS_COLOR, type Anchor, type Category, type Status } from '@/lib/feedbackTypes'
 import { assignBadges } from '@/components/feedback/badges'
@@ -48,7 +48,7 @@ export function CommentGutter({
   const author = {
     email: currentEmail,
     name: user?.displayName ?? currentEmail,
-    role: isAdmin ? 'admin' : 'allow',
+    role: isAdmin ? 'admin' : canMod ? 'sub_admin' : 'allow',
   }
 
   // ── Data ──────────────────────────────────────────────────────────────────
@@ -124,8 +124,8 @@ export function CommentGutter({
   }, [draftText])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-  async function handleCreate(body: string, category?: Category) {
-    await addComment({ comicId, line, anchors: composerAnchors, body, comicVersion, category }, author)
+  async function handleCreate(body: string, category?: Category, published?: boolean) {
+    await addComment({ comicId, line, anchors: composerAnchors, body, comicVersion, category, published }, author)
     setComposing(false)
     setGeneralComment(false)
     setSelection([])
@@ -341,6 +341,7 @@ export function CommentGutter({
             onRemoveAnchor={handleRemoveAnchor}
             onSubmit={handleCreate}
             onCancel={handleCancel}
+            canPublishDirectly={canMod}
           />
         )}
 
@@ -383,13 +384,17 @@ export function CommentGutter({
                     currentEmail={currentEmail}
                     changedSince={changedSince(t.root, comicVersion, versions)}
                     knownRefs={knownRefs}
-                    onReply={async (body) => {
-                      await addReply({ comicId, line, parentId: t.root.id, body, comicVersion }, author)
+                    onReply={async (body, published) => {
+                      await addReply({ comicId, line, parentId: t.root.id, body, comicVersion, published }, author)
                     }}
                     onSetStatus={(s) => setStatus(t.root.id, s)}
                     onHide={(h) => hideComment(t.root.id, h)}
                     onDelete={(id) => deleteComment(id)}
                     onJumpToBeat={handleJump}
+                    onApprove={() => setPublished(t.root.id, true, { email: author.email, name: author.name })}
+                    onEdit={async (body) => {
+                      await editComment(t.root.id, { body })
+                    }}
                   />
                 </div>
               )

@@ -57,6 +57,8 @@ vi.mock('@/lib/feedback', () => ({
   },
   addReply: vi.fn().mockResolvedValue(undefined),
   setStatus: vi.fn(),
+  setPublished: vi.fn(),
+  editComment: vi.fn().mockResolvedValue(undefined),
   hideComment: vi.fn(),
   deleteComment: vi.fn(),
 }))

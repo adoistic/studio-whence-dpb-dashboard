@@ -20,7 +20,8 @@ function node(over: Partial<FeedbackNode>): FeedbackNode {
     id: 'x', comicId: 'c', line: 'biographies', parentId: null, anchors: [],
     authorEmail: 'a@x.com', authorName: 'Ankit', authorRole: 'allow',
     body: '', status: 'open', category: 'fact', comicVersion: 1, hidden: false,
-    createdAt: 1000, ...over,
+    // Seeded/approved comments are published; the default copy is approved-only.
+    published: true, createdAt: 1000, ...over,
   }
 }
 function anchor(over: Partial<Anchor>): Anchor {
@@ -119,6 +120,19 @@ describe('serializeScriptWithComments', () => {
     // no inline marker anywhere in the body
     const body = out.split('─── COMMENTS ───')[0]
     expect(body).not.toContain('〔C1〕')
+  })
+
+  it('excludes a draft thread by default and includes it with { includeDrafts: true }', () => {
+    const draft: Thread = {
+      root: node({ id: 'd1', published: false, anchors: [], body: 'draft note' }),
+      replies: [],
+    }
+    // Default: drafts are excluded.
+    const out = serializeScriptWithComments(DRAFT, [draft])
+    expect(out).not.toContain('draft note')
+    // With includeDrafts the draft is serialized.
+    const withDrafts = serializeScriptWithComments(DRAFT, [draft], { includeDrafts: true })
+    expect(withDrafts).toContain('draft note')
   })
 
   it('orders anchored markers top-to-bottom by document position', () => {

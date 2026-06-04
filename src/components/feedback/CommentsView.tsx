@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
-import { useComicFeedback, addReply, setStatus, hideComment, deleteComment } from '@/lib/feedback'
+import { useComicFeedback, addReply, setStatus, setPublished, editComment, hideComment, deleteComment } from '@/lib/feedback'
 import { useComicVersions } from '@/lib/useComicVersions'
 import {
   visibleTo,
@@ -55,7 +55,7 @@ export function CommentsView({
   const author = {
     email: currentEmail,
     name: user?.displayName ?? currentEmail,
-    role: isAdmin ? 'admin' : 'allow',
+    role: isAdmin ? 'admin' : canMod ? 'sub_admin' : 'allow',
   }
 
   // ── Data ──────────────────────────────────────────────────────────────────
@@ -252,13 +252,17 @@ export function CommentsView({
                   currentEmail={currentEmail}
                   changedSince={changedSince(t.root, comicVersion, versions)}
                   knownRefs={knownRefs}
-                  onReply={async (body) => {
-                    await addReply({ comicId, line, parentId: t.root.id, body, comicVersion }, author)
+                  onReply={async (body, published) => {
+                    await addReply({ comicId, line, parentId: t.root.id, body, comicVersion, published }, author)
                   }}
                   onSetStatus={(s) => setStatus(t.root.id, s)}
                   onHide={(h) => hideComment(t.root.id, h)}
                   onDelete={(id) => deleteComment(id)}
                   onJumpToBeat={onJumpInDraft}
+                  onApprove={() => setPublished(t.root.id, true, { email: author.email, name: author.name })}
+                  onEdit={async (body) => {
+                    await editComment(t.root.id, { body })
+                  }}
                 />
               </article>
             )
