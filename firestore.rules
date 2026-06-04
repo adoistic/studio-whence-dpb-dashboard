@@ -68,7 +68,14 @@ service cloud.firestore {
         && request.resource.data.hidden == false
         && (request.resource.data.parentId == null
               ? request.resource.data.status == 'open' : true)
-        && (isSubAdmin() || request.resource.data.published == false);
+        // Non-moderators cannot self-publish a root. A reply may be created
+        // published ONLY when its parent doc is already published (so a member
+        // replying to a published comment stays visible to themselves); a reply
+        // to a draft stays draft.
+        && (isSubAdmin()
+            || request.resource.data.published == false
+            || (request.resource.data.parentId != null
+                && get(/databases/$(database)/documents/feedback/$(request.resource.data.parentId)).data.published == true));
       allow update: if isSubAdmin()
         || (isAllowlisted()
             && resource.data.authorEmail == userEmail()
@@ -79,7 +86,11 @@ service cloud.firestore {
             && request.resource.data.createdAt == resource.data.createdAt
             && request.resource.data.status == resource.data.status
             && request.resource.data.hidden == resource.data.hidden
-            && request.resource.data.published == resource.data.published);
+            && request.resource.data.published == resource.data.published
+            // `.get(...)` (not `.category`) so a doc with no category field —
+            // accessing an absent property throws — compares cleanly: an author
+            // may not mutate category, but a category-less doc still edits fine.
+            && request.resource.data.get('category', null) == resource.data.get('category', null));
       allow delete: if isSubAdmin() || (isAllowlisted() && resource.data.authorEmail == userEmail());
     }
 

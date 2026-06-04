@@ -62,6 +62,14 @@ beforeAll(async () => {
       body: 'draft root', status: 'open', comicVersion: 1, hidden: false, published: false,
       createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
     })
+    // A published root WITH a category, authored by the allowlisted editor —
+    // used to prove the author-update branch pins `category`.
+    await setDoc(doc(db, 'feedback/cat-doc'), {
+      comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'mr.ankitgzb@gmail.com', authorName: 'Ankit', authorRole: 'editor',
+      body: 'before', status: 'open', category: 'fact', comicVersion: 1, hidden: false, published: true,
+      createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
+    })
   })
 })
 afterAll(async () => { await env.cleanup() })
@@ -154,6 +162,21 @@ describe('firestore.rules — feedback', () => {
     await assertSucceeds(getDoc(doc(allowed(), 'comics/biographies__01-x/versions/1')))
     await assertFails(setDoc(doc(allowed(), 'comics/biographies__01-x/versions/1'), { version: 1 }))
   })
+  it('author can edit own body/anchors but cannot mutate category', async () => {
+    const db = editor()
+    const base = {
+      comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'mr.ankitgzb@gmail.com', authorName: 'Ankit', authorRole: 'editor',
+      status: 'open', comicVersion: 1, hidden: false, published: true,
+      createdAt: '2026-06-03', updatedAt: '2026-06-04',
+    }
+    // Editing body (+ anchors) while keeping category unchanged is allowed.
+    await assertSucceeds(setDoc(doc(db, 'feedback/cat-doc'),
+      { ...base, body: 'edited', category: 'fact', anchors: [{ kind: 'page', ref: 'p1', page: 1, snapshot: 'Page 1' }], editedAt: '2026-06-04' }))
+    // Mutating category is denied.
+    await assertFails(setDoc(doc(db, 'feedback/cat-doc'),
+      { ...base, body: 'edited', category: 'tone', editedAt: '2026-06-04' }))
+  })
   it('author cannot flip hidden on own doc', async () => {
     await assertFails(setDoc(doc(editor(), 'feedback/root-ankit'),
       { ...rootDoc({ authorEmail: 'mr.ankitgzb@gmail.com', authorRole: 'editor' }), hidden: true }))
@@ -199,6 +222,23 @@ describe('firestore.rules — roles & approval', () => {
   it('member create MUST set published == false', async () => {
     await assertFails(setDoc(doc(member(), 'feedback/m-pub'), rootDoc({ published: true })))
     await assertSucceeds(setDoc(doc(member(), 'feedback/m-draft'), rootDoc({ published: false })))
+  })
+
+  // ── Create: replies inherit parent published state ──
+  it('member CAN create a published reply under a published root', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { status, ...reply } = rootDoc({ parentId: 'pub', published: true })
+    await assertSucceeds(setDoc(doc(member(), 'feedback/reply-under-pub'), reply))
+  })
+  it('member CANNOT create a published reply under a draft root', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { status, ...reply } = rootDoc({ parentId: 'draft', published: true })
+    await assertFails(setDoc(doc(member(), 'feedback/reply-under-draft'), reply))
+  })
+  it('member CAN create a draft reply under a draft root', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { status, ...reply } = rootDoc({ parentId: 'draft', published: false })
+    await assertSucceeds(setDoc(doc(member(), 'feedback/draft-reply-under-draft'), reply))
   })
   it('sub_admin create with published == true succeeds', async () => {
     await assertSucceeds(setDoc(doc(subAdmin(), 'feedback/sa-pub'),

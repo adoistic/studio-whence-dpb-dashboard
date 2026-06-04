@@ -74,7 +74,10 @@ export function addReply(
     comicId: input.comicId, line: input.line, parentId: input.parentId, anchors: [],
     authorEmail: author.email, authorName: author.name, authorRole: author.role,
     body: input.body, comicVersion: input.comicVersion, hidden: false,
-    // A member's reply is a draft too until approved.
+    // A reply inherits its parent root's published state (the caller passes
+    // `parent.published`): a reply to a published root is itself published and
+    // immediately visible; a reply to a draft stays draft. Falls back to draft
+    // when no value is supplied.
     published: input.published ?? false,
     createdAt: serverTimestamp(), updatedAt: serverTimestamp(), editedAt: null,
   })

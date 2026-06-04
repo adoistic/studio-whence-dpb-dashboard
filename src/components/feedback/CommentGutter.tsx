@@ -385,7 +385,14 @@ export function CommentGutter({
                     changedSince={changedSince(t.root, comicVersion, versions)}
                     knownRefs={knownRefs}
                     onReply={async (body, published) => {
-                      await addReply({ comicId, line, parentId: t.root.id, body, comicVersion, published }, author)
+                      // Replies inherit the parent root's published state by
+                      // default (a member only ever sees published roots, so
+                      // their reply becomes visible immediately). A moderator's
+                      // explicit publish-toggle overrides the inheritance.
+                      await addReply(
+                        { comicId, line, parentId: t.root.id, body, comicVersion, published: published ?? t.root.published === true },
+                        author,
+                      )
                     }}
                     onSetStatus={(s) => setStatus(t.root.id, s)}
                     onHide={(h) => hideComment(t.root.id, h)}
