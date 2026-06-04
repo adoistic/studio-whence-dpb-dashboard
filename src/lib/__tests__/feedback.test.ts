@@ -27,6 +27,13 @@ describe('feedback actions', () => {
       comicId: 'c', parentId: null, authorEmail: 'a@b.com', status: 'open', hidden: false, comicVersion: 2,
     })
   })
+  it('addComment writes the given category (defaults to fact when omitted)', async () => {
+    await addComment({ comicId: 'c', line: 'biographies', anchors: [], body: 'hi', comicVersion: 2, category: 'tone' }, author)
+    expect(calls.addDoc[0]).toMatchObject({ category: 'tone' })
+    calls.addDoc = []
+    await addComment({ comicId: 'c', line: 'biographies', anchors: [], body: 'hi', comicVersion: 2 }, author)
+    expect(calls.addDoc[0]).toMatchObject({ category: 'fact' })
+  })
   it('addReply writes parentId and no status', async () => {
     await addReply({ comicId: 'c', line: 'biographies', parentId: 'root1', body: 'r', comicVersion: 2 }, author)
     expect(calls.addDoc[0]).toMatchObject({ parentId: 'root1' })

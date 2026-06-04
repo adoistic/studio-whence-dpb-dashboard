@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import type { Comic } from '@/types/content'
 import { ComicPageShell } from '../ComicPageShell'
 
@@ -28,6 +28,18 @@ vi.mock('@/lib/dataApi', () => ({ readMarkdown: async () => '' }))
 vi.mock('@/components/feedback/CommentGutter', () => ({
   CommentGutter: (props: { comicId: string; comicVersion: number; line: string }) => (
     <div data-testid="comment-gutter" data-comic-id={props.comicId} data-version={props.comicVersion} data-line={props.line} />
+  ),
+}))
+
+vi.mock('@/components/feedback/CommentsView', () => ({
+  CommentsView: (props: { comicId: string; draftText: string | null }) => (
+    <div data-testid="comments-view" data-comic-id={props.comicId} data-draft-text={props.draftText ?? ''} />
+  ),
+}))
+
+vi.mock('@/components/feedback/CopyScriptToolbar', () => ({
+  CopyScriptToolbar: (props: { comicId: string }) => (
+    <div data-testid="copy-toolbar" data-comic-id={props.comicId} />
   ),
 }))
 
@@ -153,6 +165,36 @@ describe('ComicPageShell', () => {
     mockDraft = () => ({ text: null, loading: false })
     render(<ComicPageShell comic={comic} />)
     expect(screen.queryByTestId('comment-gutter')).not.toBeInTheDocument()
+  })
+
+  test('renders the Draft ⇄ Comments tab toggle and defaults to the draft view', () => {
+    mockDraft = () => ({ text: '<h2>Page 1</h2><p>Open on a runway.</p>', loading: false })
+    render(<ComicPageShell comic={comic} />)
+    // Both tabs render.
+    expect(screen.getByRole('tab', { name: /^draft$/i })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: /^comments$/i })).toBeInTheDocument()
+    // Draft is selected by default → the gutter shows, the comments view does not.
+    expect(screen.getByRole('tab', { name: /^draft$/i })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByTestId('comment-gutter')).toBeInTheDocument()
+    expect(screen.queryByTestId('comments-view')).not.toBeInTheDocument()
+  })
+
+  test('clicking Comments shows the comment-centric view, then Draft returns', () => {
+    mockDraft = () => ({ text: '<h2>Page 1</h2><p>Open on a runway.</p>', loading: false })
+    render(<ComicPageShell comic={comic} />)
+
+    fireEvent.click(screen.getByRole('tab', { name: /^comments$/i }))
+    const cv = screen.getByTestId('comments-view')
+    expect(cv).toHaveAttribute('data-comic-id', `${comic.line}__${comic.slug}`)
+    expect(cv).toHaveAttribute('data-draft-text', '<h2>Page 1</h2><p>Open on a runway.</p>')
+    // The gutter (draft-view-only) is gone in the comments view.
+    expect(screen.queryByTestId('comment-gutter')).not.toBeInTheDocument()
+    // The copy toolbar stays visible across both views.
+    expect(screen.getByTestId('copy-toolbar')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('tab', { name: /^draft$/i }))
+    expect(screen.getByTestId('comment-gutter')).toBeInTheDocument()
+    expect(screen.queryByTestId('comments-view')).not.toBeInTheDocument()
   })
 
   test('numbers provenance markers in the injected draft', async () => {

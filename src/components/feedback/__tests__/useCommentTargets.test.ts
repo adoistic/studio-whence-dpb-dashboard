@@ -85,6 +85,10 @@ describe('useCommentTargets lifecycle', () => {
     expect(badges[0].textContent).toBe('1')
     expect(badges[1].textContent).toBe('1')
     expect(el.querySelectorAll('.cs-beat-pulse').length).toBe(2)
+    // Colour now comes from the thread's status (no status → open → amber #e0a000).
+    expect((badges[0] as HTMLElement).style.background).toBe('rgb(224, 160, 0)')
+    const anchored = el.querySelector('.cs-beat-anchored') as HTMLElement
+    expect(anchored.style.getPropertyValue('--beat-colour')).toBe('#e0a000')
 
     ;(badges[0] as HTMLButtonElement).click()
     expect(onSelectThread).toHaveBeenCalledWith('t1')

@@ -1,8 +1,8 @@
 'use client'
 import { useEffect, type RefObject } from 'react'
 import type { Anchor, Thread } from '@/lib/feedbackTypes'
+import { STATUS_COLOR } from '@/lib/feedbackTypes'
 import { assignBadges } from '@/components/feedback/badges'
-import { BADGE_PALETTE } from '@/components/feedback/constants'
 import { indexUnits, anchorFromUnit, parseAnchorRef } from '@/components/feedback/anchorRef'
 
 export interface CommentTargetOptions {
@@ -57,6 +57,8 @@ export function useCommentTargets(
     if (!el || !draftText) return
     const units = indexUnits(el)
     const badges = assignBadges(threads)
+    // Resolve a thread's root status → colour (status now drives comment colour).
+    const statusById = new Map(threads.map((t) => [t.root.id, t.root.status ?? 'open']))
 
     // ── Clear previous decorations (idempotent across node recreation) ───────
     el.querySelectorAll(INJECTED_SELECTOR).forEach((n) => n.remove())
@@ -67,7 +69,7 @@ export function useCommentTargets(
 
     // ── 1. Existing-anchor display ───────────────────────────────────────────
     badges.forEach((badge, threadId) => {
-      const colour = BADGE_PALETTE[(badge.num - 1) % BADGE_PALETTE.length]
+      const colour = STATUS_COLOR[statusById.get(threadId) ?? 'open'].hex
       const isActive = threadId === opts.activeThreadId
       for (const ref of badge.refs) {
         const unit = units.get(ref)

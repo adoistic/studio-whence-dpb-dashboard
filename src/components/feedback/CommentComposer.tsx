@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import type { Anchor } from '@/lib/feedbackTypes'
-import { anchorLabel } from '@/lib/feedbackTypes'
+import type { Anchor, Category } from '@/lib/feedbackTypes'
+import { anchorLabel, CATEGORY_LABELS, CATEGORY_ORDER } from '@/lib/feedbackTypes'
 import { PinIcon } from '@/components/feedback/icons'
 
 export interface CommentComposerProps {
@@ -10,7 +10,7 @@ export interface CommentComposerProps {
   anchors: Anchor[]
   onAddAnchor: () => void
   onRemoveAnchor: (ref: string) => void
-  onSubmit: (body: string) => Promise<void>
+  onSubmit: (body: string, category?: Category) => Promise<void>
   onCancel: () => void
   busy?: boolean
   /** Hide the "+ add another location" button (select-mode picks units in the
@@ -29,6 +29,7 @@ export function CommentComposer({
   hideAddAnchor = false,
 }: CommentComposerProps) {
   const [body, setBody] = useState('')
+  const [category, setCategory] = useState<Category>('fact')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -40,7 +41,7 @@ export function CommentComposer({
     setSubmitting(true)
     setError(null)
     try {
-      await onSubmit(trimmed)
+      await onSubmit(trimmed, mode === 'comment' ? category : undefined)
       setBody('')
     } catch {
       setError("Couldn't post. Please try again.")
@@ -98,7 +99,26 @@ export function CommentComposer({
       )}
 
       {/* Actions row */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {/* Category — comment mode only */}
+        {mode === 'comment' && (
+          <label className="inline-flex items-center gap-1 font-sans text-[0.7rem] text-brand-slate">
+            <span className="sr-only">Category</span>
+            <select
+              aria-label="comment category"
+              value={category}
+              onChange={(e) => setCategory(e.target.value as Category)}
+              className="rounded-[2px] border border-brand-pale-dusk bg-white px-2 py-0.5 font-sans text-[0.7rem] text-brand-deep focus:border-brand-lavender focus:outline-none"
+            >
+              {CATEGORY_ORDER.map((c) => (
+                <option key={c} value={c}>
+                  {CATEGORY_LABELS[c]}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
+
         {/* Add-location — comment mode only (hidden in select-mode) */}
         {mode === 'comment' && !hideAddAnchor && (
           <button

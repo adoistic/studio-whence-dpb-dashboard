@@ -2,6 +2,34 @@
 
 export type Status = 'open' | 'in_progress' | 'resolved' | 'deferred' | 'wont_fix'
 
+export type Category =
+  | 'fact' | 'repetition' | 'tone' | 'clarity' | 'pacing' | 'continuity'
+  | 'missing' | 'art' | 'source' | 'sensitivity' | 'language' | 'question' | 'other'
+
+export const CATEGORY_LABELS: Record<Category, string> = {
+  fact: 'Fact', repetition: 'Repetition', tone: 'Tone/Voice', clarity: 'Clarity',
+  pacing: 'Pacing/Layout', continuity: 'Continuity', missing: 'Missing/Enrichment',
+  art: 'Art direction', source: 'Source/Citation', sensitivity: 'Sensitivity',
+  language: 'Language', question: 'Question', other: 'Other',
+}
+
+export const CATEGORY_ORDER: Category[] = ['fact','repetition','tone','clarity','pacing','continuity','missing','art','source','sensitivity','language','question','other']
+
+/**
+ * Single source of truth mapping each Status to a colour set. Used by the status
+ * pill, the gutter card accent, the filter chips, and the in-script anchored-line
+ * highlight (the hex drives the `--beat-colour` custom property + badge bg).
+ * Status now drives comment colour everywhere (replacing the per-thread
+ * BADGE_PALETTE); the badge NUMBER still distinguishes threads.
+ */
+export const STATUS_COLOR: Record<Status, { hex: string; label: string }> = {
+  open:        { hex: '#e0a000', label: 'Open' },        // amber
+  in_progress: { hex: '#4c8dff', label: 'In progress' }, // blue
+  resolved:    { hex: '#3ea869', label: 'Resolved' },    // green
+  deferred:    { hex: '#8a8a99', label: 'Deferred' },    // slate
+  wont_fix:    { hex: '#c2603a', label: "Won't fix" },   // muted red/clay
+}
+
 export type AnchorKind = 'page' | 'panel' | 'beat'
 
 export interface Anchor {
@@ -30,6 +58,8 @@ export interface FeedbackNode {
   authorRole: string
   body: string
   status?: Status
+  /** Optional — old docs / replies may lack it; treat missing as 'other' for display. */
+  category?: Category
   comicVersion: number
   hidden: boolean
   createdAt: unknown

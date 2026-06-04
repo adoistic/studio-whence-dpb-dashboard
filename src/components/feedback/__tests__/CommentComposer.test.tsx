@@ -7,7 +7,7 @@ const baseProps = {
   onSubmit: vi.fn().mockResolvedValue(undefined), onCancel: () => {},
 }
 
-it('disables Post when empty, enables when text entered, submits the body', async () => {
+it('disables Post when empty, enables when text entered, submits the body + default category', async () => {
   const onSubmit = vi.fn().mockResolvedValue(undefined)
   render(<CommentComposer {...baseProps} onSubmit={onSubmit} />)
   const post = screen.getByRole('button', { name: /post/i })
@@ -15,7 +15,27 @@ it('disables Post when empty, enables when text entered, submits the body', asyn
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'a note' } })
   expect(post).toBeEnabled()
   fireEvent.click(post)
-  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('a note'))
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('a note', 'fact'))
+})
+
+it('shows the category select in comment mode and passes the chosen category', async () => {
+  const onSubmit = vi.fn().mockResolvedValue(undefined)
+  render(<CommentComposer {...baseProps} onSubmit={onSubmit} />)
+  const select = screen.getByRole('combobox', { name: /category/i })
+  expect(select).toBeInTheDocument()
+  fireEvent.change(select, { target: { value: 'tone' } })
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'voice issue' } })
+  fireEvent.click(screen.getByRole('button', { name: /post/i }))
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('voice issue', 'tone'))
+})
+
+it('hides the category select in reply mode and submits no category', async () => {
+  const onSubmit = vi.fn().mockResolvedValue(undefined)
+  render(<CommentComposer {...baseProps} mode="reply" onSubmit={onSubmit} />)
+  expect(screen.queryByRole('combobox', { name: /category/i })).toBeNull()
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'a reply' } })
+  fireEvent.click(screen.getByRole('button', { name: /post/i }))
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('a reply', undefined))
 })
 
 it('renders removable anchor chips and the add-location button in comment mode', () => {
