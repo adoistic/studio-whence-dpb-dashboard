@@ -5,11 +5,11 @@ import { usePathname, useRouter } from 'next/navigation'
 import { signOut } from 'firebase/auth'
 import { BrandLockup } from '@/components/BrandLockup'
 import { auth } from '@/lib/firebase'
-import { useUser, useAllowStatus } from '@/lib/auth'
+import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { useLines } from '@/lib/catalog'
 
-const NAV_LINKS = [{ label: 'Home', href: '/' }, { label: 'Reviews', href: '/reviews' }] as const
-
+const HOME_LINK = { label: 'Home', href: '/' }
+const REVIEWS_LINK = { label: 'Reviews', href: '/reviews' }
 const ADMIN_LINK = { label: 'Admin', href: '/admin' }
 
 function isActive(href: string, pathname: string): boolean {
@@ -42,6 +42,7 @@ export function Topbar() {
   const router = useRouter()
   const { user, loading } = useUser()
   const allowStatus = useAllowStatus(user, loading)
+  const canMod = canModerate(allowStatus)
   const { data: lines } = useLines()
 
   async function handleSignOut() {
@@ -57,9 +58,20 @@ export function Topbar() {
         </Link>
 
         <nav aria-label="Main navigation" className="flex flex-wrap items-center gap-x-7 gap-y-2 pl-2">
-          {NAV_LINKS.map(({ label, href }) => (
-            <NavItem key={href} label={label} href={href} active={isActive(href, pathname)} />
-          ))}
+          <NavItem
+            label={HOME_LINK.label}
+            href={HOME_LINK.href}
+            active={isActive(HOME_LINK.href, pathname)}
+          />
+          {/* Reviews is the cross-comic moderation queue — moderators only.
+              Members comment per-comic on their allocated comic pages. */}
+          {canMod && (
+            <NavItem
+              label={REVIEWS_LINK.label}
+              href={REVIEWS_LINK.href}
+              active={isActive(REVIEWS_LINK.href, pathname)}
+            />
+          )}
           {(lines ?? []).map((line) => (
             <NavItem
               key={line.slug}

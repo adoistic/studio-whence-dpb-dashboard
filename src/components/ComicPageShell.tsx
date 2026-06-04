@@ -7,7 +7,9 @@ import { StatusPill } from '@/components/StatusPill'
 import { SectionHead } from '@/components/SectionHead'
 import { VersionTimeline } from '@/components/feedback/VersionTimeline'
 import { useGatedText } from '@/lib/useGatedText'
-import { useFigure, useComics } from '@/lib/catalog'
+import { useFigure } from '@/lib/catalog'
+import { useVisibleComics } from '@/lib/visibleCatalog'
+import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { normalizeSubjectSlug } from '@/lib/slugs'
 import { citationMapFromSources } from '@/lib/provenance'
 import { PersonTabs } from '@/components/PersonTabs'
@@ -59,7 +61,16 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
   const scriptRef = useRef<HTMLDivElement>(null)
   const figureSlug = normalizeSubjectSlug(comic.subject_slug)
   const fig = useFigure(figureSlug)
-  const peopleComics = useComics({ subject_slug: figureSlug })
+  // Sibling/peer comics for PersonTabs. A member with only a single-comic grant
+  // cannot scan `subject_slug ==` (the rules would reject any sibling they're not
+  // allocated), so read the viewer's visible set and filter to this subject.
+  // Moderators see every sibling; members see only the readable ones (degrades to
+  // an empty peer list, never an error).
+  const { user, loading: authLoading } = useUser()
+  const status = useAllowStatus(user, authLoading)
+  const canMod = canModerate(status)
+  const email = user?.email ?? null
+  const peopleComics = useVisibleComics(canMod, email)
   const citationMap = useMemo(
     () => citationMapFromSources(fig.data?.sources ?? []),
     [fig.data],
@@ -89,13 +100,15 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
     setPendingJumpRef(null)
   }, [view, pendingJumpRef, draft.text])
 
-  const comics = (peopleComics.data ?? []).map((c) => ({
-    slug: c.slug,
-    line: c.line,
-    title: c.title,
-    status: c.status,
-    comic_number: c.comic_number,
-  }))
+  const comics = (peopleComics.data ?? [])
+    .filter((c) => c.subject_slug === figureSlug)
+    .map((c) => ({
+      slug: c.slug,
+      line: c.line,
+      title: c.title,
+      status: c.status,
+      comic_number: c.comic_number,
+    }))
 
   const seriesLine = [comic.series, comic.comic_number ? `Comic ${comic.comic_number}` : null]
     .filter(Boolean)

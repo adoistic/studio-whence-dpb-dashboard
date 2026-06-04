@@ -213,13 +213,28 @@ describe('ReviewsPageShell', () => {
     },
   )
 
-  it('does not render the Pending approval panel for a member', () => {
+  it('renders a terminal not-authorized card for a member (no list, no panel)', () => {
     allowStatus = 'allow'
     rootsData = [root({ id: 'd1', body: 'Awaiting note', published: false })]
     render(<ReviewsPageShell />)
 
+    // The whole cross-comic reviews surface is editorial-only: a member gets the
+    // terminal gate, not the pending panel or the list.
+    expect(screen.getByText(/not authorized/i)).toBeInTheDocument()
+    expect(screen.getByText(/reviews are for editors/i)).toBeInTheDocument()
     expect(screen.queryByText(/pending approval/i)).toBeNull()
+    expect(screen.queryByRole('heading', { name: /^reviews$/i })).toBeNull()
     expect(lastViewerCanModerate).toBe(false)
+  })
+
+  it('renders the reviews list (not the gate) for a moderator', () => {
+    allowStatus = 'sub_admin'
+    rootsData = [root({ id: 'a1', body: 'Approved note', published: true })]
+    render(<ReviewsPageShell />)
+
+    expect(screen.queryByText(/not authorized/i)).toBeNull()
+    expect(screen.getByRole('heading', { name: /^reviews$/i })).toBeInTheDocument()
+    expect(screen.getByText('Approved note')).toBeInTheDocument()
   })
 
   it('does not list an approved root in the pending panel', () => {

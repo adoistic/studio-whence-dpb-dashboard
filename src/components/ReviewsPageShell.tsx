@@ -136,6 +136,26 @@ export function ReviewsPageShell() {
   // root drops out of `pending` automatically (no manual refresh).
   const pending = canMod ? (roots ?? []).filter((r) => isDraft(r)) : []
 
+  // ── Authorization gate ──────────────────────────────────────────────────────
+  // The cross-comic reviews list is editorial-only: a member's mixed-comic
+  // feedback query would be rejected by the allocation rules, and members
+  // comment per-comic on their allocated comic pages instead. Once status has
+  // resolved to a non-moderator, render a terminal card (no redirect), the same
+  // gate style AdminPanel uses.
+  const statusResolved = status_raw !== 'loading'
+  if (statusResolved && !canMod) {
+    return (
+      <div className="mx-auto max-w-[640px] px-6 py-24">
+        <div className="rounded-lg border border-brand-pale-dusk bg-brand-pale-dusk/30 px-6 py-8 text-center">
+          <h1 className="font-serif font-light text-brand-umber text-[1.6rem]">Not authorized</h1>
+          <p className="mt-2 font-serif text-brand-umber/70">
+            Reviews are for editors.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-[1200px] px-6 pb-24 pt-12">
       {/* ── Header ─────────────────────────────────────────────────────── */}

@@ -54,6 +54,29 @@ service cloud.firestore {
            allocDoc().get('lines', []).hasAny([fline])
         || allocDoc().get('figures_effective', []).hasAny([fslug]) ));
     }
+    // FEEDBACK gate. A feedback doc carries `comicId` (`{line}__{slug}`); the
+    // `line` is DERIVED from comicId (its prefix), never read from the separate
+    // `line` field. This matters for LIST queries: a member's per-comic feedback
+    // query filters on `comicId` (+ published/hidden) but NOT on `line`, and a
+    // `list` rule that reads an UNCONSTRAINED field (resource.data.line) is
+    // rejected by Firestore. comicId is in the query filter, so deriving the line
+    // from it keeps the rule list-safe. `subject_slug` isn't on the feedback doc,
+    // so the figure branch looks it up from the comic doc.
+    // Uses RAW `figures` (consistent with comicAllowed): a single-comic grant
+    // reaches that comic's feedback via `comics`, a figure grant via `figures`, a
+    // line grant via `lines`. A comic grant must NOT cascade to sibling comics'
+    // feedback, so this does NOT use figures_effective.
+    function feedbackLineOf(cid) {
+      return cid.split('__')[0];
+    }
+    function feedbackAllocAllowed(cid) {
+      return isSubAdmin() || (hasAlloc() && (
+           allocDoc().get('comics', []).hasAny([cid])
+        || allocDoc().get('lines', []).hasAny([feedbackLineOf(cid)])
+        || (exists(/databases/$(database)/documents/comics/$(cid))
+            && allocDoc().get('figures', []).hasAny([get(/databases/$(database)/documents/comics/$(cid)).data.get('subject_slug','')]))
+      ));
+    }
 
     match /allowlist/{email} {
       allow read: if isAllowlisted();
@@ -81,11 +104,11 @@ service cloud.firestore {
     //    publish Action's Admin SDK, which bypasses rules) ──
     match /meta/{d}      { allow read: if isAllowlisted(); allow write: if false; }
     match /lines/{d}     { allow read: if isAllowlisted(); allow write: if false; }
-    // Figure docs do NOT carry a `line` field (see src/types/content.ts Figure:
-    // series/slug/sources_count/words only). The doc id `f` IS the subject_slug,
-    // so the research gate is driven by `f` via figures_effective. We still pass
-    // resource.data.get('line','') (absent → '' → never matches a real line),
-    // so the `lines` branch lights up automatically if a line field is ever added.
+    // Figure docs DO carry a `line` field (written by the content publish
+    // pipeline, tools/publish_to_firestore.py). The doc id `f` IS the
+    // subject_slug, so the research gate is driven by `f` via figures_effective;
+    // the `lines` branch lights up via resource.data.get('line','') so a member
+    // holding only a `lines` grant reaches that line's figure research.
     match /figures/{f}   {
       allow read: if isAllowlisted()
         && figureResearchAllowed(resource.data.get('line', ''), f);
@@ -117,11 +140,15 @@ service cloud.firestore {
 
     // ── Feedback (live source of truth; client-written under these rules) ──
     match /feedback/{id} {
-      allow read: if isAllowlisted()
-        && (isSubAdmin() || (resource.data.published == true && resource.data.hidden == false));
+      allow read: if isAllowlisted() && (
+        isSubAdmin()
+        || (resource.data.published == true && resource.data.hidden == false
+            && feedbackAllocAllowed(resource.data.comicId))
+      );
       allow create: if isAllowlisted()
         && request.resource.data.authorEmail == userEmail()
         && request.resource.data.hidden == false
+        && feedbackAllocAllowed(request.resource.data.comicId)
         && (request.resource.data.parentId == null
               ? request.resource.data.status == 'open' : true)
         // Non-moderators cannot self-publish a root. A reply may be created

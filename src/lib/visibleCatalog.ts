@@ -122,10 +122,10 @@ export function useVisibleComics(
 //
 // Figure docs are keyed by subject slug (content repo: tools/firestore_catalog.py
 // writes `figures/{slug}`), so the documentId() filter targets the slug directly.
-// Figure docs do not yet carry a `line` field; until WA1b lands, the line branch
-// matches nothing — it is included so the gate works the moment that field ships,
-// and a member viewing a line they only hold via `lines` still reaches each
-// figure's page (where `useFigure` is a single allocated read).
+// Figure docs carry a `line` field (written by the content publish pipeline), so
+// the line branch resolves the figures of any line the member holds via `lines`;
+// a member viewing a line they only hold via `lines` still reaches each figure's
+// page (where `useFigure` is a single allocated read).
 
 export function useVisibleFigures(
   canModerate: boolean,

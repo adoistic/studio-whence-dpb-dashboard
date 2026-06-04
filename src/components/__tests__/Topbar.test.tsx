@@ -26,13 +26,14 @@ import { Topbar } from '../Topbar'
 // per test without breaking the mock factory.
 
 let mockUseUser: () => { user: User | null; loading: boolean }
-let mockUseAllowStatus: () => 'admin' | 'allow' | 'pending' | 'loading'
+let mockUseAllowStatus: () => 'admin' | 'sub_admin' | 'allow' | 'pending' | 'loading'
 let mockUseLines: () => { data: Line[] | null; loading: boolean }
 let mockPathname: () => string
 
 vi.mock('@/lib/auth', () => ({
   useUser: () => mockUseUser(),
   useAllowStatus: () => mockUseAllowStatus(),
+  canModerate: (s: string) => s === 'admin' || s === 'sub_admin',
 }))
 
 vi.mock('@/lib/catalog', () => ({
@@ -168,6 +169,35 @@ describe('Topbar — Admin link visibility', () => {
     expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /admin/i })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Business Legends' })).toBeNull()
+  })
+})
+
+describe('Topbar — Reviews link visibility (moderator-only)', () => {
+  beforeEach(() => {
+    mockUseUser = () => ({ user: fakeUser('x@thothica.com'), loading: false })
+    mockUseLines = () => ({ data: TWO_LINES, loading: false })
+    mockPathname = () => '/'
+  })
+
+  test('Reviews link is HIDDEN for a plain member ("allow")', () => {
+    mockUseAllowStatus = () => 'allow'
+    render(<Topbar />)
+    // Home + line links still render for everyone.
+    expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Business Legends' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /reviews/i })).not.toBeInTheDocument()
+  })
+
+  test('Reviews link is SHOWN for a moderator ("sub_admin")', () => {
+    mockUseAllowStatus = () => 'sub_admin'
+    render(<Topbar />)
+    expect(screen.getByRole('link', { name: /reviews/i })).toBeInTheDocument()
+  })
+
+  test('Reviews link is SHOWN for the admin', () => {
+    mockUseAllowStatus = () => 'admin'
+    render(<Topbar />)
+    expect(screen.getByRole('link', { name: /reviews/i })).toBeInTheDocument()
   })
 })
 

@@ -50,12 +50,6 @@ vi.mock('@/components/FooterWithData', () => ({
   FooterWithData: () => <div data-testid="footer" />,
 }))
 
-// ContentProvider wraps the authed children. Stub it to a passthrough so the
-// real runtime fetch never runs in this unit test.
-vi.mock('@/lib/content', () => ({
-  ContentProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}))
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function renderLayout(children: React.ReactNode = <div data-testid="child" />) {

@@ -5,7 +5,6 @@ import { useUser, useAllowStatus } from '@/lib/auth'
 import { Topbar } from '@/components/Topbar'
 import { FooterWithData } from '@/components/FooterWithData'
 import { Eyebrow } from '@/components/Eyebrow'
-import { ContentProvider } from '@/lib/content'
 
 export default function AuthedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -51,11 +50,14 @@ export default function AuthedLayout({ children }: { children: React.ReactNode }
     return checkingAccessScreen
   }
   // admin, sub_admin, or allow
+  // NOTE: the old ContentProvider mount (which fetched the FULL catalog via
+  // /content for every authed user) was removed — pages read Firestore via
+  // catalog.ts (B2.7 cutover), so nothing consumes that context anymore.
   return (
-    <ContentProvider>
+    <>
       <Topbar />
       {children}
       <FooterWithData />
-    </ContentProvider>
+    </>
   )
 }
