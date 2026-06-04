@@ -14,6 +14,7 @@ import { PersonTabs } from '@/components/PersonTabs'
 import { useProvenanceMarkers } from '@/lib/useProvenanceMarkers'
 import { ProvenanceTooltip } from '@/components/ProvenanceTooltip'
 import { CommentGutter } from '@/components/feedback/CommentGutter'
+import { CopyScriptToolbar } from '@/components/feedback/CopyScriptToolbar'
 
 // Memoized so tooltip-state re-renders of ComicPageShell don't re-parse the
 // draft. React 19 recreates dangerouslySetInnerHTML child nodes on every host
@@ -146,6 +147,16 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
               Loading the script…
             </p>
           ) : draft.text ? (
+            <>
+            {/* Reader toolbar — sits above both the script and (later) the
+                Draft/Comments view tab. */}
+            <div className="flex justify-end">
+              <CopyScriptToolbar
+                comicId={`${comic.line}__${comic.slug}`}
+                comicTitle={comic.title}
+                draftText={draft.text}
+              />
+            </div>
             <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
               {/* The script column — each cs-page renders as its own paper
                   sheet (styled in globals.css), so the muted app background
@@ -169,6 +180,7 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
                 />
               </aside>
             </div>
+            </>
           ) : (
             <p className="font-serif italic text-brand-slate">Draft not available yet.</p>
           )}

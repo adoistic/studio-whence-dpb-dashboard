@@ -31,6 +31,12 @@ vi.mock('@/components/feedback/CommentGutter', () => ({
   ),
 }))
 
+vi.mock('@/components/feedback/CopyScriptToolbar', () => ({
+  CopyScriptToolbar: (props: { comicId: string }) => (
+    <div data-testid="copy-toolbar" data-comic-id={props.comicId} />
+  ),
+}))
+
 const comic: Comic = {
   title: 'The Sky-High Dreamer',
   subject: 'J.R.D. Tata',
