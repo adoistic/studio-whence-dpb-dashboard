@@ -41,6 +41,24 @@ vi.mock('@/lib/admin', () => ({
   reinstate,
 }))
 
+// ── allocation + catalog mocks (AllocationsSection consumes these) ────────────────
+// The AdminPanel suite doesn't exercise the allocations flow; these stubs just
+// keep the section from hitting Firestore. The allocations flow is covered in
+// AllocationsSection.test.tsx.
+
+vi.mock('@/lib/allocation', () => ({
+  useAllocation: () => ({ data: null, loading: false }),
+  setGrants: vi.fn(() => Promise.resolve()),
+  addGrant: () => ({ lines: [], figures: [], comics: [] }),
+  removeGrant: () => ({ lines: [], figures: [], comics: [] }),
+}))
+
+vi.mock('@/lib/catalog', () => ({
+  useLines: () => ({ data: [], loading: false }),
+  useFigures: () => ({ data: [], loading: false }),
+  useComics: () => ({ data: [], loading: false }),
+}))
+
 import { AdminPanel } from '@/components/AdminPanel'
 
 beforeEach(() => {

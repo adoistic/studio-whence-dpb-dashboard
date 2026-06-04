@@ -10,6 +10,7 @@ import {
   removeMember, suspendEmail, reinstate,
   type AccessRequest, type Member, type SuspendedEntry,
 } from '@/lib/admin'
+import { AllocationsSection } from '@/components/admin/AllocationsSection'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -316,6 +317,9 @@ export function AdminPanel() {
           onAddMember={(email, asSubAdmin) => run(() => addMember(email, { asSubAdmin, adminEmail }))}
           onSuspend={(email) => run(() => suspendEmail(email, { adminEmail }))}
         />
+
+        {/* ── 5. Allocations ─────────────────────────────────────────── */}
+        <AllocationsSection adminEmail={adminEmail} />
       </div>
     </div>
   )
