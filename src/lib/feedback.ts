@@ -5,7 +5,7 @@ import {
   doc, serverTimestamp, type QueryConstraint,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { groupThreads, type FeedbackNode, type Thread, type Status, type Anchor } from '@/lib/feedbackTypes'
+import { groupThreads, type FeedbackNode, type Thread, type Status, type Anchor, type Category } from '@/lib/feedbackTypes'
 
 export interface Live<T> { data: T; loading: boolean; error?: Error }
 export interface Author { email: string; name: string; role: string }
@@ -33,13 +33,14 @@ export function useAllRoots(): Live<FeedbackNode[]> {
 }
 
 export function addComment(
-  input: { comicId: string; line: string; anchors: Anchor[]; body: string; comicVersion: number },
+  input: { comicId: string; line: string; anchors: Anchor[]; body: string; comicVersion: number; category?: Category },
   author: Author,
 ) {
   return addDoc(collection(db, 'feedback'), {
     comicId: input.comicId, line: input.line, parentId: null, anchors: input.anchors,
     authorEmail: author.email, authorName: author.name, authorRole: author.role,
-    body: input.body, status: 'open', comicVersion: input.comicVersion, hidden: false,
+    body: input.body, status: 'open', category: input.category ?? 'fact',
+    comicVersion: input.comicVersion, hidden: false,
     createdAt: serverTimestamp(), updatedAt: serverTimestamp(), editedAt: null,
   })
 }

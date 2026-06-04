@@ -2,10 +2,9 @@
 
 import { useState } from 'react'
 import type { Thread, FeedbackNode, Status } from '@/lib/feedbackTypes'
-import { toMillis, anchorLabel } from '@/lib/feedbackTypes'
+import { toMillis, anchorLabel, STATUS_COLOR, CATEGORY_LABELS } from '@/lib/feedbackTypes'
 import type { Badge } from '@/components/feedback/badges'
 import { CommentComposer } from '@/components/feedback/CommentComposer'
-import { BADGE_PALETTE } from '@/components/feedback/constants'
 import { PinIcon } from '@/components/feedback/icons'
 
 const STATUS_LABELS: Record<Status, string> = {
@@ -14,14 +13,6 @@ const STATUS_LABELS: Record<Status, string> = {
   resolved: 'Resolved',
   deferred: 'Deferred',
   wont_fix: "Won't fix",
-}
-
-const STATUS_DOT: Record<Status, string> = {
-  open: 'bg-brand-lavender',
-  in_progress: 'bg-brand-gold',
-  resolved: 'bg-[#1fb6a6]',
-  deferred: 'bg-brand-slate',
-  wont_fix: 'bg-brand-umber',
 }
 
 /** Simple relative-time formatter — avoids adding a date-fns dependency. */
@@ -60,9 +51,17 @@ export interface CommentThreadProps {
 // ──────────────────────────────────────────────────────────────────────────────
 
 function StatusPillFeedback({ status }: { status: Status }) {
+  const hex = STATUS_COLOR[status]?.hex ?? STATUS_COLOR.open.hex
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-brand-pale-dusk bg-brand-threshold px-2 py-0.5 font-sans text-[0.6rem] uppercase tracking-label text-brand-umber">
-      <span aria-hidden className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_DOT[status] ?? 'bg-brand-slate'}`} />
+    <span
+      className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-sans text-[0.6rem] uppercase tracking-label"
+      style={{
+        borderColor: `color-mix(in srgb, ${hex} 50%, transparent)`,
+        background: `color-mix(in srgb, ${hex} 14%, transparent)`,
+        color: hex,
+      }}
+    >
+      <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: hex }} />
       {STATUS_LABELS[status] ?? status}
     </span>
   )
@@ -105,7 +104,9 @@ export function CommentThread({
   const [replying, setReplying] = useState(false)
   const { root, replies } = thread
 
-  const badgeColour = badge ? BADGE_PALETTE[(badge.num - 1) % BADGE_PALETTE.length] : undefined
+  // Status drives the comment colour everywhere (badge bg, card accent, pill).
+  const statusColour = STATUS_COLOR[root.status ?? 'open'].hex
+  const categoryLabel = CATEGORY_LABELS[root.category ?? 'other']
   const canDeleteRoot = isAdmin || root.authorEmail === currentEmail
 
   async function handleReply(body: string) {
@@ -114,23 +115,31 @@ export function CommentThread({
   }
 
   return (
-    <div className="flex flex-col gap-0 rounded-[2px] border border-brand-pale-dusk bg-brand-threshold shadow-sm">
+    <div
+      className="flex flex-col gap-0 rounded-[2px] border border-l-4 border-brand-pale-dusk bg-brand-threshold shadow-sm"
+      style={{ borderLeftColor: statusColour }}
+    >
       {/* ── Root comment ──────────────────────────────────────────────── */}
       <div className="flex flex-col gap-2 p-3">
         {/* Header row */}
         <div className="flex flex-wrap items-center gap-2">
-          {/* Badge chip */}
-          {badge && badgeColour && (
+          {/* Badge chip — number distinguishes threads; colour follows status */}
+          {badge && (
             <span
               aria-label={`thread ${badge.num}`}
               className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-sans text-[0.65rem] font-semibold text-white"
-              style={{ background: badgeColour }}
+              style={{ background: statusColour }}
             >
               {badge.num}
             </span>
           )}
 
           <NodeMeta node={root} />
+
+          {/* Category chip */}
+          <span className="inline-flex items-center rounded-full border border-brand-pale-dusk bg-brand-pale-dusk/40 px-2 py-0.5 font-sans text-[0.6rem] uppercase tracking-label text-brand-umber">
+            {categoryLabel}
+          </span>
 
           {/* Status pill */}
           {root.status && <StatusPillFeedback status={root.status} />}

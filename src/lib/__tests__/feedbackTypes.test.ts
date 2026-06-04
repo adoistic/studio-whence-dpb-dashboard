@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { groupThreads, changedSince, visibleTo, type FeedbackNode } from '@/lib/feedbackTypes'
+import {
+  groupThreads, changedSince, visibleTo,
+  CATEGORY_LABELS, CATEGORY_ORDER, STATUS_COLOR,
+  type FeedbackNode, type Category, type Status,
+} from '@/lib/feedbackTypes'
 
 const node = (over: Partial<FeedbackNode>): FeedbackNode => ({
   id: 'x', comicId: 'c', line: 'biographies', parentId: null, anchors: [],
@@ -48,6 +52,30 @@ describe('changedSince', () => {
   it('false when comment is already on the current version', () => {
     const n = node({ comicVersion: 2, anchors: [{ kind: 'beat', ref: 'p1.pl1.b1', page: 1, panel: 1, snapshot: 's' }] })
     expect(changedSince(n, 2, versions)).toBe(false)
+  })
+})
+
+describe('Category taxonomy', () => {
+  it('CATEGORY_ORDER and CATEGORY_LABELS cover the same 13 categories', () => {
+    expect(CATEGORY_ORDER).toHaveLength(13)
+    for (const c of CATEGORY_ORDER) expect(CATEGORY_LABELS[c]).toBeTruthy()
+    expect(Object.keys(CATEGORY_LABELS).sort()).toEqual([...CATEGORY_ORDER].sort())
+  })
+  it('starts with fact and ends with other', () => {
+    expect(CATEGORY_ORDER[0]).toBe<Category>('fact')
+    expect(CATEGORY_ORDER.at(-1)).toBe<Category>('other')
+  })
+})
+
+describe('STATUS_COLOR', () => {
+  const statuses: Status[] = ['open', 'in_progress', 'resolved', 'deferred', 'wont_fix']
+  it('has a distinct hex + label for every status', () => {
+    const hexes = statuses.map((s) => STATUS_COLOR[s].hex)
+    expect(new Set(hexes).size).toBe(statuses.length)
+    for (const s of statuses) {
+      expect(STATUS_COLOR[s].hex).toMatch(/^#[0-9a-f]{6}$/i)
+      expect(STATUS_COLOR[s].label).toBeTruthy()
+    }
   })
 })
 

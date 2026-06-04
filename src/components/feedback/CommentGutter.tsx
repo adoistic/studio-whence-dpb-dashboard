@@ -4,11 +4,10 @@ import { useState, useMemo, useEffect, useRef, type RefObject } from 'react'
 import { useUser, useAllowStatus } from '@/lib/auth'
 import { useComicFeedback, addComment, addReply, setStatus, hideComment, deleteComment } from '@/lib/feedback'
 import { useComicVersions } from '@/lib/useComicVersions'
-import { visibleTo, changedSince, type Anchor, type Status } from '@/lib/feedbackTypes'
+import { visibleTo, changedSince, STATUS_COLOR, type Anchor, type Category, type Status } from '@/lib/feedbackTypes'
 import { assignBadges } from '@/components/feedback/badges'
 import { useCommentTargets } from '@/components/feedback/useCommentTargets'
 import { indexUnits } from '@/components/feedback/anchorRef'
-import { BADGE_PALETTE } from '@/components/feedback/constants'
 import { CommentComposer } from '@/components/feedback/CommentComposer'
 import { CommentThread } from '@/components/feedback/CommentThread'
 
@@ -122,8 +121,8 @@ export function CommentGutter({
   }, [draftText])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-  async function handleCreate(body: string) {
-    await addComment({ comicId, line, anchors: composerAnchors, body, comicVersion }, author)
+  async function handleCreate(body: string, category?: Category) {
+    await addComment({ comicId, line, anchors: composerAnchors, body, comicVersion, category }, author)
     setComposing(false)
     setGeneralComment(false)
     setSelection([])
@@ -266,18 +265,21 @@ export function CommentGutter({
           <div className="flex flex-wrap items-center gap-1 px-3.5 pb-2.5">
             {STATUS_FILTERS.map(({ value, label }) => {
               const on = statusFilter.has(value)
+              const hex = STATUS_COLOR[value].hex
               return (
                 <button
                   key={value}
                   type="button"
                   aria-pressed={on}
                   onClick={() => toggleStatus(value)}
-                  className={`rounded-full border px-2 py-0.5 font-sans text-[0.62rem] font-medium uppercase tracking-label transition-colors ${
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 font-sans text-[0.62rem] font-medium uppercase tracking-label transition-colors ${
                     on
                       ? 'border-brand-indigo bg-brand-indigo text-brand-pale-dusk'
                       : 'border-brand-pale-dusk bg-white text-brand-slate hover:border-brand-lavender/60 hover:text-brand-indigo'
                   }`}
                 >
+                  {/* Status-colour dot doubles the filter legend as the colour key */}
+                  <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full" style={{ background: hex }} />
                   {label}
                 </button>
               )
@@ -345,9 +347,7 @@ export function CommentGutter({
             {filtered.map((t) => {
               const isActive = t.root.id === activeThreadId
               const isAnchored = t.root.anchors.length > 0
-              const colour = isActive
-                ? BADGE_PALETTE[((badges.get(t.root.id)?.num ?? 1) - 1) % BADGE_PALETTE.length]
-                : undefined
+              const colour = isActive ? STATUS_COLOR[t.root.status ?? 'open'].hex : undefined
               return (
                 <div
                   key={t.root.id}

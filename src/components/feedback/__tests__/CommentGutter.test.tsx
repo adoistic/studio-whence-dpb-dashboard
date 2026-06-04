@@ -169,9 +169,21 @@ describe('CommentGutter', () => {
     const [payload] = addComment.mock.calls[0]
     expect(payload.anchors).toEqual([a, b])
     expect(payload.body).toBe('fix these')
+    // The composer's default category threads through handleCreate → addComment.
+    expect(payload.category).toBe('fact')
 
     // Posting clears the selection bar.
     await vi.waitFor(() => expect(screen.queryByText('2 selected')).toBeNull())
+  })
+
+  it('passes the chosen category from the composer to addComment', async () => {
+    render(<CommentGutter {...props} />)
+    fireEvent.click(screen.getByRole('button', { name: /general comment/i }))
+    fireEvent.change(screen.getByRole('combobox', { name: /category/i }), { target: { value: 'tone' } })
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'voice note' } })
+    fireEvent.click(screen.getByRole('button', { name: /post/i }))
+    await vi.waitFor(() => expect(addComment).toHaveBeenCalled())
+    expect(addComment.mock.calls[0][0].category).toBe('tone')
   })
 
   it('toggling the same unit twice removes it (dedupe by ref)', () => {

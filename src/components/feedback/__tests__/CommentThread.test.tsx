@@ -21,6 +21,22 @@ const base = {
   onHide: vi.fn(), onDelete: vi.fn(), onJumpToBeat: vi.fn(),
 }
 
+it('renders the category chip (defaults to Other when absent) and the mapped label', () => {
+  const { rerender } = render(<CommentThread thread={mkThread()} isAdmin={false} {...base} />)
+  expect(screen.getByText('Other')).toBeInTheDocument()
+  rerender(<CommentThread thread={mkThread({ category: 'fact' })} isAdmin={false} {...base} />)
+  expect(screen.getByText('Fact')).toBeInTheDocument()
+})
+
+it('applies the status colour to the card left-accent', () => {
+  const { container } = render(
+    <CommentThread thread={mkThread({ status: 'resolved' })} isAdmin={false} {...base} />,
+  )
+  const card = container.firstElementChild as HTMLElement
+  // STATUS_COLOR.resolved.hex = #3ea869 → rgb(62, 168, 105)
+  expect(card.style.borderLeftColor).toBe('rgb(62, 168, 105)')
+})
+
 it('renders root, reply, and anchor jump-chip', () => {
   render(<CommentThread thread={mkThread()} isAdmin={false} {...base} />)
   expect(screen.getByText('Check this date.')).toBeInTheDocument()
