@@ -35,7 +35,8 @@ function relativeTime(createdAt: unknown): string {
 export interface CommentThreadProps {
   thread: Thread
   badge?: Badge
-  isAdmin: boolean
+  /** Moderation rights (admin or sub_admin): status select, hide, delete-any, see hidden. */
+  canModerate: boolean
   currentEmail: string
   changedSince: boolean
   knownRefs: Set<string>
@@ -91,7 +92,7 @@ function NodeMeta({ node }: { node: FeedbackNode }) {
 export function CommentThread({
   thread,
   badge,
-  isAdmin,
+  canModerate,
   currentEmail,
   changedSince,
   knownRefs,
@@ -107,7 +108,7 @@ export function CommentThread({
   // Status drives the comment colour everywhere (badge bg, card accent, pill).
   const statusColour = STATUS_COLOR[root.status ?? 'open'].hex
   const categoryLabel = CATEGORY_LABELS[root.category ?? 'other']
-  const canDeleteRoot = isAdmin || root.authorEmail === currentEmail
+  const canDeleteRoot = canModerate || root.authorEmail === currentEmail
 
   async function handleReply(body: string) {
     await onReply(body)
@@ -144,8 +145,8 @@ export function CommentThread({
           {/* Status pill */}
           {root.status && <StatusPillFeedback status={root.status} />}
 
-          {/* Hidden indicator (admin only) */}
-          {isAdmin && root.hidden && (
+          {/* Hidden indicator (moderators only) */}
+          {canModerate && root.hidden && (
             <span className="font-sans text-[0.6rem] uppercase tracking-label text-brand-slate opacity-60">
               hidden
             </span>
@@ -199,8 +200,8 @@ export function CommentThread({
         {/* Body */}
         <p className="font-sans text-sm leading-relaxed text-brand-deep">{root.body}</p>
 
-        {/* Admin controls */}
-        {isAdmin && (
+        {/* Moderation controls */}
+        {canModerate && (
           <div className="mt-1 flex flex-wrap items-center gap-2 border-t border-brand-pale-dusk pt-2">
             {/* Status select */}
             <select
@@ -237,8 +238,8 @@ export function CommentThread({
           </div>
         )}
 
-        {/* Author-only delete (non-admin, own root) */}
-        {!isAdmin && canDeleteRoot && (
+        {/* Author-only delete (non-moderator, own root) */}
+        {!canModerate && canDeleteRoot && (
           <div className="mt-1 flex items-center gap-2 border-t border-brand-pale-dusk pt-2">
             <button
               type="button"
@@ -256,7 +257,7 @@ export function CommentThread({
       {replies.length > 0 && (
         <div className="flex flex-col gap-0 border-t border-brand-pale-dusk">
           {replies.map((reply) => {
-            const canDeleteReply = isAdmin || reply.authorEmail === currentEmail
+            const canDeleteReply = canModerate || reply.authorEmail === currentEmail
             return (
               <div
                 key={reply.id}

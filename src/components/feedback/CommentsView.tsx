@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useUser, useAllowStatus } from '@/lib/auth'
+import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { useComicFeedback, addReply, setStatus, hideComment, deleteComment } from '@/lib/feedback'
 import { useComicVersions } from '@/lib/useComicVersions'
 import {
@@ -49,6 +49,8 @@ export function CommentsView({
   const { user, loading: authLoading } = useUser()
   const allowStatus = useAllowStatus(user, authLoading)
   const isAdmin = allowStatus === 'admin'
+  // Moderation (see drafts + hidden, status/hide/delete-any) — admins + sub-admins.
+  const canMod = canModerate(allowStatus)
   const currentEmail = user?.email ?? ''
   const author = {
     email: currentEmail,
@@ -57,11 +59,11 @@ export function CommentsView({
   }
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const { data: threads } = useComicFeedback(comicId)
+  const { data: threads } = useComicFeedback(comicId, canMod)
   const { data: versions } = useComicVersions(comicId)
 
   // ── Visibility + badge numbering (over the full visible set) ───────────────
-  const visible = threads.filter((t) => visibleTo(t.root, isAdmin))
+  const visible = threads.filter((t) => visibleTo(t.root, canMod))
   const badges = assignBadges(visible)
 
   // ── Draft-derived parsing (all in useMemo — no ref reads during render) ─────
@@ -140,7 +142,7 @@ export function CommentsView({
     return [...anchored, ...general]
     // `visible` is derived fresh each render; key the memo on the stable inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threads, isAdmin, statusFilter, categoryFilter, refOrder])
+  }, [threads, canMod, statusFilter, categoryFilter, refOrder])
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -246,7 +248,7 @@ export function CommentsView({
                 <CommentThread
                   thread={t}
                   badge={badges.get(t.root.id)}
-                  isAdmin={isAdmin}
+                  canModerate={canMod}
                   currentEmail={currentEmail}
                   changedSince={changedSince(t.root, comicVersion, versions)}
                   knownRefs={knownRefs}

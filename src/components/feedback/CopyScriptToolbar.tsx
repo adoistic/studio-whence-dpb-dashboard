@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { useComicFeedback } from '@/lib/feedback'
 import { serializeScript, serializeScriptWithComments } from '@/components/feedback/copyScript'
 import { ClipboardIcon } from '@/components/feedback/icons'
@@ -14,7 +15,11 @@ export interface CopyScriptToolbarProps {
 type Which = 'plain' | 'comments'
 
 export function CopyScriptToolbar({ comicId, comicTitle, draftText }: CopyScriptToolbarProps) {
-  const { data: threads } = useComicFeedback(comicId)
+  // Moderators can copy the full (draft + hidden) thread set; members get only
+  // the published, non-hidden comments their gated query is allowed to read.
+  const { user, loading: authLoading } = useUser()
+  const canMod = canModerate(useAllowStatus(user, authLoading))
+  const { data: threads } = useComicFeedback(comicId, canMod)
   const [copied, setCopied] = useState<Which | null>(null)
 
   const disabled = draftText === null

@@ -51,11 +51,16 @@ const resolved: Thread = {
 }
 
 let threadData: Thread[] = []
+// Captures the `viewerCanModerate` arg the gutter passes to the gated read hook.
+let lastViewerCanModerate: boolean | undefined
 
 const addComment = vi.fn().mockResolvedValue(undefined)
 
 vi.mock('@/lib/feedback', () => ({
-  useComicFeedback: () => ({ data: threadData, loading: false }),
+  useComicFeedback: (_comicId: string, viewerCanModerate: boolean) => {
+    lastViewerCanModerate = viewerCanModerate
+    return { data: threadData, loading: false }
+  },
   addComment: (...args: unknown[]) => addComment(...args),
   addReply: vi.fn().mockResolvedValue(undefined),
   setStatus: vi.fn(),
@@ -67,9 +72,14 @@ vi.mock('@/lib/useComicVersions', () => ({
   useComicVersions: () => ({ data: [], loading: false }),
 }))
 
+// The viewer role is driven per-test via `allowStatus`; `canModerate` mirrors
+// the real predicate (admin + sub_admin → true) so the moderation-UI assertions
+// are real. Inlined (not importActual) to avoid pulling in real firebase.
+let allowStatus = 'allow'
 vi.mock('@/lib/auth', () => ({
   useUser: () => ({ user: { email: 'me@x.com', displayName: 'Me' }, loading: false }),
-  useAllowStatus: () => 'allow',
+  useAllowStatus: () => allowStatus,
+  canModerate: (s: string) => s === 'admin' || s === 'sub_admin',
 }))
 
 // Capture the hook's options so the test can drive selection programmatically.
@@ -106,6 +116,8 @@ const props = {
 beforeEach(() => {
   threadData = []
   lastToggle = null
+  allowStatus = 'allow'
+  lastViewerCanModerate = undefined
   addComment.mockClear()
   scrollIntoView.mockClear()
   // jsdom has no IntersectionObserver; the scroll-spy effect needs one when a
@@ -242,5 +254,29 @@ describe('CommentGutter', () => {
     // stop the card-level handler from also firing → exactly one jump.
     fireEvent.click(screen.getByRole('button', { name: /jump to/i }))
     expect(scrollIntoView).toHaveBeenCalledTimes(1)
+  })
+
+  it('passes viewerCanModerate=false for a member and true for a sub_admin', () => {
+    threadData = [general]
+    const { unmount } = render(<CommentGutter {...props} />)
+    expect(lastViewerCanModerate).toBe(false)
+    unmount()
+    allowStatus = 'sub_admin'
+    render(<CommentGutter {...props} />)
+    expect(lastViewerCanModerate).toBe(true)
+  })
+
+  it('a sub_admin sees the moderation status control (not admin-only)', () => {
+    allowStatus = 'sub_admin'
+    threadData = [general]
+    render(<CommentGutter {...props} />)
+    expect(screen.getByRole('combobox', { name: /comment status/i })).toBeInTheDocument()
+  })
+
+  it('a member sees no moderation status control', () => {
+    allowStatus = 'allow'
+    threadData = [general]
+    render(<CommentGutter {...props} />)
+    expect(screen.queryByRole('combobox', { name: /comment status/i })).toBeNull()
   })
 })

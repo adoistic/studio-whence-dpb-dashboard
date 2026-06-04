@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef, type RefObject } from 'react'
-import { useUser, useAllowStatus } from '@/lib/auth'
+import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { useComicFeedback, addComment, addReply, setStatus, hideComment, deleteComment } from '@/lib/feedback'
 import { useComicVersions } from '@/lib/useComicVersions'
 import { visibleTo, changedSince, STATUS_COLOR, type Anchor, type Category, type Status } from '@/lib/feedbackTypes'
@@ -41,6 +41,9 @@ export function CommentGutter({
   const { user, loading: authLoading } = useUser()
   const allowStatus = useAllowStatus(user, authLoading)
   const isAdmin = allowStatus === 'admin'
+  // Moderation (approve/hide/delete-any/status/see-drafts+hidden) is open to
+  // admins AND sub-admins; only the read-gate and these controls key off it.
+  const canMod = canModerate(allowStatus)
   const currentEmail = user?.email ?? ''
   const author = {
     email: currentEmail,
@@ -49,11 +52,11 @@ export function CommentGutter({
   }
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const { data: threads } = useComicFeedback(comicId)
+  const { data: threads } = useComicFeedback(comicId, canMod)
   const { data: versions } = useComicVersions(comicId)
 
   // ── Visibility filter ─────────────────────────────────────────────────────
-  const visible = threads.filter((t) => visibleTo(t.root, isAdmin))
+  const visible = threads.filter((t) => visibleTo(t.root, canMod))
   const badges = assignBadges(visible)
 
   // ── Status filter ──────────────────────────────────────────────────────────
@@ -67,7 +70,7 @@ export function CommentGutter({
     () => visible.filter((t) => statusFilter.has(t.root.status ?? 'open')),
     // `visible` is derived fresh each render; key on the stable inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [threads, isAdmin, statusFilter],
+    [threads, canMod, statusFilter],
   )
   function toggleStatus(s: Status) {
     setStatusFilter((prev) => {
@@ -170,7 +173,7 @@ export function CommentGutter({
     return m
     // `visible` is derived fresh each render; key the memo on the stable inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threads, isAdmin])
+  }, [threads, canMod])
 
   useEffect(() => {
     const container = scriptRef.current
@@ -376,7 +379,7 @@ export function CommentGutter({
                   <CommentThread
                     thread={t}
                     badge={badges.get(t.root.id)}
-                    isAdmin={isAdmin}
+                    canModerate={canMod}
                     currentEmail={currentEmail}
                     changedSince={changedSince(t.root, comicVersion, versions)}
                     knownRefs={knownRefs}

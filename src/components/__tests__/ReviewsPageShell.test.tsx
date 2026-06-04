@@ -25,9 +25,13 @@ const root = (over: Partial<FeedbackNode>): FeedbackNode => ({
 
 let rootsData: FeedbackNode[] = []
 let loadingFlag = false
+let lastViewerCanModerate: boolean | undefined
 
 vi.mock('@/lib/feedback', () => ({
-  useAllRoots: () => ({ data: rootsData, loading: loadingFlag }),
+  useAllRoots: (viewerCanModerate: boolean) => {
+    lastViewerCanModerate = viewerCanModerate
+    return { data: rootsData, loading: loadingFlag }
+  },
 }))
 
 vi.mock('@/lib/catalog', () => ({
@@ -37,9 +41,12 @@ vi.mock('@/lib/catalog', () => ({
   }),
 }))
 
+// `canModerate` mirrors the real predicate so the gated-read arg is genuinely derived.
+let allowStatus = 'admin'
 vi.mock('@/lib/auth', () => ({
   useUser: () => ({ user: { email: 'me@x.com' }, loading: false }),
-  useAllowStatus: () => 'admin',
+  useAllowStatus: () => allowStatus,
+  canModerate: (s: string) => s === 'admin' || s === 'sub_admin',
 }))
 
 vi.mock('next/link', () => ({
@@ -58,6 +65,21 @@ describe('ReviewsPageShell', () => {
   beforeEach(() => {
     rootsData = []
     loadingFlag = false
+    allowStatus = 'admin'
+    lastViewerCanModerate = undefined
+  })
+
+  it('passes viewerCanModerate to useAllRoots: true for admin/sub_admin, false for a member', () => {
+    render(<ReviewsPageShell />)
+    expect(lastViewerCanModerate).toBe(true) // admin (default)
+
+    allowStatus = 'sub_admin'
+    render(<ReviewsPageShell />)
+    expect(lastViewerCanModerate).toBe(true)
+
+    allowStatus = 'allow'
+    render(<ReviewsPageShell />)
+    expect(lastViewerCanModerate).toBe(false)
   })
 
   it('renders a row per root with comic title and deep-link', () => {

@@ -24,6 +24,13 @@ vi.mock('@/lib/feedback', () => ({
   useComicFeedback: () => ({ data: threadData, loading: false }),
 }))
 
+// The toolbar now reads the viewer's role to scope the gated feedback read.
+vi.mock('@/lib/auth', () => ({
+  useUser: () => ({ user: { email: 'me@x.com' }, loading: false }),
+  useAllowStatus: () => 'allow',
+  canModerate: (s: string) => s === 'admin' || s === 'sub_admin',
+}))
+
 import { CopyScriptToolbar } from '@/components/feedback/CopyScriptToolbar'
 
 const writeText = vi.fn().mockResolvedValue(undefined)

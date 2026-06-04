@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { useAllRoots } from '@/lib/feedback'
 import { useComics } from '@/lib/catalog'
-import { useUser, useAllowStatus } from '@/lib/auth'
+import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { visibleTo, anchorLabel, type Anchor, type Status } from '@/lib/feedbackTypes'
 import { CommentIcon, PinIcon } from '@/components/feedback/icons'
 
@@ -103,15 +103,17 @@ function Chip({
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function ReviewsPageShell() {
-  // Data
-  const { data: roots, loading } = useAllRoots()
-  const { data: comics } = useComics()
-
   // Identity
   const { user, loading: authLoading } = useUser()
   const status_raw = useAllowStatus(user ?? null, authLoading)
-  const isAdmin = status_raw === 'admin'
+  // Moderators (admin + sub_admin) read every root (drafts + hidden); members
+  // get only published, non-hidden via the gated query.
+  const canMod = canModerate(status_raw)
   const currentEmail = user?.email ?? ''
+
+  // Data
+  const { data: roots, loading } = useAllRoots(canMod)
+  const { data: comics } = useComics()
 
   // Build comic title map: `${line}__${slug}` → title
   const titleByComicId = new Map(comics?.map((c) => [`${c.line}__${c.slug}`, c.title]) ?? [])
@@ -123,7 +125,7 @@ export function ReviewsPageShell() {
 
   // Apply filters
   const filtered = (roots ?? [])
-    .filter((r) => visibleTo(r, isAdmin))
+    .filter((r) => visibleTo(r, canMod))
     .filter((r) => statusFilter === 'all' || r.status === statusFilter)
     .filter((r) => !mine || r.authorEmail === currentEmail)
     .filter((r) => !anchoredOnly || r.anchors.length > 0)
