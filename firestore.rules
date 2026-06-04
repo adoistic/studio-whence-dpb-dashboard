@@ -12,13 +12,28 @@ service cloud.firestore {
     function isAdmin() {
       return isSignedIn() && userEmail() == 'adnan@thothica.com';
     }
+    function isSuspended() {
+      return isSignedIn() && exists(/databases/$(database)/documents/suspended/$(userEmail()));
+    }
+    function hasAllowDoc() {
+      return isSignedIn() && exists(/databases/$(database)/documents/allowlist/$(userEmail()));
+    }
+    // isAllowlisted EXCLUDES suspended users and includes admin.
     function isAllowlisted() {
-      return isDomainAllowed() ||
-             (isSignedIn() && exists(/databases/$(database)/documents/allowlist/$(userEmail())));
+      return !isSuspended() && (isAdmin() || isDomainAllowed() || hasAllowDoc());
+    }
+    function isSubAdmin() {
+      return isAdmin() ||
+        (isAllowlisted() && hasAllowDoc()
+          && get(/databases/$(database)/documents/allowlist/$(userEmail())).data.role == 'sub_admin');
     }
 
     match /allowlist/{email} {
       allow read: if isAllowlisted();
+      allow write: if isAdmin();
+    }
+    match /suspended/{email} {
+      allow read: if isSubAdmin();
       allow write: if isAdmin();
     }
     match /access_requests/{email} {
@@ -46,13 +61,15 @@ service cloud.firestore {
 
     // ── Feedback (live source of truth; client-written under these rules) ──
     match /feedback/{id} {
-      allow read: if isAllowlisted();
+      allow read: if isAllowlisted()
+        && (isSubAdmin() || (resource.data.published == true && resource.data.hidden == false));
       allow create: if isAllowlisted()
         && request.resource.data.authorEmail == userEmail()
         && request.resource.data.hidden == false
         && (request.resource.data.parentId == null
-              ? request.resource.data.status == 'open' : true);
-      allow update: if isAdmin()
+              ? request.resource.data.status == 'open' : true)
+        && (isSubAdmin() || request.resource.data.published == false);
+      allow update: if isSubAdmin()
         || (isSignedIn()
             && resource.data.authorEmail == userEmail()
             && request.resource.data.authorEmail == resource.data.authorEmail
@@ -61,8 +78,9 @@ service cloud.firestore {
             && request.resource.data.comicVersion == resource.data.comicVersion
             && request.resource.data.createdAt == resource.data.createdAt
             && request.resource.data.status == resource.data.status
-            && request.resource.data.hidden == resource.data.hidden);
-      allow delete: if isAdmin() || (isAllowlisted() && resource.data.authorEmail == userEmail());
+            && request.resource.data.hidden == resource.data.hidden
+            && request.resource.data.published == resource.data.published);
+      allow delete: if isSubAdmin() || (isAllowlisted() && resource.data.authorEmail == userEmail());
     }
 
     match /_internal/{d} { allow read, write: if false; }

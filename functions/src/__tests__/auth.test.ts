@@ -5,11 +5,15 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 // `firebase-admin/app`     → initializeApp is a no-op; getApps returns [] so the
 //                            module-load guard initializes exactly once.
 // `firebase-admin/auth`    → getAuth().verifyIdToken is controllable per-test.
-// `firebase-admin/firestore` → getFirestore().collection().doc().get() is
-//                            controllable per-test (snap.exists toggles allow/deny).
+// `firebase-admin/firestore` → getFirestore().collection(name).doc().get() is
+//                            routed PER COLLECTION: `suspendedGet` answers the
+//                            `suspended` lookup, `docGet` answers `allowlist`.
+//                            `suspendedGet` defaults to {exists:false} each test
+//                            so existing allow paths are unaffected.
 
 const verifyIdToken = vi.fn()
 const docGet = vi.fn()
+const suspendedGet = vi.fn()
 
 vi.mock('firebase-admin/app', () => ({
   initializeApp: vi.fn(),
@@ -22,8 +26,8 @@ vi.mock('firebase-admin/auth', () => ({
 
 vi.mock('firebase-admin/firestore', () => ({
   getFirestore: vi.fn(() => ({
-    collection: vi.fn(() => ({
-      doc: vi.fn(() => ({ get: docGet })),
+    collection: vi.fn((name: string) => ({
+      doc: vi.fn(() => ({ get: name === 'suspended' ? suspendedGet : docGet })),
     })),
   })),
 }))
@@ -48,6 +52,11 @@ function allowlistDoc(exists: boolean) {
   docGet.mockResolvedValue({ exists })
 }
 
+// Helper: make the suspended doc exist (or not).
+function suspendedDoc(exists: boolean) {
+  suspendedGet.mockResolvedValue({ exists })
+}
+
 describe('authorize', () => {
   const ORIGINAL_ENV = { ...process.env }
 
@@ -61,6 +70,9 @@ describe('authorize', () => {
     // (clearAllMocks wipes mockReturnValue/mockResolvedValue overrides).
     verifyIdToken.mockReset()
     docGet.mockReset()
+    suspendedGet.mockReset()
+    // Default: nobody is suspended, so existing allow paths are unaffected.
+    suspendedGet.mockResolvedValue({ exists: false })
     delete process.env.ADMIN_EMAIL
   })
 
@@ -197,17 +209,57 @@ describe('authorize', () => {
 
   test('the allowlist doc is looked up under the normalized email', async () => {
     // A gmail with mixed case: lookup must use the lowercased key.
-    const collection = vi.fn(() => ({ doc }))
-    const doc = vi.fn(() => ({ get: docGet }))
+    // Route the suspended lookup to suspendedGet (not suspended → {exists:false})
+    // and the allowlist lookup to docGet, both via the per-collection mock.
+    const suspendedDocFn = vi.fn(() => ({ get: suspendedGet }))
+    const allowDocFn = vi.fn(() => ({ get: docGet }))
+    const collection = vi.fn((name: string) => ({
+      doc: name === 'suspended' ? suspendedDocFn : allowDocFn,
+    }))
     const { getFirestore } = await import('firebase-admin/firestore')
     ;(getFirestore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       collection,
     })
     decodesTo('Mixed.Case@Gmail.com')
+    suspendedDoc(false)
     allowlistDoc(true)
     const result = await authorize(req('Bearer tok'))
     expect(result).toEqual({ email: 'mixed.case@gmail.com' })
     expect(collection).toHaveBeenCalledWith('allowlist')
-    expect(doc).toHaveBeenCalledWith('mixed.case@gmail.com')
+    expect(allowDocFn).toHaveBeenCalledWith('mixed.case@gmail.com')
+  })
+
+  // ─── Suspension (overrides every allow) ──────────────────────────────────────
+
+  test('suspended domain user → denied (even though @thothica.com)', async () => {
+    decodesTo('banned@thothica.com')
+    suspendedDoc(true)
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toBeNull()
+    // The allowlist is never consulted once suspended.
+    expect(docGet).not.toHaveBeenCalled()
+  })
+
+  test('suspended admin email → denied', async () => {
+    decodesTo('adnan@thothica.com')
+    suspendedDoc(true)
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toBeNull()
+  })
+
+  test('suspended allowlisted gmail → denied (allowlist not reached)', async () => {
+    decodesTo('friend@gmail.com')
+    suspendedDoc(true)
+    allowlistDoc(true)
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toBeNull()
+    expect(docGet).not.toHaveBeenCalled()
+  })
+
+  test('suspended lookup throws → null (fail closed)', async () => {
+    decodesTo('x@thothica.com')
+    suspendedGet.mockRejectedValue(new Error('firestore down'))
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toBeNull()
   })
 })

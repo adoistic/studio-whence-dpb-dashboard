@@ -12,11 +12,12 @@
  * the client `src/lib/auth.ts` `classifyByEmail` — and vice versa.
  *
  *   1. empty email                → deny
- *   2. email === ADMIN_EMAIL      → allow   (default adnan@thothica.com)
- *   3. email ends @thothica.com   → allow
- *   4. email ends @dpb.in         → allow
- *   5. /allowlist/{email} exists  → allow   (any role counts)
- *   6. otherwise                  → deny
+ *   2. /suspended/{email} exists  → deny    (overrides every allow below)
+ *   3. email === ADMIN_EMAIL      → allow   (default adnan@thothica.com)
+ *   4. email ends @thothica.com   → allow
+ *   5. email ends @dpb.in         → allow
+ *   6. /allowlist/{email} exists  → allow   (any role counts)
+ *   7. otherwise                  → deny
  *
  * Fail CLOSED on ANY error (missing/garbled header, verifyIdToken throws,
  * Firestore throws): return null. Never grant access on error.
@@ -111,17 +112,21 @@ export async function authorize(
     const email = normalize(decoded.email)
     if (!email) return null
 
-    // Rules 2–4: admin / allowed domains.
+    const fs = getFirestore()
+
+    // Rule 2: suspension overrides every allow below — even a domain/admin
+    // email loses R2 access once a /suspended/{email} doc exists.
+    const suspendedSnap = await fs.collection('suspended').doc(email).get()
+    if (suspendedSnap.exists) return null
+
+    // Rules 3–5: admin / allowed domains.
     if (classifyByEmail(email) === true) return { email }
 
-    // Rule 5: Firestore allowlist. Any existing doc counts as allow.
-    const snap = await getFirestore()
-      .collection('allowlist')
-      .doc(email)
-      .get()
+    // Rule 6: Firestore allowlist. Any existing doc counts as allow.
+    const snap = await fs.collection('allowlist').doc(email).get()
     if (snap.exists) return { email }
 
-    // Rule 6: no match → deny.
+    // Rule 7: no match → deny.
     return null
   } catch {
     // Fail closed on any error (bad header, verify throws, Firestore throws).
