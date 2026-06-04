@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, useRef, type RefObject } from 'react'
 import { useUser, useAllowStatus } from '@/lib/auth'
 import { useComicFeedback, addComment, addReply, setStatus, hideComment, deleteComment } from '@/lib/feedback'
 import { useComicVersions } from '@/lib/useComicVersions'
-import { visibleTo, changedSince, type Anchor } from '@/lib/feedbackTypes'
+import { visibleTo, changedSince, type Anchor, type Status } from '@/lib/feedbackTypes'
 import { assignBadges } from '@/components/feedback/badges'
 import { useCommentTargets } from '@/components/feedback/useCommentTargets'
 import { indexUnits } from '@/components/feedback/anchorRef'
@@ -19,6 +19,17 @@ export interface CommentGutterProps {
   scriptRef: RefObject<HTMLElement | null>
   draftText: string | null
 }
+
+// Status filter chips, in display order. "Unaddressed" (open + in_progress) is
+// on by default; addressed/parked statuses are hidden until toggled on.
+const STATUS_FILTERS: { value: Status; label: string }[] = [
+  { value: 'open', label: 'Open' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'resolved', label: 'Resolved' },
+  { value: 'deferred', label: 'Deferred' },
+  { value: 'wont_fix', label: "Won't fix" },
+]
+const DEFAULT_STATUSES: Status[] = ['open', 'in_progress']
 
 export function CommentGutter({
   comicId,
@@ -45,6 +56,28 @@ export function CommentGutter({
   // ── Visibility filter ─────────────────────────────────────────────────────
   const visible = threads.filter((t) => visibleTo(t.root, isAdmin))
   const badges = assignBadges(visible)
+
+  // ── Status filter ──────────────────────────────────────────────────────────
+  // Default to "unaddressed" (open + in_progress). A root with no status counts
+  // as `open`. The selection bar, general-comment button, and composer ignore
+  // this filter; only the rendered thread list is filtered. Badge numbers stay
+  // stable (assigned over `visible`) so a thread keeps its number/colour when
+  // revealed by a toggle.
+  const [statusFilter, setStatusFilter] = useState<Set<Status>>(() => new Set(DEFAULT_STATUSES))
+  const filtered = useMemo(
+    () => visible.filter((t) => statusFilter.has(t.root.status ?? 'open')),
+    // `visible` is derived fresh each render; key on the stable inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [threads, isAdmin, statusFilter],
+  )
+  function toggleStatus(s: Status) {
+    setStatusFilter((prev) => {
+      const next = new Set(prev)
+      if (next.has(s)) next.delete(s)
+      else next.add(s)
+      return next
+    })
+  }
 
   // ── Local state ───────────────────────────────────────────────────────────
   // Select-mode: the reader toggles any number of units (page/panel/beat) in
@@ -206,7 +239,7 @@ export function CommentGutter({
           list scrolls under them. */}
       <div
         ref={gutterRef}
-        className="relative flex flex-col gap-4 lg:max-h-[calc(100vh-3rem)] lg:overflow-y-auto"
+        className="relative flex flex-col gap-4 lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto"
       >
         {/* Sticky header + actions — matching background so threads scrolling
             under it don't show through, plus a subtle bottom divider. */}
@@ -225,6 +258,30 @@ export function CommentGutter({
             >
               + General comment
             </button>
+          </div>
+
+          {/* Status filter chips — compact, always visible in the sticky header.
+              Default shows unaddressed (Open + In progress); toggle to reveal
+              addressed/parked threads. Chips wrap on the ~22rem-wide gutter. */}
+          <div className="flex flex-wrap items-center gap-1 px-3.5 pb-2.5">
+            {STATUS_FILTERS.map(({ value, label }) => {
+              const on = statusFilter.has(value)
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleStatus(value)}
+                  className={`rounded-full border px-2 py-0.5 font-sans text-[0.62rem] font-medium uppercase tracking-label transition-colors ${
+                    on
+                      ? 'border-brand-indigo bg-brand-indigo text-brand-pale-dusk'
+                      : 'border-brand-pale-dusk bg-white text-brand-slate hover:border-brand-lavender/60 hover:text-brand-indigo'
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
           </div>
 
           {/* Selection action bar — appears once any unit is selected in the
@@ -282,10 +339,10 @@ export function CommentGutter({
           />
         )}
 
-        {/* Thread list */}
-        {visible.length > 0 ? (
+        {/* Thread list (status-filtered; badges keyed off the full visible set) */}
+        {filtered.length > 0 ? (
           <div className="flex flex-col gap-3">
-            {visible.map((t) => {
+            {filtered.map((t) => {
               const isActive = t.root.id === activeThreadId
               const isAnchored = t.root.anchors.length > 0
               const colour = isActive
@@ -296,9 +353,15 @@ export function CommentGutter({
                   key={t.root.id}
                   id={`thread-card-${t.root.id}`}
                   className={`rounded-[3px] transition-shadow ${
-                    isActive ? 'ring-2 ring-offset-1 ring-offset-brand-threshold' : ''
-                  } ${isAnchored ? 'cursor-pointer' : ''}`}
-                  style={isActive && colour ? { boxShadow: `0 0 0 2px ${colour}` } : undefined}
+                    isActive ? 'ring-offset-1 ring-offset-brand-threshold' : ''
+                  } ${isAnchored ? 'cursor-pointer' : 'cursor-default'}`}
+                  style={
+                    isActive && colour
+                      ? {
+                          boxShadow: `0 0 0 3px ${colour}, 0 4px 14px color-mix(in srgb, ${colour} 40%, transparent)`,
+                        }
+                      : undefined
+                  }
                   onClick={
                     isAnchored
                       ? (e) => {
@@ -331,7 +394,11 @@ export function CommentGutter({
           </div>
         ) : (
           !composing && (
-            <p className="font-sans text-[0.75rem] text-brand-slate/60">No comments yet.</p>
+            <p className="font-sans text-[0.75rem] text-brand-slate/60">
+              {visible.length > 0
+                ? 'No comments match the current status filter.'
+                : 'No comments yet.'}
+            </p>
           )
         )}
         </div>

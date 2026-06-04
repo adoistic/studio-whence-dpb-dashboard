@@ -428,8 +428,9 @@
    colour. --beat-colour is set inline by useBeatMarkers. */
 .comic-script .cs-beat-anchored {
   --beat-colour: var(--brand-gold, #C4A265);
-  border-left: 3px solid var(--beat-colour);
-  background-color: color-mix(in srgb, var(--beat-colour) 9%, transparent);
+  border-left: 5px solid var(--beat-colour);
+  background-color: color-mix(in srgb, var(--beat-colour) 20%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--beat-colour) 35%, transparent);
   padding-inline: 0.7em;
   padding-block: 0.45em;
   margin-left: 1.7rem;        /* room for the margin badge */
@@ -522,13 +523,32 @@
   background: var(--brand-pale-dusk, #E8E2F0);
 }
 
-/* Active thread — strong highlight tying the line to its highlighted card. */
+/* Active thread — the jump target. A solid ring in the thread's colour, a
+   stronger tint, and a brief pulse so it's unmistakable where you landed. */
 .comic-script .cs-beat-active,
 .comic-script .cs-beat-pulse {
-  outline: 2px solid var(--beat-colour, var(--brand-gold, #C4A265));
+  --beat-colour-active: var(--beat-colour, var(--brand-gold, #C4A265));
+  outline: 3px solid var(--beat-colour-active);
   outline-offset: 2px;
+  border-left-color: var(--beat-colour-active);
   border-radius: var(--radius-brand, 2px);
-  background-color: color-mix(in srgb, var(--beat-colour, var(--brand-gold, #C4A265)) 16%, transparent) !important;
+  background-color: color-mix(in srgb, var(--beat-colour-active) 32%, transparent) !important;
+  box-shadow: 0 0 0 1px var(--beat-colour-active),
+              0 4px 16px color-mix(in srgb, var(--beat-colour-active) 45%, transparent);
+  animation: cs-beat-pulse 0.9s var(--ease-out, ease) 1;
+}
+@keyframes cs-beat-pulse {
+  0% {
+    outline-color: var(--beat-colour-active);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--beat-colour-active) 60%, transparent);
+  }
+  45% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--beat-colour-active) 30%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 1px var(--beat-colour-active),
+                0 4px 16px color-mix(in srgb, var(--beat-colour-active) 45%, transparent);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .comic-script .cs-caption,
@@ -537,6 +557,8 @@
   .comic-script .cs-sfx { transition: none; }
   .comic-script .cs-beat-badge { transition: none; }
   .comic-script .cs-beat-comment { transition: none; }
+  .comic-script .cs-beat-active,
+  .comic-script .cs-beat-pulse { animation: none; }
 }
 
 /* ── Select mode (multi-target commenting) ─────────────────────────────────

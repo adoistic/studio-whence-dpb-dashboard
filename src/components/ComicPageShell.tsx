@@ -156,8 +156,10 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
                   {tip && <ProvenanceTooltip {...tip} />}
                 </div>
               </div>
-              {/* The comment margin — sticky beside the page, scrolls on its own */}
-              <aside className="lg:sticky lg:top-6 lg:w-[22rem] lg:shrink-0">
+              {/* The comment margin — sticky beside the page, scrolls on its own.
+                  top-20 (80px) clears the ~60px sticky Topbar (z-40) + a small gap
+                  so the gutter's own sticky "Comments" header isn't hidden behind it. */}
+              <aside className="lg:sticky lg:top-20 lg:w-[22rem] lg:shrink-0">
                 <CommentGutter
                   comicId={`${comic.line}__${comic.slug}`}
                   line={comic.line}

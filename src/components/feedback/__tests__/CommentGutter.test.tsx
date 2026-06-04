@@ -45,6 +45,11 @@ const hidden: Thread = {
   replies: [],
 }
 
+const resolved: Thread = {
+  root: { ...general.root, id: 'r1', body: 'Resolved note', status: 'resolved' },
+  replies: [],
+}
+
 let threadData: Thread[] = []
 
 const addComment = vi.fn().mockResolvedValue(undefined)
@@ -80,8 +85,12 @@ vi.mock('@/components/feedback/useCommentTargets', () => ({
   },
 }))
 
+// A spy element returned by indexUnits for the anchored beat, so the jump
+// handler's scrollIntoView call can be asserted.
+const scrollIntoView = vi.fn()
+const beatEl = { scrollIntoView } as unknown as HTMLElement
 vi.mock('@/components/feedback/anchorRef', () => ({
-  indexUnits: () => new Map(),
+  indexUnits: () => new Map([['p13.pl1.b1', beatEl]]),
 }))
 
 import { CommentGutter } from '@/components/feedback/CommentGutter'
@@ -98,6 +107,20 @@ beforeEach(() => {
   threadData = []
   lastToggle = null
   addComment.mockClear()
+  scrollIntoView.mockClear()
+  // jsdom has no IntersectionObserver; the scroll-spy effect needs one when a
+  // non-null scriptRef is supplied.
+  vi.stubGlobal(
+    'IntersectionObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+      takeRecords() {
+        return []
+      }
+    },
+  )
 })
 
 describe('CommentGutter', () => {
@@ -167,5 +190,45 @@ describe('CommentGutter', () => {
     expect(screen.getByText('1 selected')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /clear/i }))
     expect(screen.queryByText(/selected/)).toBeNull()
+  })
+
+  it('default status filter shows open roots and hides resolved roots', () => {
+    threadData = [general, resolved]
+    render(<CommentGutter {...props} />)
+    expect(screen.getByText('General note')).toBeInTheDocument()
+    expect(screen.queryByText('Resolved note')).toBeNull()
+  })
+
+  it('toggling the Resolved chip reveals a resolved root', () => {
+    threadData = [resolved]
+    render(<CommentGutter {...props} />)
+    expect(screen.queryByText('Resolved note')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^resolved$/i }))
+    expect(screen.getByText('Resolved note')).toBeInTheDocument()
+  })
+
+  it('clicking an anchored thread card jumps to its first beat (scrollIntoView)', () => {
+    threadData = [anchored]
+    render(<CommentGutter {...props} scriptRef={{ current: document.createElement('div') }} />)
+    // The whole card is clickable; click on the card body (the note text), not a
+    // control, so the card-level jump handler fires.
+    fireEvent.click(screen.getByText('Anchored note'))
+    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'center' })
+  })
+
+  it('clicking an interactive child of the card does not double-fire the card jump', () => {
+    threadData = [anchored]
+    // draftText carries the beat ref so the live "jump" chip (a <button>) renders.
+    render(
+      <CommentGutter
+        {...props}
+        draftText='<p data-beat-ref="p13.pl1.b1"></p>'
+        scriptRef={{ current: document.createElement('div') }}
+      />,
+    )
+    // The chip handles its own jump; the card's closest('button,...') guard must
+    // stop the card-level handler from also firing → exactly one jump.
+    fireEvent.click(screen.getByRole('button', { name: /jump to/i }))
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
   })
 })
