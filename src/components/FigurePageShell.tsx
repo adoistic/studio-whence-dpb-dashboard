@@ -5,7 +5,8 @@ import type { Figure } from '@/types/content'
 import { SectionHead } from '@/components/SectionHead'
 import { ResearchReader } from '@/components/ResearchReader'
 import { PersonTabs } from '@/components/PersonTabs'
-import { useComics } from '@/lib/catalog'
+import { useVisibleComics } from '@/lib/visibleCatalog'
+import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 
 function titleCaseSlug(slug: string): string {
   return slug.split('-').map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(' ')
@@ -84,10 +85,20 @@ export function FigurePageShell({
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const toggle = (key: string) => setCollapsed((c) => ({ ...c, [key]: !c[key] }))
 
-  const peopleComics = useComics({ subject_slug: figure.slug })
-  const comics = (peopleComics.data ?? []).map((c) => ({
-    slug: c.slug, line: c.line, title: c.title, status: c.status, comic_number: c.comic_number,
-  }))
+  // A member who reached this figure via a single-COMIC grant can read the
+  // figure's research (figures_effective) but not necessarily all its comics, so
+  // a `subject_slug ==` scan could be rejected. Read the viewer's full visible
+  // set and filter to this figure — moderators still see every comic.
+  const { user, loading: authLoading } = useUser()
+  const status = useAllowStatus(user, authLoading)
+  const canMod = canModerate(status)
+  const email = user?.email ?? null
+  const visibleComics = useVisibleComics(canMod, email)
+  const comics = (visibleComics.data ?? [])
+    .filter((c) => c.subject_slug === figure.slug)
+    .map((c) => ({
+      slug: c.slug, line: c.line, title: c.title, status: c.status, comic_number: c.comic_number,
+    }))
 
   const sources = figure.sources ?? []
   const books = sources.filter((s) => s.kind === 'book')

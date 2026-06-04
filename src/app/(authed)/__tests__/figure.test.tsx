@@ -71,10 +71,14 @@ describe('FigurePage — /figures/<slug> routing', () => {
     render(<FigurePage />)
     expect(screen.getByText(/loading/i)).toBeInTheDocument()
   })
-  test('error state', () => {
+  test('permission-denied / read error → clean not-found (no existence leak)', () => {
+    // Under the allocation rules, a figure the member isn't allocated throws
+    // permission-denied → useFigure sets `error`. The page must render the same
+    // clean not-found as a genuinely missing doc, never a raw error state.
     setPathname('/figures/dhirubhai-ambani')
-    mockUseFigure = () => ({ data: null, loading: false, error: new Error('boom') })
+    mockUseFigure = () => ({ data: null, loading: false, error: new Error('permission-denied') })
     render(<FigurePage />)
-    expect(screen.getByText(/couldn.t load/i, { selector: 'p' })).toBeInTheDocument()
+    expect(screen.getByText(/figure not found/i)).toBeInTheDocument()
+    expect(screen.queryByText(/couldn.t load/i)).not.toBeInTheDocument()
   })
 })

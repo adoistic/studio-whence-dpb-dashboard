@@ -1,7 +1,9 @@
 'use client'
 
 import type { Line } from '@/types/content'
-import { useLines, useComics, useFigures, usePeople } from '@/lib/catalog'
+import { useLines, usePeople } from '@/lib/catalog'
+import { useVisibleComics, useVisibleFigures } from '@/lib/visibleCatalog'
+import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { personDocToRow } from '@/lib/people'
 import { LinePageShell } from '@/components/LinePageShell'
 import { LoadingState, ErrorState, NotFoundState } from '@/components/QuietStates'
@@ -21,9 +23,18 @@ function lineSlugFromPath(): string {
 export default function LinePage() {
   const { data: lines, loading, error } = useLines()
   const slug = lineSlugFromPath()
-  const { data: comics } = useComics({ line: slug })
+
+  // Members get the gated catalog; moderators get the full scan. We filter the
+  // visible comics down to this line (the page can't issue a member-safe
+  // line-scoped scan — see visibleCatalog).
+  const { user, loading: authLoading } = useUser()
+  const status = useAllowStatus(user, authLoading)
+  const canMod = canModerate(status)
+  const email = user?.email ?? null
+  const { data: allComics } = useVisibleComics(canMod, email)
+  const comics = (allComics ?? []).filter((c) => c.line === slug)
   const isBio = slug === 'biographies'
-  const { data: figures } = useFigures() // all figures are biographies
+  const { data: figures } = useVisibleFigures(canMod, email) // all figures are biographies
   const { data: people } = usePeople(slug)
 
   if (loading) return <LoadingState />
@@ -32,7 +43,7 @@ export default function LinePage() {
   const lineDoc = lines.find((l) => l.slug === slug)
   if (!lineDoc) return <NotFoundState title="Line not found" detail={`No line matches “${slug}”.`} />
 
-  const line: Line = { ...lineDoc, comics: comics ?? [], figures: isBio ? (figures ?? []) : [] }
+  const line: Line = { ...lineDoc, comics, figures: isBio ? (figures ?? []) : [] }
   const peopleRows = isBio ? (people ?? []).map(personDocToRow) : undefined
 
   // INTROS[slug] is typed non-undefined (tsconfig has no noUncheckedIndexedAccess),
