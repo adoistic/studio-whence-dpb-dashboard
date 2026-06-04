@@ -98,12 +98,22 @@ function classifyByEmail(email: string): true | null {
 }
 
 /**
- * Authorize a request. Returns `{ email }` (NORMALIZED) on allow, or `null`
- * on deny. Fails closed on every error path.
+ * Authorize a request. Returns `{ email, moderator }` (email NORMALIZED) on
+ * allow, or `null` on deny. Fails closed on every error path.
+ *
+ * `moderator` is the bypass flag for the allocation gate (work-allocation
+ * feature): it is `true` when the caller is the admin (env `ADMIN_EMAIL`) OR
+ * holds an `allowlist/{email}` doc whose `role === 'sub_admin'`. Admin +
+ * sub-admins see every work; plain members are restricted to allocated works.
+ *
+ * IMPORTANT: domain users (@thothica / @dpb.in) used to short-circuit BEFORE
+ * the allowlist read. We now ALWAYS read `allowlist/{email}` once we've decided
+ * the caller is allowed, so a domain user who is also a sub_admin (an allowlist
+ * doc with `role: 'sub_admin'`) is correctly reported as a moderator.
  */
 export async function authorize(
   req: AuthRequestLike
-): Promise<{ email: string } | null> {
+): Promise<{ email: string; moderator: boolean } | null> {
   try {
     const token = extractBearer(req)
     if (!token) return null
@@ -119,12 +129,25 @@ export async function authorize(
     const suspendedSnap = await fs.collection('suspended').doc(email).get()
     if (suspendedSnap.exists) return null
 
-    // Rules 3–5: admin / allowed domains.
-    if (classifyByEmail(email) === true) return { email }
+    // Admin email → allowed AND moderator, with no allowlist read needed.
+    if (email === adminEmail()) return { email, moderator: true }
+
+    // Read the allowlist doc once. It serves two purposes now:
+    //   - it can grant access (Rule 6: any existing doc allows a non-domain
+    //     user), and
+    //   - its `role` field decides moderator status (`sub_admin`).
+    // We read it even for domain users so a sub_admin domain user is flagged.
+    const snap = await fs.collection('allowlist').doc(email).get()
+    const role = snap.exists
+      ? (snap.data?.() as { role?: string } | undefined)?.role
+      : undefined
+    const moderator = role === 'sub_admin'
+
+    // Rules 4–5: admin / allowed domains → allowed (moderator iff sub_admin).
+    if (classifyByEmail(email) === true) return { email, moderator }
 
     // Rule 6: Firestore allowlist. Any existing doc counts as allow.
-    const snap = await fs.collection('allowlist').doc(email).get()
-    if (snap.exists) return { email }
+    if (snap.exists) return { email, moderator }
 
     // Rule 7: no match → deny.
     return null

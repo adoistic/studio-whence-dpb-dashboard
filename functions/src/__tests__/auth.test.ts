@@ -47,9 +47,10 @@ function decodesTo(email: string | undefined) {
   verifyIdToken.mockResolvedValue({ email })
 }
 
-// Helper: make the allowlist doc exist (or not).
-function allowlistDoc(exists: boolean) {
-  docGet.mockResolvedValue({ exists })
+// Helper: make the allowlist doc exist (or not), with an optional role field.
+// `data()` is supplied so the new moderator-detection path can read `role`.
+function allowlistDoc(exists: boolean, role?: string) {
+  docGet.mockResolvedValue({ exists, data: () => (exists ? { role } : {}) })
 }
 
 // Helper: make the suspended doc exist (or not).
@@ -73,6 +74,10 @@ describe('authorize', () => {
     suspendedGet.mockReset()
     // Default: nobody is suspended, so existing allow paths are unaffected.
     suspendedGet.mockResolvedValue({ exists: false })
+    // Default: no allowlist doc. authorize now reads allowlist even for domain
+    // users (to detect a sub_admin role), so it must always resolve to a shape
+    // carrying `exists` and `data()` rather than undefined.
+    docGet.mockResolvedValue({ exists: false, data: () => ({}) })
     delete process.env.ADMIN_EMAIL
   })
 
@@ -80,33 +85,50 @@ describe('authorize', () => {
     process.env = { ...ORIGINAL_ENV }
   })
 
-  test('admin email (default adnan@thothica.com) → allowed', async () => {
+  test('admin email (default adnan@thothica.com) → allowed + moderator', async () => {
     decodesTo('adnan@thothica.com')
     const result = await authorize(req('Bearer tok'))
-    expect(result).toEqual({ email: 'adnan@thothica.com' })
-    // No Firestore lookup needed for admin.
+    expect(result).toEqual({ email: 'adnan@thothica.com', moderator: true })
+    // No allowlist lookup needed for admin (short-circuits before it).
     expect(docGet).not.toHaveBeenCalled()
   })
 
-  test('@thothica.com domain → allowed (no Firestore lookup)', async () => {
+  test('@thothica.com domain → allowed, not moderator (reads allowlist)', async () => {
     decodesTo('x@thothica.com')
     const result = await authorize(req('Bearer tok'))
-    expect(result).toEqual({ email: 'x@thothica.com' })
-    expect(docGet).not.toHaveBeenCalled()
+    expect(result).toEqual({ email: 'x@thothica.com', moderator: false })
+    // Allowlist IS read now (to detect a sub_admin role even for domain users).
+    expect(docGet).toHaveBeenCalledTimes(1)
   })
 
-  test('@dpb.in domain → allowed (no Firestore lookup)', async () => {
+  test('@dpb.in domain → allowed, not moderator (reads allowlist)', async () => {
     decodesTo('y@dpb.in')
     const result = await authorize(req('Bearer tok'))
-    expect(result).toEqual({ email: 'y@dpb.in' })
-    expect(docGet).not.toHaveBeenCalled()
+    expect(result).toEqual({ email: 'y@dpb.in', moderator: false })
+    expect(docGet).toHaveBeenCalledTimes(1)
   })
 
-  test('gmail WITH allowlist doc → allowed', async () => {
+  test('domain user WITH sub_admin allowlist doc → allowed + moderator', async () => {
+    decodesTo('boss@thothica.com')
+    allowlistDoc(true, 'sub_admin')
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toEqual({ email: 'boss@thothica.com', moderator: true })
+    expect(docGet).toHaveBeenCalledTimes(1)
+  })
+
+  test('gmail WITH allowlist doc (no role) → allowed, not moderator', async () => {
     decodesTo('friend@gmail.com')
     allowlistDoc(true)
     const result = await authorize(req('Bearer tok'))
-    expect(result).toEqual({ email: 'friend@gmail.com' })
+    expect(result).toEqual({ email: 'friend@gmail.com', moderator: false })
+    expect(docGet).toHaveBeenCalledTimes(1)
+  })
+
+  test('gmail WITH sub_admin allowlist doc → allowed + moderator', async () => {
+    decodesTo('mod@gmail.com')
+    allowlistDoc(true, 'sub_admin')
+    const result = await authorize(req('Bearer tok'))
+    expect(result).toEqual({ email: 'mod@gmail.com', moderator: true })
     expect(docGet).toHaveBeenCalledTimes(1)
   })
 
@@ -161,50 +183,51 @@ describe('authorize', () => {
     expect(docGet).not.toHaveBeenCalled()
   })
 
-  test('case-insensitive: Adnan@Thothica.com → admin, returns normalized email', async () => {
+  test('case-insensitive: Adnan@Thothica.com → admin + moderator, normalized email', async () => {
     decodesTo('Adnan@Thothica.com')
     const result = await authorize(req('Bearer tok'))
-    expect(result).toEqual({ email: 'adnan@thothica.com' })
+    expect(result).toEqual({ email: 'adnan@thothica.com', moderator: true })
     expect(docGet).not.toHaveBeenCalled()
   })
 
   test('case-insensitive: X@THOTHICA.COM → allowed (domain), normalized', async () => {
     decodesTo('X@THOTHICA.COM')
     const result = await authorize(req('Bearer tok'))
-    expect(result).toEqual({ email: 'x@thothica.com' })
+    expect(result).toEqual({ email: 'x@thothica.com', moderator: false })
   })
 
   test('case-insensitive bearer scheme: "bearer tok" → parsed', async () => {
     decodesTo('x@thothica.com')
     const result = await authorize(req('bearer tok'))
-    expect(result).toEqual({ email: 'x@thothica.com' })
+    expect(result).toEqual({ email: 'x@thothica.com', moderator: false })
     expect(verifyIdToken).toHaveBeenCalledWith('tok')
   })
 
-  test('ADMIN_EMAIL env override is honored (different admin)', async () => {
+  test('ADMIN_EMAIL env override is honored (different admin) → moderator', async () => {
     process.env.ADMIN_EMAIL = 'boss@example.com'
     decodesTo('boss@example.com')
     const result = await authorize(req('Bearer tok'))
-    expect(result).toEqual({ email: 'boss@example.com' })
+    expect(result).toEqual({ email: 'boss@example.com', moderator: true })
     expect(docGet).not.toHaveBeenCalled()
   })
 
-  test('ADMIN_EMAIL override: the default admin then needs allowlist', async () => {
+  test('ADMIN_EMAIL override: the default admin then is a plain domain user', async () => {
     // With a custom admin set, adnan@thothica.com is no longer admin — but it
-    // still wins on the @thothica.com domain rule, so it is allowed without a
-    // Firestore lookup. Verify the domain rule still holds.
+    // still wins on the @thothica.com domain rule, so it is allowed. The
+    // allowlist IS read now (to detect a sub_admin role); here it's absent, so
+    // moderator is false.
     process.env.ADMIN_EMAIL = 'boss@example.com'
     decodesTo('adnan@thothica.com')
     const result = await authorize(req('Bearer tok'))
-    expect(result).toEqual({ email: 'adnan@thothica.com' })
-    expect(docGet).not.toHaveBeenCalled()
+    expect(result).toEqual({ email: 'adnan@thothica.com', moderator: false })
+    expect(docGet).toHaveBeenCalledTimes(1)
   })
 
-  test('ADMIN_EMAIL override with trailing case/space is normalized', async () => {
+  test('ADMIN_EMAIL override with trailing case/space is normalized → moderator', async () => {
     process.env.ADMIN_EMAIL = '  Boss@Example.com  '
     decodesTo('boss@example.com')
     const result = await authorize(req('Bearer tok'))
-    expect(result).toEqual({ email: 'boss@example.com' })
+    expect(result).toEqual({ email: 'boss@example.com', moderator: true })
   })
 
   test('the allowlist doc is looked up under the normalized email', async () => {
@@ -224,7 +247,7 @@ describe('authorize', () => {
     suspendedDoc(false)
     allowlistDoc(true)
     const result = await authorize(req('Bearer tok'))
-    expect(result).toEqual({ email: 'mixed.case@gmail.com' })
+    expect(result).toEqual({ email: 'mixed.case@gmail.com', moderator: false })
     expect(collection).toHaveBeenCalledWith('allowlist')
     expect(allowDocFn).toHaveBeenCalledWith('mixed.case@gmail.com')
   })

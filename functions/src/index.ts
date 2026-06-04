@@ -5,6 +5,11 @@ import type { Response } from "express";
 import { authorize } from "./auth";
 import { safeKey, RESOLVE_PREFIXES, READ_PREFIXES } from "./keys";
 import { getObject, presignGet } from "./r2";
+import {
+  getAllocation,
+  isKeyAllowedForMember,
+  type Allocation,
+} from "./allocation";
 
 /**
  * dataApi — the gatekeeper Cloud Function for the gated data backbone.
@@ -130,9 +135,33 @@ export const dataApi = onRequest(
     }
 
     // Validate + drop invalid keys (don't fail the whole batch for one bad key).
-    const validKeys = keys
+    let validKeys = keys
       .map((k) => safeKey(String(k), RESOLVE_PREFIXES))
       .filter((k): k is string => k !== null);
+
+    // Allocation gate: moderators (admin + sub-admins) see everything; a member
+    // is restricted to allocated works. Read the allocation doc ONCE, then drop
+    // any key whose work the member isn't allocated (same "drop, don't fail the
+    // batch" approach used for invalid keys above). Fails closed on error.
+    if (!auth.moderator) {
+      let alloc: Allocation | null;
+      try {
+        alloc = await getAllocation(auth.email);
+      } catch {
+        res.status(500).json({ error: "resolve failed" });
+        return;
+      }
+      const allowed = await Promise.all(
+        validKeys.map(async (k) => {
+          try {
+            return await isKeyAllowedForMember(k, alloc);
+          } catch {
+            return false; // fail closed on a per-key lookup error
+          }
+        })
+      );
+      validKeys = validKeys.filter((_, i) => allowed[i]);
+    }
 
     try {
       const entries = await Promise.all(
@@ -158,6 +187,21 @@ export const dataApi = onRequest(
     if (key === null) {
       res.status(403).json({ error: "forbidden" });
       return;
+    }
+    // Allocation gate: moderators read any valid key; a member may read only a
+    // key for an allocated work — otherwise 403. Fails closed on error.
+    if (!auth.moderator) {
+      let permitted = false;
+      try {
+        const alloc = await getAllocation(auth.email);
+        permitted = await isKeyAllowedForMember(key, alloc);
+      } catch {
+        permitted = false;
+      }
+      if (!permitted) {
+        res.status(403).json({ error: "forbidden" });
+        return;
+      }
     }
     try {
       const { body, contentType } = await getObject(key);

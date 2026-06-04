@@ -10,14 +10,18 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 
 // `vi.mock` factories are hoisted above imports, so the mock fns must be
 // created with `vi.hoisted` to be referenceable inside the factories.
-const { authorize, presignGet, getObject } = vi.hoisted(() => ({
-  authorize: vi.fn(),
-  presignGet: vi.fn(),
-  getObject: vi.fn(),
-}));
+const { authorize, presignGet, getObject, getAllocation, isKeyAllowedForMember } =
+  vi.hoisted(() => ({
+    authorize: vi.fn(),
+    presignGet: vi.fn(),
+    getObject: vi.fn(),
+    getAllocation: vi.fn(),
+    isKeyAllowedForMember: vi.fn(),
+  }));
 
 vi.mock("../auth", () => ({ authorize }));
 vi.mock("../r2", () => ({ presignGet, getObject }));
+vi.mock("../allocation", () => ({ getAllocation, isKeyAllowedForMember }));
 vi.mock("firebase-functions/v2/https", () => ({
   // The real call shape is `onRequest(options, handler)`, but it may also be
   // called as `onRequest(handler)`. The actual handler is the function arg.
@@ -97,6 +101,16 @@ beforeEach(() => {
   authorize.mockReset();
   presignGet.mockReset();
   getObject.mockReset();
+  getAllocation.mockReset();
+  isKeyAllowedForMember.mockReset();
+  // Safe defaults: an allocation doc exists but allows nothing. Tests that run
+  // as a MEMBER override these explicitly. Moderator tests never consult them.
+  getAllocation.mockResolvedValue({
+    lines: [],
+    figures_effective: [],
+    comics: [],
+  });
+  isKeyAllowedForMember.mockResolvedValue(false);
 });
 
 const ALLOWED_ORIGIN = "https://studio-whence-dpb.web.app";
@@ -134,7 +148,7 @@ describe("CORS preflight (OPTIONS)", () => {
 
 describe("GET /content", () => {
   test("authorized → getObject('content.json'), 200 with its body", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     const buf = Buffer.from('{"hello":"world"}');
     getObject.mockResolvedValue({ body: buf, contentType: "application/json" });
 
@@ -172,7 +186,7 @@ describe("GET /content", () => {
   });
 
   test("never presigns content.json (presignGet untouched)", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     getObject.mockResolvedValue({
       body: Buffer.from("{}"),
       contentType: "application/json",
@@ -187,7 +201,7 @@ describe("GET /content", () => {
   });
 
   test("R2 error → 500", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     getObject.mockRejectedValue(new Error("r2 down"));
     const req = makeReq({
       method: "GET",
@@ -204,7 +218,7 @@ describe("GET /content", () => {
 
 describe("POST /resolve", () => {
   test("mix of valid + invalid keys → invalid dropped, valid presigned", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     presignGet.mockImplementation(async (k: string) => `https://signed/${k}`);
 
     const req = makeReq({
@@ -234,7 +248,7 @@ describe("POST /resolve", () => {
   });
 
   test("string JSON body is tolerated (parsed)", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     presignGet.mockImplementation(async (k: string) => `https://signed/${k}`);
     const req = makeReq({
       method: "POST",
@@ -251,7 +265,7 @@ describe("POST /resolve", () => {
   });
 
   test(">50 keys → 400", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     const keys = Array.from({ length: 51 }, (_, i) => `research/${i}.md`);
     const req = makeReq({
       method: "POST",
@@ -267,7 +281,7 @@ describe("POST /resolve", () => {
   });
 
   test("keys not an array → 400", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     const req = makeReq({
       method: "POST",
       path: "/resolve",
@@ -295,7 +309,7 @@ describe("POST /resolve", () => {
   });
 
   test(">50 keys → 400 (CORS header present)", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     const keys = Array.from({ length: 51 }, (_, i) => `research/${i}.md`);
     const req = makeReq({
       method: "POST",
@@ -313,7 +327,7 @@ describe("POST /resolve", () => {
   });
 
   test("presignGet throws → 500", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     presignGet.mockRejectedValue(new Error("r2 down"));
     const req = makeReq({
       method: "POST",
@@ -328,7 +342,7 @@ describe("POST /resolve", () => {
   });
 
   test("all keys invalid → 200 { urls: {} }, presignGet never called", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     const req = makeReq({
       method: "POST",
       path: "/resolve",
@@ -347,7 +361,7 @@ describe("POST /resolve", () => {
 
 describe("GET /read", () => {
   test("authorized with a safe key → getObject(safeKey), 200 body", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     const buf = Buffer.from("# heading");
     getObject.mockResolvedValue({ body: buf, contentType: "text/markdown" });
     const req = makeReq({
@@ -365,7 +379,7 @@ describe("GET /read", () => {
   });
 
   test("disallowed prefix key (secrets/) → 403, getObject never called (CORS header present)", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     const req = makeReq({
       method: "GET",
       path: "/read",
@@ -381,7 +395,7 @@ describe("GET /read", () => {
   });
 
   test("no ?key= param at all → 403 (safeKey('') is null)", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     const req = makeReq({
       method: "GET",
       path: "/read",
@@ -395,7 +409,7 @@ describe("GET /read", () => {
   });
 
   test("traversal key (../content.json) → 403", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     const req = makeReq({
       method: "GET",
       path: "/read",
@@ -422,7 +436,7 @@ describe("GET /read", () => {
   });
 
   test("NoSuchKey error → 404 (CORS header present)", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     getObject.mockRejectedValue(
       Object.assign(new Error("missing"), { name: "NoSuchKey" })
     );
@@ -440,7 +454,7 @@ describe("GET /read", () => {
   });
 
   test("other R2 error → 500 (CORS header present)", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     getObject.mockRejectedValue(new Error("r2 down"));
     const req = makeReq({
       method: "GET",
@@ -460,7 +474,7 @@ describe("GET /read", () => {
 
 describe("routing", () => {
   test("emulator path /dataApi/content still routes to content", async () => {
-    authorize.mockResolvedValue({ email: "x@thothica.com" });
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
     getObject.mockResolvedValue({
       body: Buffer.from("{}"),
       contentType: "application/json",
@@ -497,5 +511,166 @@ describe("routing", () => {
     const res = new FakeRes();
     await handler(req, res);
     expect(res.statusCode).toBe(404);
+  });
+});
+
+// ─── Allocation gate (member vs moderator) ───────────────────────────────────
+//
+// `authorize` now returns `{ email, moderator }`. Moderators (admin + sub-admins)
+// see every valid key; members are filtered through `isKeyAllowedForMember`,
+// with the allocation doc read ONCE per request via `getAllocation`.
+
+describe("allocation gate — POST /resolve", () => {
+  function memberResolve(keys: string[]) {
+    return makeReq({
+      method: "POST",
+      path: "/resolve",
+      authorization: "Bearer tok",
+      body: { keys },
+    });
+  }
+
+  test("member: allocated keys survive (presigned), non-allocated dropped", async () => {
+    authorize.mockResolvedValue({ email: "m@gmail.com", moderator: false });
+    getAllocation.mockResolvedValue({
+      lines: [],
+      figures_effective: ["sachin-tendulkar"],
+      comics: [],
+    });
+    // Only the sachin research key is allowed; the other is not.
+    const allowedKey =
+      "research/biographies/03/_books/sachin-tendulkar/a.md";
+    const deniedKey = "research/biographies/03/_books/virat-kohli/b.md";
+    isKeyAllowedForMember.mockImplementation(async (k: string) => k === allowedKey);
+    presignGet.mockImplementation(async (k: string) => `https://signed/${k}`);
+
+    const res = new FakeRes();
+    await handler(memberResolve([allowedKey, deniedKey]), res);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.jsonBody).toEqual({
+      urls: { [allowedKey]: `https://signed/${allowedKey}` },
+    });
+    // Allocation doc read exactly once for the whole batch.
+    expect(getAllocation).toHaveBeenCalledTimes(1);
+    expect(getAllocation).toHaveBeenCalledWith("m@gmail.com");
+    expect(presignGet).toHaveBeenCalledTimes(1);
+  });
+
+  test("moderator: all valid keys survive (gate not consulted)", async () => {
+    authorize.mockResolvedValue({ email: "a@thothica.com", moderator: true });
+    presignGet.mockImplementation(async (k: string) => `https://signed/${k}`);
+    const res = new FakeRes();
+    await handler(
+      memberResolve([
+        "research/biographies/03/_books/sachin-tendulkar/a.md",
+        "research/biographies/03/_books/virat-kohli/b.md",
+      ]),
+      res
+    );
+    expect(res.statusCode).toBe(200);
+    expect(presignGet).toHaveBeenCalledTimes(2);
+    expect(getAllocation).not.toHaveBeenCalled();
+    expect(isKeyAllowedForMember).not.toHaveBeenCalled();
+  });
+
+  test("member with NO allocation doc → all keys dropped", async () => {
+    authorize.mockResolvedValue({ email: "m@gmail.com", moderator: false });
+    getAllocation.mockResolvedValue(null);
+    isKeyAllowedForMember.mockResolvedValue(false);
+    const res = new FakeRes();
+    await handler(
+      memberResolve(["research/biographies/03/_books/sachin-tendulkar/a.md"]),
+      res
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.jsonBody).toEqual({ urls: {} });
+    expect(presignGet).not.toHaveBeenCalled();
+  });
+
+  test("member: getAllocation throws → 500 (fail closed)", async () => {
+    authorize.mockResolvedValue({ email: "m@gmail.com", moderator: false });
+    getAllocation.mockRejectedValue(new Error("firestore down"));
+    const res = new FakeRes();
+    await handler(
+      memberResolve(["research/biographies/03/_books/sachin-tendulkar/a.md"]),
+      res
+    );
+    expect(res.statusCode).toBe(500);
+    expect(res.jsonBody).toEqual({ error: "resolve failed" });
+    expect(presignGet).not.toHaveBeenCalled();
+  });
+});
+
+describe("allocation gate — GET /read", () => {
+  function memberRead(key: string) {
+    return makeReq({
+      method: "GET",
+      path: "/read",
+      authorization: "Bearer tok",
+      query: { key },
+    });
+  }
+
+  test("member: allocated key → 200 served", async () => {
+    authorize.mockResolvedValue({ email: "m@gmail.com", moderator: false });
+    getAllocation.mockResolvedValue({
+      lines: ["biographies"],
+      figures_effective: [],
+      comics: [],
+    });
+    isKeyAllowedForMember.mockResolvedValue(true);
+    const buf = Buffer.from("# ok");
+    getObject.mockResolvedValue({ body: buf, contentType: "text/markdown" });
+    const res = new FakeRes();
+    await handler(memberRead("research/biographies/03/_books/x/a.md"), res);
+    expect(res.statusCode).toBe(200);
+    expect(res.sentBody).toBe(buf);
+    expect(getAllocation).toHaveBeenCalledTimes(1);
+  });
+
+  test("member: non-allocated key → 403, getObject never called", async () => {
+    authorize.mockResolvedValue({ email: "m@gmail.com", moderator: false });
+    getAllocation.mockResolvedValue({
+      lines: [],
+      figures_effective: [],
+      comics: [],
+    });
+    isKeyAllowedForMember.mockResolvedValue(false);
+    const res = new FakeRes();
+    await handler(memberRead("research/biographies/03/_books/x/a.md"), res);
+    expect(res.statusCode).toBe(403);
+    expect(res.jsonBody).toEqual({ error: "forbidden" });
+    expect(getObject).not.toHaveBeenCalled();
+  });
+
+  test("moderator: served without consulting the gate", async () => {
+    authorize.mockResolvedValue({ email: "a@thothica.com", moderator: true });
+    const buf = Buffer.from("# ok");
+    getObject.mockResolvedValue({ body: buf, contentType: "text/markdown" });
+    const res = new FakeRes();
+    await handler(memberRead("research/biographies/03/_books/x/a.md"), res);
+    expect(res.statusCode).toBe(200);
+    expect(getAllocation).not.toHaveBeenCalled();
+    expect(isKeyAllowedForMember).not.toHaveBeenCalled();
+  });
+
+  test("member with NO allocation doc → 403", async () => {
+    authorize.mockResolvedValue({ email: "m@gmail.com", moderator: false });
+    getAllocation.mockResolvedValue(null);
+    isKeyAllowedForMember.mockResolvedValue(false);
+    const res = new FakeRes();
+    await handler(memberRead("research/biographies/03/_books/x/a.md"), res);
+    expect(res.statusCode).toBe(403);
+    expect(getObject).not.toHaveBeenCalled();
+  });
+
+  test("member: gate lookup throws → 403 (fail closed)", async () => {
+    authorize.mockResolvedValue({ email: "m@gmail.com", moderator: false });
+    getAllocation.mockRejectedValue(new Error("firestore down"));
+    const res = new FakeRes();
+    await handler(memberRead("research/biographies/03/_books/x/a.md"), res);
+    expect(res.statusCode).toBe(403);
+    expect(getObject).not.toHaveBeenCalled();
   });
 });
