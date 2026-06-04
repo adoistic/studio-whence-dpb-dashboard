@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useMemo, useRef } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { Comic } from '@/types/content'
 import { StatusPill } from '@/components/StatusPill'
@@ -14,7 +14,9 @@ import { PersonTabs } from '@/components/PersonTabs'
 import { useProvenanceMarkers } from '@/lib/useProvenanceMarkers'
 import { ProvenanceTooltip } from '@/components/ProvenanceTooltip'
 import { CommentGutter } from '@/components/feedback/CommentGutter'
+import { CommentsView } from '@/components/feedback/CommentsView'
 import { CopyScriptToolbar } from '@/components/feedback/CopyScriptToolbar'
+import { indexUnits } from '@/components/feedback/anchorRef'
 
 // Memoized so tooltip-state re-renders of ComicPageShell don't re-parse the
 // draft. React 19 recreates dangerouslySetInnerHTML child nodes on every host
@@ -64,6 +66,28 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
   )
   const tip = useProvenanceMarkers(scriptRef, citationMap, draft.text)
   const hasFigure = comic.line === 'biographies' && !!figureSlug && !!fig.data
+
+  // ── Draft ⇄ Comments view ────────────────────────────────────────────────
+  const [view, setView] = useState<'draft' | 'comments'>('draft')
+  // When a comment in the Comments view is clicked, switch to the Draft view and
+  // remember which beat to scroll to once it's mounted.
+  const [pendingJumpRef, setPendingJumpRef] = useState<string | null>(null)
+
+  function jumpInDraft(ref: string) {
+    setView('draft')
+    setPendingJumpRef(ref)
+  }
+
+  // After the draft view mounts (or the draft html changes), scroll the pending
+  // beat into view. The ref is read here in the EFFECT, never during render.
+  useEffect(() => {
+    if (view !== 'draft' || !pendingJumpRef) return
+    const root = scriptRef.current
+    if (!root) return
+    const el = indexUnits(root).get(pendingJumpRef)
+    el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setPendingJumpRef(null)
+  }, [view, pendingJumpRef, draft.text])
 
   const comics = (peopleComics.data ?? []).map((c) => ({
     slug: c.slug,
@@ -148,15 +172,46 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
             </p>
           ) : draft.text ? (
             <>
-            {/* Reader toolbar — sits above both the script and (later) the
-                Draft/Comments view tab. */}
-            <div className="flex justify-end">
+            {/* Reader header — the copy toolbar + the Draft/Comments view tab
+                read as one bar; the toolbar stays visible in BOTH views. */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              {/* View tab toggle */}
+              <div
+                role="tablist"
+                aria-label="Reader view"
+                className="inline-flex items-center gap-0.5 rounded-full border border-brand-pale-dusk bg-brand-threshold/70 p-0.5 font-sans"
+              >
+                {([
+                  { key: 'draft', label: 'Draft' },
+                  { key: 'comments', label: 'Comments' },
+                ] as const).map(({ key, label }) => {
+                  const active = view === key
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      onClick={() => setView(key)}
+                      className={`rounded-full px-4 py-1.5 font-sans text-[0.72rem] font-semibold uppercase tracking-label transition-colors ${
+                        active
+                          ? 'bg-brand-indigo text-brand-pale-dusk shadow-sm'
+                          : 'text-brand-slate hover:text-brand-indigo'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
               <CopyScriptToolbar
                 comicId={`${comic.line}__${comic.slug}`}
                 comicTitle={comic.title}
                 draftText={draft.text}
               />
             </div>
+
+            {view === 'draft' ? (
             <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
               {/* The script column — each cs-page renders as its own paper
                   sheet (styled in globals.css), so the muted app background
@@ -180,6 +235,15 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
                 />
               </aside>
             </div>
+            ) : (
+              <CommentsView
+                comicId={`${comic.line}__${comic.slug}`}
+                line={comic.line}
+                comicVersion={comic.version ?? 0}
+                draftText={draft.text}
+                onJumpInDraft={jumpInDraft}
+              />
+            )}
             </>
           ) : (
             <p className="font-serif italic text-brand-slate">Draft not available yet.</p>
