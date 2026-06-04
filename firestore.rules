@@ -10,7 +10,7 @@ service cloud.firestore {
       );
     }
     function isAdmin() {
-      return isSignedIn() && userEmail() == 'adnan@thothica.com';
+      return isSignedIn() && userEmail() == 'adnan@thothica.com' && !isSuspended();
     }
     function isSuspended() {
       return isSignedIn() && exists(/databases/$(database)/documents/suspended/$(userEmail()));
@@ -70,7 +70,7 @@ service cloud.firestore {
               ? request.resource.data.status == 'open' : true)
         && (isSubAdmin() || request.resource.data.published == false);
       allow update: if isSubAdmin()
-        || (isSignedIn()
+        || (isAllowlisted()
             && resource.data.authorEmail == userEmail()
             && request.resource.data.authorEmail == resource.data.authorEmail
             && request.resource.data.parentId == resource.data.parentId

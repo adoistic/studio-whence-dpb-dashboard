@@ -41,6 +41,13 @@ beforeAll(async () => {
     await setDoc(doc(db, 'allowlist/sub@dpb.in'), { role: 'sub_admin' })
     // A suspended domain user — denied everything, even catalog reads.
     await setDoc(doc(db, 'suspended/banned@thothica.com'), {})
+    // A feedback doc authored by the suspended user (to prove they can't even edit own).
+    await setDoc(doc(db, 'feedback/banned-doc'), {
+      comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'banned@thothica.com', authorName: 'Banned', authorRole: 'allow',
+      body: 'before', status: 'open', comicVersion: 1, hidden: false, published: true,
+      createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
+    })
     // A published feedback root — visible to members.
     await setDoc(doc(db, 'feedback/pub'), {
       comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
@@ -225,5 +232,14 @@ describe('firestore.rules — roles & approval', () => {
   })
   it('member cannot read suspended/{email}', async () => {
     await assertFails(getDoc(doc(member(), 'suspended/banned@thothica.com')))
+  })
+  it('suspended user cannot edit even their own feedback', async () => {
+    // the author-update branch is gated on isAllowlisted() (which excludes suspended)
+    await assertFails(setDoc(doc(suspended(), 'feedback/banned-doc'), {
+      comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'banned@thothica.com', authorName: 'Banned', authorRole: 'allow',
+      body: 'edited while suspended', status: 'open', comicVersion: 1, hidden: false, published: true,
+      createdAt: '2026-06-03', updatedAt: '2026-06-04', editedAt: '2026-06-04',
+    }))
   })
 })
