@@ -70,16 +70,58 @@ beforeAll(async () => {
       body: 'before', status: 'open', category: 'fact', comicVersion: 1, hidden: false, published: true,
       createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
     })
+
+    // ── Work-allocation seeds ──
+    // x@thothica.com is used as a plain MEMBER across the feedback/roles blocks
+    // and reads the seeded biographies comic + its version subcollection there.
+    // Grant it the biographies line so those existing reads stay green under the
+    // new comic/version gate, while it remains a non-moderator for feedback tests.
+    await setDoc(doc(db, 'allocations/x@thothica.com'), {
+      lines: ['biographies'], figures: ['jrd-tata'], comics: [],
+      figures_effective: ['jrd-tata'], updatedBy: 'adnan@thothica.com', updatedAt: '2026-06-03',
+    })
+    // A dedicated allocated member for the allocation describe block.
+    // Granted: line biographies; figure sachin-tendulkar; comic indic__01-ramayana
+    // (line indic NOT granted). figures_effective adds dhirubhai-ambani as the
+    // subject of the granted comic (UI derives this; rules just read it).
+    await setDoc(doc(db, 'allowlist/member@dpb.in'), { role: 'allow' })
+    await setDoc(doc(db, 'allocations/member@dpb.in'), {
+      lines: ['biographies'], figures: ['sachin-tendulkar'], comics: ['indic__01-ramayana'],
+      figures_effective: ['sachin-tendulkar', 'dhirubhai-ambani'],
+      updatedBy: 'adnan@thothica.com', updatedAt: '2026-06-03',
+    })
+    // A member with NO allocation doc (allowlisted only) → must see no IP.
+    await setDoc(doc(db, 'allowlist/noalloc@dpb.in'), { role: 'allow' })
+    // Catalog seed docs for allocation assertions.
+    await setDoc(doc(db, 'comics/biographies__x'), { line: 'biographies', subject_slug: 'foo', status: 'draft' })
+    await setDoc(doc(db, 'comics/indic__01-ramayana'), { line: 'indic', subject_slug: 'ram', status: 'draft' })
+    await setDoc(doc(db, 'comics/awareness__y'), { line: 'awareness', subject_slug: 'bar', status: 'draft' })
+    await setDoc(doc(db, 'comics/indic__02'), { line: 'indic', subject_slug: 'ram', status: 'draft' })
+    await setDoc(doc(db, 'comics/biographies__x/versions/1'), { version: 1, note: 'v' })
+    await setDoc(doc(db, 'comics/awareness__y/versions/1'), { version: 1, note: 'v' })
+    // Figure docs carry NO line field (matches src/types/content.ts Figure).
+    await setDoc(doc(db, 'figures/sachin-tendulkar'), { slug: 'sachin-tendulkar', series: 'cricket' })
+    await setDoc(doc(db, 'figures/dhirubhai-ambani'), { slug: 'dhirubhai-ambani', series: 'business' })
+    await setDoc(doc(db, 'figures/unrelated'), { slug: 'unrelated', series: 'awareness' })
+    await setDoc(doc(db, 'figures/sachin-tendulkar/sources/book-a'), { kind: 'book' })
+    await setDoc(doc(db, 'figures/unrelated/sources/book-a'), { kind: 'book' })
   })
 })
 afterAll(async () => { await env.cleanup() })
 
 describe('firestore.rules — catalog', () => {
-  it('allowlisted (thothica.com) user can read catalog + sources subcollection', async () => {
+  it('allowlisted user can read navigation catalog (meta/people)', async () => {
+    // meta + people stay isAllowlisted()-only (navigation/structure, no IP).
     const db = env.authenticatedContext('u1', { email: 'x@thothica.com' }).firestore()
     await assertSucceeds(getDoc(doc(db, 'meta/catalog')))
-    await assertSucceeds(getDocs(collection(db, 'comics')))
     await assertSucceeds(getDoc(doc(db, 'people/jrd-tata')))
+  })
+  it('moderator can scan the full comics catalog + a figure sources subcollection', async () => {
+    // After work-allocation gating, a FULL comics/sources scan is moderator-only;
+    // a plain member must query their allocated subset (covered in the allocation
+    // describe block). sub@dpb.in is seeded as a sub_admin → bypasses the gate.
+    const db = env.authenticatedContext('mod1', { email: 'sub@dpb.in' }).firestore()
+    await assertSucceeds(getDocs(collection(db, 'comics')))
     await assertSucceeds(getDocs(collection(db, 'figures/jrd-tata/sources')))
   })
   it('non-allowlisted user is denied', async () => {
@@ -281,5 +323,79 @@ describe('firestore.rules — roles & approval', () => {
       body: 'edited while suspended', status: 'open', comicVersion: 1, hidden: false, published: true,
       createdAt: '2026-06-03', updatedAt: '2026-06-04', editedAt: '2026-06-04',
     }))
+  })
+})
+
+describe('firestore.rules — work allocation', () => {
+  const member   = () => env.authenticatedContext('al-m', { email: 'member@dpb.in' }).firestore()
+  const noAlloc  = () => env.authenticatedContext('al-n', { email: 'noalloc@dpb.in' }).firestore()
+  const subAdmin = () => env.authenticatedContext('al-sa', { email: 'sub@dpb.in' }).firestore()
+  const admin    = () => env.authenticatedContext('al-ad', { email: 'adnan@thothica.com' }).firestore()
+
+  // ── Member comic reads: union of line / comic / figures_effective grants ──
+  it('member reads a comic in an allocated LINE (biographies)', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'comics/biographies__x')))
+  })
+  it('member reads a specifically-allocated COMIC even when its line is not granted', async () => {
+    // indic line is NOT granted, but indic__01-ramayana is granted by id.
+    await assertSucceeds(getDoc(doc(member(), 'comics/indic__01-ramayana')))
+  })
+  it('member is DENIED a comic outside every grant', async () => {
+    await assertFails(getDoc(doc(member(), 'comics/awareness__y')))   // line awareness not granted
+    await assertFails(getDoc(doc(member(), 'comics/indic__02')))      // line indic not granted, id not granted
+  })
+
+  // ── Version subcollection inherits the parent comic's gate ──
+  it('member reads versions of an allocated comic; denied for a non-allocated comic', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'comics/biographies__x/versions/1')))
+    await assertFails(getDoc(doc(member(), 'comics/awareness__y/versions/1')))
+  })
+
+  // ── Figure research reads (gated by slug via figures_effective) ──
+  it('member reads research for a granted figure and a figures_effective figure; denied otherwise', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'figures/sachin-tendulkar')))   // raw figure grant
+    await assertSucceeds(getDoc(doc(member(), 'figures/dhirubhai-ambani')))   // via figures_effective (comic grant)
+    await assertFails(getDoc(doc(member(), 'figures/unrelated')))             // not granted
+  })
+  it('member reads sources of a granted figure; denied for a non-granted figure', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'figures/sachin-tendulkar/sources/book-a')))
+    await assertFails(getDoc(doc(member(), 'figures/unrelated/sources/book-a')))
+  })
+
+  // ── No allocation doc → no IP at all ──
+  it('a member with NO allocation doc is denied every comic and figure', async () => {
+    await assertFails(getDoc(doc(noAlloc(), 'comics/biographies__x')))
+    await assertFails(getDoc(doc(noAlloc(), 'comics/indic__01-ramayana')))
+    await assertFails(getDoc(doc(noAlloc(), 'figures/sachin-tendulkar')))
+    await assertFails(getDoc(doc(noAlloc(), 'figures/sachin-tendulkar/sources/book-a')))
+  })
+
+  // ── Moderators bypass the gate entirely ──
+  it('sub_admin reads ALL comics and figures (bypass)', async () => {
+    await assertSucceeds(getDoc(doc(subAdmin(), 'comics/awareness__y')))
+    await assertSucceeds(getDoc(doc(subAdmin(), 'comics/indic__02')))
+    await assertSucceeds(getDoc(doc(subAdmin(), 'figures/unrelated')))
+    await assertSucceeds(getDoc(doc(subAdmin(), 'figures/unrelated/sources/book-a')))
+  })
+  it('admin reads ALL comics and figures (bypass)', async () => {
+    await assertSucceeds(getDoc(doc(admin(), 'comics/awareness__y')))
+    await assertSucceeds(getDoc(doc(admin(), 'comics/indic__02')))
+    await assertSucceeds(getDoc(doc(admin(), 'figures/unrelated')))
+  })
+
+  // ── allocations/{email} access control ──
+  it('member reads OWN allocation doc; denied someone else’s', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'allocations/member@dpb.in')))
+    await assertFails(getDoc(doc(member(), 'allocations/x@thothica.com')))
+  })
+  it('a non-admin cannot write an allocation; admin can', async () => {
+    await assertFails(setDoc(doc(member(), 'allocations/member@dpb.in'),
+      { lines: ['indic'], figures: [], comics: [], figures_effective: [] }))
+    await assertFails(setDoc(doc(subAdmin(), 'allocations/member@dpb.in'),
+      { lines: ['indic'], figures: [], comics: [], figures_effective: [] }))
+    await assertSucceeds(setDoc(doc(admin(), 'allocations/member@dpb.in'),
+      { lines: ['biographies'], figures: ['sachin-tendulkar'], comics: ['indic__01-ramayana'],
+        figures_effective: ['sachin-tendulkar', 'dhirubhai-ambani'],
+        updatedBy: 'adnan@thothica.com', updatedAt: '2026-06-03' }))
   })
 })
