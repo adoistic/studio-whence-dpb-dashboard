@@ -6,7 +6,9 @@ import type { Kpi } from '@/components/KpiStrip'
 import { LineCard } from '@/components/LineCard'
 import { SampleStrip } from '@/components/SampleStrip'
 import { SectionHead } from '@/components/SectionHead'
-import { useHeadline, useLines, useComics } from '@/lib/catalog'
+import { useHeadline, useLines } from '@/lib/catalog'
+import { useVisibleComics } from '@/lib/visibleCatalog'
+import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { useResolved } from '@/lib/useResolved'
 import { HERO_BACKDROP, SAMPLE_PAGES } from '@/lib/images'
 import type { ActivityEntry } from '@/types/content'
@@ -18,7 +20,15 @@ const WORDS_ON_FILE = 10_000_000
 export default function Home() {
   const { data: meta } = useHeadline()
   const { data: lines } = useLines()
-  const { data: comics } = useComics() // all comics, one query, for per-line LineCard counts
+
+  // Resolve the viewer's moderation status. Moderators (admin/sub_admin) see all
+  // comics; a member sees only their allocated set, so the per-line LineCard
+  // counts and the visible line list both derive from the gated read.
+  const { user, loading: authLoading } = useUser()
+  const status = useAllowStatus(user, authLoading)
+  const canMod = canModerate(status)
+  const email = user?.email ?? null
+  const { data: comics } = useVisibleComics(canMod, email) // visible comics, for per-line LineCard counts
 
   // Resolve the hero backdrop key to a presigned URL; render the <img> only
   // once it's present (degrades cleanly mid-load).
@@ -83,19 +93,25 @@ export default function Home() {
       {/* ── Body ───────────────────────────────────────────────────────── */}
       <main className="mx-auto max-w-[1200px] px-6">
         {/* The production lines */}
-        {lines && comics && (
-          <section className="flex flex-col gap-8 pt-16 md:pt-20">
-            <SectionHead kicker="The lines" title={`${lines.length} lines in production`} />
-            <div className="grid grid-cols-1 gap-7 md:grid-cols-2">
-              {lines.map((line) => (
-                <LineCard
-                  key={line.slug}
-                  line={{ ...line, comics: comics.filter((c) => c.line === line.slug), figures: [] }}
-                />
-              ))}
-            </div>
-          </section>
-        )}
+        {lines && comics && (() => {
+          // Moderators see every line; a member sees only lines with ≥1 visible comic.
+          const visibleLines = canMod
+            ? lines
+            : lines.filter((line) => comics.some((c) => c.line === line.slug))
+          return (
+            <section className="flex flex-col gap-8 pt-16 md:pt-20">
+              <SectionHead kicker="The lines" title={`${visibleLines.length} lines in production`} />
+              <div className="grid grid-cols-1 gap-7 md:grid-cols-2">
+                {visibleLines.map((line) => (
+                  <LineCard
+                    key={line.slug}
+                    line={{ ...line, comics: comics.filter((c) => c.line === line.slug), figures: [] }}
+                  />
+                ))}
+              </div>
+            </section>
+          )
+        })()}
 
         {/* What we make — finished sample pages */}
         {SAMPLE_PAGES.length > 0 && (

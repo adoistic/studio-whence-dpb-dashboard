@@ -4,7 +4,7 @@ import {
   initializeTestEnvironment, type RulesTestEnvironment,
   assertSucceeds, assertFails,
 } from '@firebase/rules-unit-testing'
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore'
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, query, where } from 'firebase/firestore'
 
 let env: RulesTestEnvironment
 beforeAll(async () => {
@@ -23,7 +23,7 @@ beforeAll(async () => {
     await setDoc(doc(db, 'feedback/root-ankit'), {
       comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
       authorEmail: 'mr.ankitgzb@gmail.com', authorName: 'Ankit', authorRole: 'editor',
-      body: 'Fix dates.', status: 'open', comicVersion: 1, hidden: false,
+      body: 'Fix dates.', status: 'open', comicVersion: 1, hidden: false, published: true,
       createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
     })
     await setDoc(doc(db, 'comics/biographies__01-x/versions/1'), { version: 1, date: '2026-05-29', note: 'init' })
@@ -32,19 +32,158 @@ beforeAll(async () => {
     await setDoc(doc(db, 'feedback/stranger-doc'), {
       comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
       authorEmail: 'nope@gmail.com', authorName: 'Nope', authorRole: 'allow',
-      body: 'x', status: 'open', comicVersion: 1, hidden: false,
+      body: 'x', status: 'open', comicVersion: 1, hidden: false, published: true,
       createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
+    })
+
+    // ── Roles & approval seeds ──
+    // A sub_admin (moderator). sub@dpb.in is domain-allowed AND carries the role doc.
+    await setDoc(doc(db, 'allowlist/sub@dpb.in'), { role: 'sub_admin' })
+    // A suspended domain user — denied everything, even catalog reads.
+    await setDoc(doc(db, 'suspended/banned@thothica.com'), {})
+    // A feedback doc authored by the suspended user (to prove they can't even edit own).
+    await setDoc(doc(db, 'feedback/banned-doc'), {
+      comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'banned@thothica.com', authorName: 'Banned', authorRole: 'allow',
+      body: 'before', status: 'open', comicVersion: 1, hidden: false, published: true,
+      createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
+    })
+    // A published feedback root — visible to members.
+    await setDoc(doc(db, 'feedback/pub'), {
+      comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'x@thothica.com', authorName: 'X', authorRole: 'allow',
+      body: 'published root', status: 'open', comicVersion: 1, hidden: false, published: true,
+      createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
+    })
+    // A draft feedback root — visible ONLY to sub_admins/admin.
+    await setDoc(doc(db, 'feedback/draft'), {
+      comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'someone@thothica.com', authorName: 'Someone', authorRole: 'allow',
+      body: 'draft root', status: 'open', comicVersion: 1, hidden: false, published: false,
+      createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
+    })
+    // A published root WITH a category, authored by the allowlisted editor —
+    // used to prove the author-update branch pins `category`.
+    await setDoc(doc(db, 'feedback/cat-doc'), {
+      comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'mr.ankitgzb@gmail.com', authorName: 'Ankit', authorRole: 'editor',
+      body: 'before', status: 'open', category: 'fact', comicVersion: 1, hidden: false, published: true,
+      createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
+    })
+
+    // ── Work-allocation seeds ──
+    // x@thothica.com is used as a plain MEMBER across the feedback/roles blocks
+    // and reads the seeded biographies comic + its version subcollection there.
+    // Grant it the biographies line so those existing reads stay green under the
+    // new comic/version gate, while it remains a non-moderator for feedback tests.
+    await setDoc(doc(db, 'allocations/x@thothica.com'), {
+      lines: ['biographies'], figures: ['jrd-tata'], comics: [],
+      figures_effective: ['jrd-tata'], updatedBy: 'adnan@thothica.com', updatedAt: '2026-06-03',
+    })
+    // A dedicated allocated member for the allocation describe block.
+    // Granted: line biographies; figure sachin-tendulkar; comic indic__01-ramayana
+    // (line indic NOT granted). figures_effective adds dhirubhai-ambani as the
+    // subject of the granted comic (UI derives this; rules just read it).
+    await setDoc(doc(db, 'allowlist/member@dpb.in'), { role: 'allow' })
+    await setDoc(doc(db, 'allocations/member@dpb.in'), {
+      lines: ['biographies'], figures: ['sachin-tendulkar'], comics: ['indic__01-ramayana'],
+      figures_effective: ['sachin-tendulkar', 'dhirubhai-ambani'],
+      updatedBy: 'adnan@thothica.com', updatedAt: '2026-06-03',
+    })
+    // A member granted ONE comic by id (no raw figure grant). The granted
+    // comic's subject (sachin-tendulkar) lands in figures_effective so the
+    // figure's RESEARCH is unlocked — but the figure's OTHER comics must stay
+    // locked (a comic grant must not cascade to sibling comics).
+    await setDoc(doc(db, 'allowlist/comicmember@dpb.in'), { role: 'allow' })
+    await setDoc(doc(db, 'allocations/comicmember@dpb.in'), {
+      comics: ['biographies__c1'], lines: [], figures: [],
+      figures_effective: ['sachin-tendulkar'],
+      updatedBy: 'adnan@thothica.com', updatedAt: '2026-06-03',
+    })
+    // The granted comic + a SIBLING comic with the same subject (NOT granted by id).
+    await setDoc(doc(db, 'comics/biographies__c1'), { line: 'biographies', subject_slug: 'sachin-tendulkar', status: 'draft' })
+    await setDoc(doc(db, 'comics/biographies__c2'), { line: 'biographies', subject_slug: 'sachin-tendulkar', status: 'draft' })
+    // A member with NO allocation doc (allowlisted only) → must see no IP.
+    await setDoc(doc(db, 'allowlist/noalloc@dpb.in'), { role: 'allow' })
+    // Catalog seed docs for allocation assertions.
+    await setDoc(doc(db, 'comics/biographies__x'), { line: 'biographies', subject_slug: 'foo', status: 'draft' })
+    await setDoc(doc(db, 'comics/indic__01-ramayana'), { line: 'indic', subject_slug: 'ram', status: 'draft' })
+    await setDoc(doc(db, 'comics/awareness__y'), { line: 'awareness', subject_slug: 'bar', status: 'draft' })
+    await setDoc(doc(db, 'comics/indic__02'), { line: 'indic', subject_slug: 'ram', status: 'draft' })
+    await setDoc(doc(db, 'comics/biographies__x/versions/1'), { version: 1, note: 'v' })
+    await setDoc(doc(db, 'comics/awareness__y/versions/1'), { version: 1, note: 'v' })
+    // Figure docs carry NO line field (matches src/types/content.ts Figure).
+    await setDoc(doc(db, 'figures/sachin-tendulkar'), { slug: 'sachin-tendulkar', series: 'cricket' })
+    await setDoc(doc(db, 'figures/dhirubhai-ambani'), { slug: 'dhirubhai-ambani', series: 'business' })
+    await setDoc(doc(db, 'figures/unrelated'), { slug: 'unrelated', series: 'awareness' })
+    await setDoc(doc(db, 'figures/sachin-tendulkar/sources/book-a'), { kind: 'book' })
+    await setDoc(doc(db, 'figures/unrelated/sources/book-a'), { kind: 'book' })
+
+    // ── Feedback allocation seeds ──
+    // A dedicated published feedback doc on biographies__x (member@dpb.in holds
+    // the biographies LINE) — kept separate from feedback/pub, which the roles
+    // describe mutates to hidden, so this read stays deterministic.
+    await setDoc(doc(db, 'feedback/fb-bio'), {
+      comicId: 'biographies__x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'x@thothica.com', authorName: 'X', authorRole: 'allow',
+      body: 'bio comment', status: 'open', comicVersion: 1, hidden: false, published: true,
+      createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
+    })
+    // Published feedback on an awareness comic — member@dpb.in is NOT allocated
+    // the awareness line/comic/figure, so they must be DENIED reading it even
+    // though it is published. A moderator reads it via the isSubAdmin() bypass.
+    await setDoc(doc(db, 'feedback/fb-awareness'), {
+      comicId: 'awareness__y', line: 'awareness', parentId: null, anchors: [],
+      authorEmail: 'x@thothica.com', authorName: 'X', authorRole: 'allow',
+      body: 'awareness comment', status: 'open', comicVersion: 1, hidden: false, published: true,
+      createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
+    })
+    // Published feedback on biographies__c1 — comicmember@dpb.in holds that comic
+    // by id (so may read its feedback) but NOT its sibling biographies__c2.
+    await setDoc(doc(db, 'feedback/fb-c1'), {
+      comicId: 'biographies__c1', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'x@thothica.com', authorName: 'X', authorRole: 'allow',
+      body: 'c1 comment', status: 'open', comicVersion: 1, hidden: false, published: true,
+      createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
+    })
+    // Published feedback on a sibling comic biographies__c2 — comicmember is NOT
+    // granted c2 (a comic grant must not cascade to siblings), so DENIED.
+    await setDoc(doc(db, 'feedback/fb-c2'), {
+      comicId: 'biographies__c2', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'x@thothica.com', authorName: 'X', authorRole: 'allow',
+      body: 'c2 comment', status: 'open', comicVersion: 1, hidden: false, published: true,
+      createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
+    })
+
+    // ── Line-grant → figure research seed (#5) ──
+    // A figure doc that DOES carry a `line` field (figures now carry line), and a
+    // member allocated ONLY that line (no figures_effective entry for it). The
+    // line-grant→figure-research branch (previously uncovered) must let them read
+    // the figure doc + its sources.
+    await setDoc(doc(db, 'figures/bio-line-figure'), { slug: 'bio-line-figure', series: 'business', line: 'biographies' })
+    await setDoc(doc(db, 'figures/bio-line-figure/sources/book-a'), { kind: 'book' })
+    await setDoc(doc(db, 'allowlist/linemember@dpb.in'), { role: 'allow' })
+    await setDoc(doc(db, 'allocations/linemember@dpb.in'), {
+      lines: ['biographies'], figures: [], comics: [], figures_effective: [],
+      updatedBy: 'adnan@thothica.com', updatedAt: '2026-06-03',
     })
   })
 })
 afterAll(async () => { await env.cleanup() })
 
 describe('firestore.rules — catalog', () => {
-  it('allowlisted (thothica.com) user can read catalog + sources subcollection', async () => {
+  it('allowlisted user can read navigation catalog (meta/people)', async () => {
+    // meta + people stay isAllowlisted()-only (navigation/structure, no IP).
     const db = env.authenticatedContext('u1', { email: 'x@thothica.com' }).firestore()
     await assertSucceeds(getDoc(doc(db, 'meta/catalog')))
-    await assertSucceeds(getDocs(collection(db, 'comics')))
     await assertSucceeds(getDoc(doc(db, 'people/jrd-tata')))
+  })
+  it('moderator can scan the full comics catalog + a figure sources subcollection', async () => {
+    // After work-allocation gating, a FULL comics/sources scan is moderator-only;
+    // a plain member must query their allocated subset (covered in the allocation
+    // describe block). sub@dpb.in is seeded as a sub_admin → bypasses the gate.
+    const db = env.authenticatedContext('mod1', { email: 'sub@dpb.in' }).firestore()
+    await assertSucceeds(getDocs(collection(db, 'comics')))
     await assertSucceeds(getDocs(collection(db, 'figures/jrd-tata/sources')))
   })
   it('non-allowlisted user is denied', async () => {
@@ -70,13 +209,25 @@ describe('firestore.rules — feedback', () => {
   const rootDoc = (over = {}) => ({
     comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
     authorEmail: 'x@thothica.com', authorName: 'X', authorRole: 'allow',
-    body: 'hi', status: 'open', comicVersion: 1, hidden: false,
+    body: 'hi', status: 'open', comicVersion: 1, hidden: false, published: false,
     createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null, ...over,
   })
   // (mr.ankitgzb@gmail.com is allowlisted in the beforeAll seed block above.)
 
-  it('allowlisted user can read the feedback collection', async () => {
-    await assertSucceeds(getDocs(collection(allowed(), 'feedback')))
+  it('allowlisted member can read published feedback (per-comic filtered query)', async () => {
+    // A member's real query constrains to a single comicId + published +
+    // not-hidden, which the read rule permits when the comic is allocated.
+    // (x@thothica.com holds line biographies, so biographies__01-x is allocated.)
+    // An unconstrained collection read would now fail — both because of the
+    // seeded draft AND because of feedback on non-allocated comics; the member's
+    // query is always per-comic, which is why /reviews is moderator-only.
+    const q = query(
+      collection(allowed(), 'feedback'),
+      where('comicId', '==', 'biographies__01-x'),
+      where('published', '==', true),
+      where('hidden', '==', false),
+    )
+    await assertSucceeds(getDocs(q))
   })
   it('non-allowlisted user is denied reading feedback', async () => {
     await assertFails(getDocs(collection(stranger(), 'feedback')))
@@ -101,14 +252,16 @@ describe('firestore.rules — feedback', () => {
   })
   it('author edits own body but cannot self-resolve', async () => {
     const db = editor()
+    // root-ankit is seeded published:true; the author-update invariant forbids
+    // changing `published`, so preserve it here.
     await assertSucceeds(setDoc(doc(db, 'feedback/root-ankit'),
-      { ...rootDoc({ authorEmail: 'mr.ankitgzb@gmail.com', authorRole: 'editor' }), body: 'edited', editedAt: '2026-06-04' }))
+      { ...rootDoc({ authorEmail: 'mr.ankitgzb@gmail.com', authorRole: 'editor', published: true }), body: 'edited', editedAt: '2026-06-04' }))
     await assertFails(setDoc(doc(db, 'feedback/root-ankit'),
-      { ...rootDoc({ authorEmail: 'mr.ankitgzb@gmail.com', authorRole: 'editor' }), status: 'resolved' }))
+      { ...rootDoc({ authorEmail: 'mr.ankitgzb@gmail.com', authorRole: 'editor', published: true }), status: 'resolved' }))
   })
   it('admin can resolve and hide', async () => {
     await assertSucceeds(setDoc(doc(admin(), 'feedback/root-ankit'),
-      { ...rootDoc({ authorEmail: 'mr.ankitgzb@gmail.com' }), status: 'resolved', hidden: true }))
+      { ...rootDoc({ authorEmail: 'mr.ankitgzb@gmail.com', published: true }), status: 'resolved', hidden: true }))
   })
   it('author deletes own; admin can delete', async () => {
     await assertSucceeds(deleteDoc(doc(admin(), 'feedback/reply1')))
@@ -117,11 +270,280 @@ describe('firestore.rules — feedback', () => {
     await assertSucceeds(getDoc(doc(allowed(), 'comics/biographies__01-x/versions/1')))
     await assertFails(setDoc(doc(allowed(), 'comics/biographies__01-x/versions/1'), { version: 1 }))
   })
+  it('author can edit own body/anchors but cannot mutate category', async () => {
+    const db = editor()
+    const base = {
+      comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'mr.ankitgzb@gmail.com', authorName: 'Ankit', authorRole: 'editor',
+      status: 'open', comicVersion: 1, hidden: false, published: true,
+      createdAt: '2026-06-03', updatedAt: '2026-06-04',
+    }
+    // Editing body (+ anchors) while keeping category unchanged is allowed.
+    await assertSucceeds(setDoc(doc(db, 'feedback/cat-doc'),
+      { ...base, body: 'edited', category: 'fact', anchors: [{ kind: 'page', ref: 'p1', page: 1, snapshot: 'Page 1' }], editedAt: '2026-06-04' }))
+    // Mutating category is denied.
+    await assertFails(setDoc(doc(db, 'feedback/cat-doc'),
+      { ...base, body: 'edited', category: 'tone', editedAt: '2026-06-04' }))
+  })
   it('author cannot flip hidden on own doc', async () => {
     await assertFails(setDoc(doc(editor(), 'feedback/root-ankit'),
       { ...rootDoc({ authorEmail: 'mr.ankitgzb@gmail.com', authorRole: 'editor' }), hidden: true }))
   })
   it('non-allowlisted author cannot delete own doc', async () => {
     await assertFails(deleteDoc(doc(stranger(), 'feedback/stranger-doc')))
+  })
+})
+
+describe('firestore.rules — roles & approval', () => {
+  const member   = () => env.authenticatedContext('m', { email: 'x@thothica.com' }).firestore()
+  const subAdmin = () => env.authenticatedContext('sa', { email: 'sub@dpb.in' }).firestore()
+  const admin    = () => env.authenticatedContext('ad', { email: 'adnan@thothica.com' }).firestore()
+  const suspended = () => env.authenticatedContext('su', { email: 'banned@thothica.com' }).firestore()
+
+  const rootDoc = (over = {}) => ({
+    comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
+    authorEmail: 'x@thothica.com', authorName: 'X', authorRole: 'allow',
+    body: 'hi', status: 'open', comicVersion: 1, hidden: false, published: false,
+    createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null, ...over,
+  })
+
+  // ── Draft visibility ──
+  it('member CAN read a published root', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'feedback/pub')))
+  })
+  it('member CANNOT read a draft root', async () => {
+    await assertFails(getDoc(doc(member(), 'feedback/draft')))
+  })
+  it('sub_admin CAN read a draft root', async () => {
+    await assertSucceeds(getDoc(doc(subAdmin(), 'feedback/draft')))
+  })
+
+  // ── Suspension ──
+  it('suspended domain user is denied catalog reads', async () => {
+    await assertFails(getDoc(doc(suspended(), 'meta/catalog')))
+  })
+  it('suspended domain user is denied feedback reads (even published)', async () => {
+    await assertFails(getDoc(doc(suspended(), 'feedback/pub')))
+  })
+
+  // ── Create: members may not self-publish ──
+  it('member create MUST set published == false', async () => {
+    await assertFails(setDoc(doc(member(), 'feedback/m-pub'), rootDoc({ published: true })))
+    await assertSucceeds(setDoc(doc(member(), 'feedback/m-draft'), rootDoc({ published: false })))
+  })
+
+  // ── Create: replies inherit parent published state ──
+  it('member CAN create a published reply under a published root', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { status, ...reply } = rootDoc({ parentId: 'pub', published: true })
+    await assertSucceeds(setDoc(doc(member(), 'feedback/reply-under-pub'), reply))
+  })
+  it('member CANNOT create a published reply under a draft root', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { status, ...reply } = rootDoc({ parentId: 'draft', published: true })
+    await assertFails(setDoc(doc(member(), 'feedback/reply-under-draft'), reply))
+  })
+  it('member CAN create a draft reply under a draft root', async () => {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { status, ...reply } = rootDoc({ parentId: 'draft', published: false })
+    await assertSucceeds(setDoc(doc(member(), 'feedback/draft-reply-under-draft'), reply))
+  })
+  it('sub_admin create with published == true succeeds', async () => {
+    await assertSucceeds(setDoc(doc(subAdmin(), 'feedback/sa-pub'),
+      rootDoc({ authorEmail: 'sub@dpb.in', published: true })))
+  })
+
+  // ── Update: only moderators may approve / flip published ──
+  it('member (author) cannot flip own draft to published', async () => {
+    // m-draft was created above by the member, published:false.
+    await assertFails(setDoc(doc(member(), 'feedback/m-draft'), rootDoc({ published: true })))
+  })
+  it('sub_admin CAN approve (set published true)', async () => {
+    await assertSucceeds(setDoc(doc(subAdmin(), 'feedback/m-draft'), rootDoc({ published: true })))
+  })
+
+  // ── Moderation that was previously admin-only is now sub_admin ──
+  it('sub_admin can set status + hidden; a member cannot moderate', async () => {
+    await assertSucceeds(setDoc(doc(subAdmin(), 'feedback/pub'),
+      rootDoc({ published: true, status: 'resolved', hidden: true })))
+    // A non-author member cannot moderate someone else's doc (author mismatch
+    // and moderation fields changed).
+    await assertFails(setDoc(doc(member(), 'feedback/draft'),
+      rootDoc({ authorEmail: 'someone@thothica.com', status: 'resolved' })))
+  })
+
+  // ── suspended/{email} collection access ──
+  it('sub_admin can read suspended/{email}; only admin writes', async () => {
+    await assertSucceeds(getDoc(doc(subAdmin(), 'suspended/banned@thothica.com')))
+    await assertFails(setDoc(doc(subAdmin(), 'suspended/new@thothica.com'), {}))
+    await assertSucceeds(setDoc(doc(admin(), 'suspended/new@thothica.com'), {}))
+  })
+  it('member cannot read suspended/{email}', async () => {
+    await assertFails(getDoc(doc(member(), 'suspended/banned@thothica.com')))
+  })
+  it('suspended user cannot edit even their own feedback', async () => {
+    // the author-update branch is gated on isAllowlisted() (which excludes suspended)
+    await assertFails(setDoc(doc(suspended(), 'feedback/banned-doc'), {
+      comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'banned@thothica.com', authorName: 'Banned', authorRole: 'allow',
+      body: 'edited while suspended', status: 'open', comicVersion: 1, hidden: false, published: true,
+      createdAt: '2026-06-03', updatedAt: '2026-06-04', editedAt: '2026-06-04',
+    }))
+  })
+})
+
+describe('firestore.rules — work allocation', () => {
+  const member   = () => env.authenticatedContext('al-m', { email: 'member@dpb.in' }).firestore()
+  const comicMember = () => env.authenticatedContext('al-cm', { email: 'comicmember@dpb.in' }).firestore()
+  const noAlloc  = () => env.authenticatedContext('al-n', { email: 'noalloc@dpb.in' }).firestore()
+  const subAdmin = () => env.authenticatedContext('al-sa', { email: 'sub@dpb.in' }).firestore()
+  const admin    = () => env.authenticatedContext('al-ad', { email: 'adnan@thothica.com' }).firestore()
+
+  // ── Member comic reads: union of line / comic / figures_effective grants ──
+  it('member reads a comic in an allocated LINE (biographies)', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'comics/biographies__x')))
+  })
+  it('member reads a specifically-allocated COMIC even when its line is not granted', async () => {
+    // indic line is NOT granted, but indic__01-ramayana is granted by id.
+    await assertSucceeds(getDoc(doc(member(), 'comics/indic__01-ramayana')))
+  })
+  it('member is DENIED a comic outside every grant', async () => {
+    await assertFails(getDoc(doc(member(), 'comics/awareness__y')))   // line awareness not granted
+    await assertFails(getDoc(doc(member(), 'comics/indic__02')))      // line indic not granted, id not granted
+  })
+  it('a RAW figure grant unlocks ALL of that figure’s comics', async () => {
+    // member@dpb.in has figures:['sachin-tendulkar'] — both sibling comics with
+    // that subject are readable (an explicit figure grant cascades to its comics).
+    await assertSucceeds(getDoc(doc(member(), 'comics/biographies__c1')))
+    await assertSucceeds(getDoc(doc(member(), 'comics/biographies__c2')))
+  })
+
+  // ── A COMIC grant must NOT cascade to the figure's SIBLING comics ──
+  // comicmember@dpb.in was granted ONLY biographies__c1 by id (figures:[]); the
+  // subject sachin-tendulkar is in figures_effective (research follows), but
+  // figures_effective must NOT unlock sibling comic biographies__c2.
+  it('comic grant unlocks the granted comic but NOT its sibling', async () => {
+    await assertSucceeds(getDoc(doc(comicMember(), 'comics/biographies__c1')))   // granted by id
+    await assertFails(getDoc(doc(comicMember(), 'comics/biographies__c2')))      // sibling, subject only in figures_effective → DENIED
+  })
+  it('comic grant DOES unlock the figure’s research (figures_effective)', async () => {
+    await assertSucceeds(getDoc(doc(comicMember(), 'figures/sachin-tendulkar')))
+    await assertSucceeds(getDoc(doc(comicMember(), 'figures/sachin-tendulkar/sources/book-a')))
+  })
+
+  // ── Version subcollection inherits the parent comic's gate ──
+  it('member reads versions of an allocated comic; denied for a non-allocated comic', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'comics/biographies__x/versions/1')))
+    await assertFails(getDoc(doc(member(), 'comics/awareness__y/versions/1')))
+  })
+
+  // ── Figure research reads (gated by slug via figures_effective) ──
+  it('member reads research for a granted figure and a figures_effective figure; denied otherwise', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'figures/sachin-tendulkar')))   // raw figure grant
+    await assertSucceeds(getDoc(doc(member(), 'figures/dhirubhai-ambani')))   // via figures_effective (comic grant)
+    await assertFails(getDoc(doc(member(), 'figures/unrelated')))             // not granted
+  })
+  it('member reads sources of a granted figure; denied for a non-granted figure', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'figures/sachin-tendulkar/sources/book-a')))
+    await assertFails(getDoc(doc(member(), 'figures/unrelated/sources/book-a')))
+  })
+
+  // ── No allocation doc → no IP at all ──
+  it('a member with NO allocation doc is denied every comic and figure', async () => {
+    await assertFails(getDoc(doc(noAlloc(), 'comics/biographies__x')))
+    await assertFails(getDoc(doc(noAlloc(), 'comics/indic__01-ramayana')))
+    await assertFails(getDoc(doc(noAlloc(), 'figures/sachin-tendulkar')))
+    await assertFails(getDoc(doc(noAlloc(), 'figures/sachin-tendulkar/sources/book-a')))
+  })
+
+  // ── Moderators bypass the gate entirely ──
+  it('sub_admin reads ALL comics and figures (bypass)', async () => {
+    await assertSucceeds(getDoc(doc(subAdmin(), 'comics/awareness__y')))
+    await assertSucceeds(getDoc(doc(subAdmin(), 'comics/indic__02')))
+    await assertSucceeds(getDoc(doc(subAdmin(), 'figures/unrelated')))
+    await assertSucceeds(getDoc(doc(subAdmin(), 'figures/unrelated/sources/book-a')))
+  })
+  it('admin reads ALL comics and figures (bypass)', async () => {
+    await assertSucceeds(getDoc(doc(admin(), 'comics/awareness__y')))
+    await assertSucceeds(getDoc(doc(admin(), 'comics/indic__02')))
+    await assertSucceeds(getDoc(doc(admin(), 'figures/unrelated')))
+  })
+
+  // ── allocations/{email} access control ──
+  it('member reads OWN allocation doc; denied someone else’s', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'allocations/member@dpb.in')))
+    await assertFails(getDoc(doc(member(), 'allocations/x@thothica.com')))
+  })
+  it('a non-admin cannot write an allocation; admin can', async () => {
+    await assertFails(setDoc(doc(member(), 'allocations/member@dpb.in'),
+      { lines: ['indic'], figures: [], comics: [], figures_effective: [] }))
+    await assertFails(setDoc(doc(subAdmin(), 'allocations/member@dpb.in'),
+      { lines: ['indic'], figures: [], comics: [], figures_effective: [] }))
+    await assertSucceeds(setDoc(doc(admin(), 'allocations/member@dpb.in'),
+      { lines: ['biographies'], figures: ['sachin-tendulkar'], comics: ['indic__01-ramayana'],
+        figures_effective: ['sachin-tendulkar', 'dhirubhai-ambani'],
+        updatedBy: 'adnan@thothica.com', updatedAt: '2026-06-03' }))
+  })
+
+  // ── Line-grant → figure research (#5; previously uncovered) ──
+  it('member allocated ONLY a line can read that line’s figure doc + sources', async () => {
+    const ctx = env.authenticatedContext('al-line', { email: 'linemember@dpb.in' }).firestore()
+    // figures/bio-line-figure carries line:'biographies'; the member holds only
+    // lines:['biographies'] (no figures_effective entry) → the line branch unlocks it.
+    await assertSucceeds(getDoc(doc(ctx, 'figures/bio-line-figure')))
+    await assertSucceeds(getDoc(doc(ctx, 'figures/bio-line-figure/sources/book-a')))
+  })
+})
+
+describe('firestore.rules — feedback allocation gate', () => {
+  // member@dpb.in: lines ['biographies'], figures ['sachin-tendulkar'],
+  //   comics ['indic__01-ramayana'] — so biographies feedback is line-allocated.
+  // comicmember@dpb.in: comics ['biographies__c1'] only (no line/figure grant).
+  const member      = () => env.authenticatedContext('fb-m', { email: 'member@dpb.in' }).firestore()
+  const comicMember = () => env.authenticatedContext('fb-cm', { email: 'comicmember@dpb.in' }).firestore()
+  const subAdmin    = () => env.authenticatedContext('fb-sa', { email: 'sub@dpb.in' }).firestore()
+
+  const fbDoc = (over = {}) => ({
+    comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
+    authorEmail: 'member@dpb.in', authorName: 'M', authorRole: 'allow',
+    body: 'hi', status: 'open', comicVersion: 1, hidden: false, published: false,
+    createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null, ...over,
+  })
+
+  // ── READ ──
+  it('member allocated comic X can read X’s published feedback', async () => {
+    // fb-bio is on biographies__x, inside the allocated biographies line.
+    await assertSucceeds(getDoc(doc(member(), 'feedback/fb-bio')))
+  })
+  it('member NOT allocated comic X is DENIED reading X’s feedback (even published)', async () => {
+    // awareness__y is outside every grant for member@dpb.in.
+    await assertFails(getDoc(doc(member(), 'feedback/fb-awareness')))
+  })
+  it('a single-comic grant reads that comic’s feedback but NOT a sibling’s', async () => {
+    // comicmember holds biographies__c1 by id; c2 is a sibling (subject only in
+    // figures_effective) → its feedback must stay denied.
+    await assertSucceeds(getDoc(doc(comicMember(), 'feedback/fb-c1')))
+    await assertFails(getDoc(doc(comicMember(), 'feedback/fb-c2')))
+  })
+  it('moderator reads any feedback (bypass)', async () => {
+    await assertSucceeds(getDoc(doc(subAdmin(), 'feedback/fb-awareness')))
+    await assertSucceeds(getDoc(doc(subAdmin(), 'feedback/fb-c2')))
+  })
+
+  // ── CREATE ──
+  it('member allocated comic X can CREATE feedback on X', async () => {
+    await assertSucceeds(setDoc(doc(member(), 'feedback/fb-create-ok'), fbDoc()))
+  })
+  it('member NOT allocated a comic cannot create feedback on it', async () => {
+    await assertFails(setDoc(doc(member(), 'feedback/fb-create-bad'),
+      fbDoc({ comicId: 'awareness__y', line: 'awareness' })))
+  })
+  it('single-comic-grant member cannot create feedback on a sibling comic', async () => {
+    await assertFails(setDoc(doc(comicMember(), 'feedback/fb-create-sib'),
+      fbDoc({ comicId: 'biographies__c2', authorEmail: 'comicmember@dpb.in' })))
+  })
+  it('moderator can create feedback on any comic (bypass)', async () => {
+    await assertSucceeds(setDoc(doc(subAdmin(), 'feedback/fb-create-mod'),
+      fbDoc({ comicId: 'awareness__y', line: 'awareness', authorEmail: 'sub@dpb.in', published: true })))
   })
 })

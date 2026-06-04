@@ -163,7 +163,7 @@ function authorLabel(n: FeedbackNode): string {
 export function serializeScriptWithComments(
   draftHtml: string,
   threads: Thread[],
-  opts?: { title?: string },
+  opts?: { title?: string; includeDrafts?: boolean },
 ): string {
   const pages = parseScript(draftHtml)
 
@@ -189,8 +189,11 @@ export function serializeScriptWithComments(
     }
   }
 
-  // Visible (non-hidden) threads, split into anchored vs general.
-  const visible = threads.filter((t) => !t.root.hidden)
+  // Visible (non-hidden) threads, split into anchored vs general. Drafts
+  // (published !== true) are excluded unless includeDrafts is set.
+  const visible = threads.filter(
+    (t) => !t.root.hidden && (opts?.includeDrafts || t.root.published === true),
+  )
   const anchored = visible.filter((t) => t.root.anchors.length > 0)
   const general = visible.filter((t) => t.root.anchors.length === 0)
 

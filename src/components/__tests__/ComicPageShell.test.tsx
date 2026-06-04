@@ -9,15 +9,26 @@ vi.mock('@/lib/useGatedText', () => ({ useGatedText: () => mockDraft() }))
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
 }))
-// Firestore catalog hooks: useFigure(slug) → { data: {figure,sources}|null }, and
-// useComics(filters) → { data: Comic[]|null }. The citation map (provenance) is
-// built from the subject figure's sources, and PersonTabs comes from useComics.
+// Firestore catalog hooks: useFigure(slug) → { data: {figure,sources}|null }.
+// The citation map (provenance) is built from the subject figure's sources.
+// PersonTabs peer comics now come from useVisibleComics (allocation-aware),
+// filtered in-component to the subject_slug — so peer rows carry subject_slug.
 type FigData = { figure: { slug: string }; sources: { title: string; files: { path: string; title: string }[] }[] } | null
 let mockFigure: () => { data: FigData; loading: boolean }
-let mockComics: () => { data: { slug: string; line: string; title: string; status: string; comic_number?: number }[] | null; loading: boolean }
+let mockComics: () => { data: { slug: string; line: string; title: string; status: string; comic_number?: number; subject_slug?: string }[] | null; loading: boolean }
 vi.mock('@/lib/catalog', () => ({
   useFigure: () => mockFigure(),
-  useComics: () => mockComics(),
+}))
+
+// Allocation-aware peer-comic read + identity. useVisibleComics(canMod, email)
+// returns the viewer's readable comics; ComicPageShell filters to subject_slug.
+vi.mock('@/lib/visibleCatalog', () => ({
+  useVisibleComics: () => mockComics(),
+}))
+vi.mock('@/lib/auth', () => ({
+  useUser: () => ({ user: { email: 'me@x.com' }, loading: false }),
+  useAllowStatus: () => 'admin',
+  canModerate: (s: string) => s === 'admin' || s === 'sub_admin',
 }))
 
 // useProvenanceMarkers transitively imports dataApi → firebase; mock the leaf
@@ -72,6 +83,7 @@ beforeEach(() => {
         title: 'The Sky-High Dreamer',
         status: 'draft',
         comic_number: 1,
+        subject_slug: 'jrd-tata',
       },
     ],
     loading: false,

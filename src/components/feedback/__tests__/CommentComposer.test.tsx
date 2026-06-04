@@ -15,7 +15,7 @@ it('disables Post when empty, enables when text entered, submits the body + defa
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'a note' } })
   expect(post).toBeEnabled()
   fireEvent.click(post)
-  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('a note', 'fact'))
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('a note', 'fact', undefined))
 })
 
 it('shows the category select in comment mode and passes the chosen category', async () => {
@@ -26,7 +26,7 @@ it('shows the category select in comment mode and passes the chosen category', a
   fireEvent.change(select, { target: { value: 'tone' } })
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'voice issue' } })
   fireEvent.click(screen.getByRole('button', { name: /post/i }))
-  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('voice issue', 'tone'))
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('voice issue', 'tone', undefined))
 })
 
 it('hides the category select in reply mode and submits no category', async () => {
@@ -35,7 +35,7 @@ it('hides the category select in reply mode and submits no category', async () =
   expect(screen.queryByRole('combobox', { name: /category/i })).toBeNull()
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'a reply' } })
   fireEvent.click(screen.getByRole('button', { name: /post/i }))
-  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('a reply', undefined))
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('a reply', undefined, undefined))
 })
 
 it('renders removable anchor chips and the add-location button in comment mode', () => {
@@ -52,6 +52,41 @@ it('renders removable anchor chips and the add-location button in comment mode',
 it('hides add-location in reply mode', () => {
   render(<CommentComposer {...baseProps} mode="reply" />)
   expect(screen.queryByRole('button', { name: /add another location/i })).toBeNull()
+})
+
+it('hides the publish control + sends undefined published for members (no canPublishDirectly)', async () => {
+  const onSubmit = vi.fn().mockResolvedValue(undefined)
+  render(<CommentComposer {...baseProps} onSubmit={onSubmit} />)
+  expect(screen.queryByRole('combobox', { name: /visibility/i })).toBeNull()
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'member note' } })
+  fireEvent.click(screen.getByRole('button', { name: /post/i }))
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('member note', 'fact', undefined))
+})
+
+it('shows the publish control only when canPublishDirectly and defaults to published===true', async () => {
+  const onSubmit = vi.fn().mockResolvedValue(undefined)
+  render(<CommentComposer {...baseProps} canPublishDirectly onSubmit={onSubmit} />)
+  expect(screen.getByRole('combobox', { name: /visibility/i })).toBeInTheDocument()
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'mod note' } })
+  fireEvent.click(screen.getByRole('button', { name: /post/i }))
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('mod note', 'fact', true))
+})
+
+it('selecting "Send for approval" makes onSubmit receive published===false and shows the helper note', async () => {
+  const onSubmit = vi.fn().mockResolvedValue(undefined)
+  render(<CommentComposer {...baseProps} canPublishDirectly onSubmit={onSubmit} />)
+  // Default "Publish directly" → no approval helper.
+  expect(screen.queryByText(/sent for approval/i)).toBeNull()
+  fireEvent.change(screen.getByRole('combobox', { name: /visibility/i }), { target: { value: 'approval' } })
+  expect(screen.getByText(/sent for approval/i)).toBeInTheDocument()
+  fireEvent.change(screen.getByRole('textbox'), { target: { value: 'needs review' } })
+  fireEvent.click(screen.getByRole('button', { name: /post/i }))
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith('needs review', 'fact', false))
+})
+
+it('shows the approval helper note for members (no publish control)', () => {
+  render(<CommentComposer {...baseProps} />)
+  expect(screen.getByText(/sent for approval/i)).toBeInTheDocument()
 })
 
 it('keeps the body and shows an error when submit rejects', async () => {

@@ -13,8 +13,15 @@ vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
 }))
 
+// The shell now lists comics through the gated read (useVisibleComics) and
+// filters to this figure's subject_slug, rather than a subject-scoped useComics.
 let mockComics: () => { data: unknown[] | null }
-vi.mock('@/lib/catalog', () => ({ useComics: () => mockComics() }))
+vi.mock('@/lib/visibleCatalog', () => ({ useVisibleComics: () => mockComics() }))
+vi.mock('@/lib/auth', () => ({
+  useUser: () => ({ user: { email: 'mod@x.com' }, loading: false }),
+  useAllowStatus: () => 'admin',
+  canModerate: (s: string) => s === 'admin' || s === 'sub_admin',
+}))
 
 beforeEach(() => {
   mockComics = () => ({ data: [] })

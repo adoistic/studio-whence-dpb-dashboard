@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  groupThreads, changedSince, visibleTo,
+  groupThreads, changedSince, visibleTo, isDraft,
   CATEGORY_LABELS, CATEGORY_ORDER, STATUS_COLOR,
   type FeedbackNode, type Category, type Status,
 } from '@/lib/feedbackTypes'
@@ -84,5 +84,13 @@ describe('visibleTo', () => {
     expect(visibleTo(node({ hidden: true }), false)).toBe(false)
     expect(visibleTo(node({ hidden: true }), true)).toBe(true)
     expect(visibleTo(node({ hidden: false }), false)).toBe(true)
+  })
+})
+
+describe('isDraft', () => {
+  it('treats published=true as not-a-draft; missing or false as a draft', () => {
+    expect(isDraft(node({ published: true }))).toBe(false)
+    expect(isDraft(node({ published: false }))).toBe(true)
+    expect(isDraft(node({}))).toBe(true) // missing published → draft for display
   })
 })

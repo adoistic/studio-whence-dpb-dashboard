@@ -7,24 +7,35 @@ import { auth, db } from '@/lib/firebase'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type AllowStatus = 'admin' | 'allow' | 'pending' | 'loading'
+export type AllowStatus =
+  | 'admin'
+  | 'sub_admin'
+  | 'allow'
+  | 'pending'
+  | 'suspended'
+  | 'loading'
 
-// ─── Pure classifier (rules 1–3, no Firestore) ────────────────────────────────
+/** True for roles that can moderate (approve/hide/edit-any) feedback. */
+export function canModerate(status: AllowStatus): boolean {
+  return status === 'admin' || status === 'sub_admin'
+}
+
+// ─── Pure classifier (admin email only, no Firestore) ─────────────────────────
 //
-// Returns 'admin' or 'allow' when the email alone is sufficient to grant
-// access, or null to signal that a Firestore /allowlist lookup (rule 4) is
-// required.  adminEmail is passed in (not read from env) so the function is
-// deterministically unit-testable with no side effects.
+// Only the admin email is determinable from the email string alone: a domain
+// user might be suspended, and an allowlisted user might be a sub_admin, so
+// both require a Firestore lookup. Returns 'admin' for the admin email, or null
+// to signal that the suspended + allowlist lookups are required. adminEmail is
+// passed in (not read from env) so the function is deterministically
+// unit-testable with no side effects.
 
 export function classifyByEmail(
   email: string | null | undefined,
   adminEmail: string | undefined,
-): 'admin' | 'allow' | null {
+): 'admin' | null {
   const e = (email ?? '').trim().toLowerCase()
   if (!e) return null
   if (adminEmail && e === adminEmail.trim().toLowerCase()) return 'admin'
-  if (e.endsWith('@thothica.com')) return 'allow'
-  if (e.endsWith('@dpb.in')) return 'allow'
   return null
 }
 
@@ -60,12 +71,17 @@ export function useUser(): { user: User | null; loading: boolean } {
 // Behaviour:
 //   - authLoading true or user === undefined → 'loading'
 //   - user === null (signed out)             → 'pending'  (fail-closed; layout redirects to /login)
-//   - classifyByEmail returns 'admin'/'allow'  → return immediately, no Firestore call
-//   - classifyByEmail returns null             → look up /allowlist/{email}
+//   - classifyByEmail returns 'admin'          → return immediately, no Firestore call
+//   - classifyByEmail returns null             → look up suspended/{email} + allowlist/{email}
 //       - in-flight                            → 'loading'
-//       - doc exists, role === 'admin'         → 'admin'
-//       - doc exists, any other role           → 'allow'
-//       - doc missing                          → 'pending'
+//       - suspended/{email} exists             → 'suspended'  (denied, even for a domain email)
+//       - else allowlist/{email} exists:
+//           - role === 'sub_admin'             → 'sub_admin'
+//           - role === 'admin'                 → 'admin'
+//           - any other role                   → 'allow'
+//       - else allowlist/{email} missing:
+//           - @thothica.com / @dpb.in domain   → 'allow'
+//           - otherwise                        → 'pending'
 //       - fetch error (fail-closed)            → 'pending'
 
 export function useAllowStatus(
@@ -95,7 +111,7 @@ export function useAllowStatus(
       return
     }
 
-    // 3. Try to classify by email alone (rules 1–3).
+    // 3. The admin email is the only status determinable without a lookup.
     const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL
     const quick = classifyByEmail(email, adminEmail)
     if (quick !== null) {
@@ -103,7 +119,7 @@ export function useAllowStatus(
       return
     }
 
-    // 4. Need a Firestore lookup (rule 4).
+    // 4. Need Firestore lookups: suspended/{email} (deny) + allowlist/{email}.
     if (!normalizedEmail) {
       // Signed-in user with no email — treat as pending.
       setStatus('pending')
@@ -113,15 +129,34 @@ export function useAllowStatus(
     let cancelled = false
     setStatus('loading')
 
-    getDoc(doc(db, 'allowlist', normalizedEmail))
-      .then((snap) => {
+    const isDomain =
+      normalizedEmail.endsWith('@thothica.com') ||
+      normalizedEmail.endsWith('@dpb.in')
+
+    Promise.all([
+      getDoc(doc(db, 'suspended', normalizedEmail)),
+      getDoc(doc(db, 'allowlist', normalizedEmail)),
+    ])
+      .then(([suspendedSnap, allowSnap]) => {
         if (cancelled) return
-        if (!snap.exists()) {
-          setStatus('pending')
+        // Suspension wins over everything (even a domain email).
+        if (suspendedSnap.exists()) {
+          setStatus('suspended')
           return
         }
-        const role = snap.data()?.role
-        setStatus(role === 'admin' ? 'admin' : 'allow')
+        if (allowSnap.exists()) {
+          const role = allowSnap.data()?.role
+          setStatus(
+            role === 'sub_admin'
+              ? 'sub_admin'
+              : role === 'admin'
+                ? 'admin'
+                : 'allow',
+          )
+          return
+        }
+        // No allowlist doc — fall back to the domain rule.
+        setStatus(isDomain ? 'allow' : 'pending')
       })
       .catch(() => {
         // Fail closed — never grant access on error.
@@ -134,7 +169,7 @@ export function useAllowStatus(
     // `normalizedEmail` is the only value the effect acts on for the Firestore
     // path; `user` is read only to distinguish undefined/null, and both map to
     // normalizedEmail=null. Keying on `normalizedEmail` (not the `user` object)
-    // avoids re-fetching the allowlist every time Firebase hands back a fresh
+    // avoids re-fetching the lookups every time Firebase hands back a fresh
     // User instance for the same account.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [normalizedEmail, authLoading])

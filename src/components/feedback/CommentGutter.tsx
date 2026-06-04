@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef, type RefObject } from 'react'
-import { useUser, useAllowStatus } from '@/lib/auth'
-import { useComicFeedback, addComment, addReply, setStatus, hideComment, deleteComment } from '@/lib/feedback'
+import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
+import { useComicFeedback, addComment, addReply, setStatus, setPublished, editComment, hideComment, deleteComment } from '@/lib/feedback'
 import { useComicVersions } from '@/lib/useComicVersions'
 import { visibleTo, changedSince, STATUS_COLOR, type Anchor, type Category, type Status } from '@/lib/feedbackTypes'
 import { assignBadges } from '@/components/feedback/badges'
@@ -41,19 +41,22 @@ export function CommentGutter({
   const { user, loading: authLoading } = useUser()
   const allowStatus = useAllowStatus(user, authLoading)
   const isAdmin = allowStatus === 'admin'
+  // Moderation (approve/hide/delete-any/status/see-drafts+hidden) is open to
+  // admins AND sub-admins; only the read-gate and these controls key off it.
+  const canMod = canModerate(allowStatus)
   const currentEmail = user?.email ?? ''
   const author = {
     email: currentEmail,
     name: user?.displayName ?? currentEmail,
-    role: isAdmin ? 'admin' : 'allow',
+    role: isAdmin ? 'admin' : canMod ? 'sub_admin' : 'allow',
   }
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const { data: threads } = useComicFeedback(comicId)
+  const { data: threads } = useComicFeedback(comicId, canMod)
   const { data: versions } = useComicVersions(comicId)
 
   // ── Visibility filter ─────────────────────────────────────────────────────
-  const visible = threads.filter((t) => visibleTo(t.root, isAdmin))
+  const visible = threads.filter((t) => visibleTo(t.root, canMod))
   const badges = assignBadges(visible)
 
   // ── Status filter ──────────────────────────────────────────────────────────
@@ -67,7 +70,7 @@ export function CommentGutter({
     () => visible.filter((t) => statusFilter.has(t.root.status ?? 'open')),
     // `visible` is derived fresh each render; key on the stable inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [threads, isAdmin, statusFilter],
+    [threads, canMod, statusFilter],
   )
   function toggleStatus(s: Status) {
     setStatusFilter((prev) => {
@@ -121,8 +124,8 @@ export function CommentGutter({
   }, [draftText])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-  async function handleCreate(body: string, category?: Category) {
-    await addComment({ comicId, line, anchors: composerAnchors, body, comicVersion, category }, author)
+  async function handleCreate(body: string, category?: Category, published?: boolean) {
+    await addComment({ comicId, line, anchors: composerAnchors, body, comicVersion, category, published }, author)
     setComposing(false)
     setGeneralComment(false)
     setSelection([])
@@ -170,7 +173,7 @@ export function CommentGutter({
     return m
     // `visible` is derived fresh each render; key the memo on the stable inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threads, isAdmin])
+  }, [threads, canMod])
 
   useEffect(() => {
     const container = scriptRef.current
@@ -338,6 +341,7 @@ export function CommentGutter({
             onRemoveAnchor={handleRemoveAnchor}
             onSubmit={handleCreate}
             onCancel={handleCancel}
+            canPublishDirectly={canMod}
           />
         )}
 
@@ -376,17 +380,28 @@ export function CommentGutter({
                   <CommentThread
                     thread={t}
                     badge={badges.get(t.root.id)}
-                    isAdmin={isAdmin}
+                    canModerate={canMod}
                     currentEmail={currentEmail}
                     changedSince={changedSince(t.root, comicVersion, versions)}
                     knownRefs={knownRefs}
-                    onReply={async (body) => {
-                      await addReply({ comicId, line, parentId: t.root.id, body, comicVersion }, author)
+                    onReply={async (body, published) => {
+                      // Replies inherit the parent root's published state by
+                      // default (a member only ever sees published roots, so
+                      // their reply becomes visible immediately). A moderator's
+                      // explicit publish-toggle overrides the inheritance.
+                      await addReply(
+                        { comicId, line, parentId: t.root.id, body, comicVersion, published: published ?? t.root.published === true },
+                        author,
+                      )
                     }}
                     onSetStatus={(s) => setStatus(t.root.id, s)}
                     onHide={(h) => hideComment(t.root.id, h)}
                     onDelete={(id) => deleteComment(id)}
                     onJumpToBeat={handleJump}
+                    onApprove={() => setPublished(t.root.id, true, { email: author.email, name: author.name })}
+                    onEdit={async (body) => {
+                      await editComment(t.root.id, { body })
+                    }}
                   />
                 </div>
               )

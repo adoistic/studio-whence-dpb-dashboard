@@ -20,11 +20,16 @@ vi.mock('@/lib/firebase', () => ({
   db: {},
 }))
 
-// We control getDoc's resolved value per test.
+// We control getDoc's resolved value per test. The hook now issues TWO reads
+// in parallel — suspended/{email} and allowlist/{email} — so the mock routes by
+// collection: `mockSuspendedGet` answers the suspended ref, `mockGetDoc` the
+// allowlist ref. `mockGetDoc` is still asserted on as the allowlist read.
 const mockGetDoc = vi.fn()
+const mockSuspendedGet = vi.fn()
 vi.mock('firebase/firestore', () => ({
-  doc: vi.fn((_db: unknown, _collection: string, id: string) => ({ id })),
-  getDoc: (...args: unknown[]) => mockGetDoc(...args),
+  doc: vi.fn((_db: unknown, collection: string, id: string) => ({ collection, id })),
+  getDoc: (ref: { collection?: string }) =>
+    ref?.collection === 'suspended' ? mockSuspendedGet(ref) : mockGetDoc(ref),
 }))
 
 // useAllowStatus does NOT call onAuthStateChanged — that's useUser's job.
@@ -58,21 +63,35 @@ function mockDocError() {
   mockGetDoc.mockRejectedValue(new Error('Firestore unavailable'))
 }
 
+/** Make the suspended/{email} lookup resolve to an existing doc. */
+function mockSuspended() {
+  mockSuspendedGet.mockResolvedValue({ exists: () => true, data: () => ({}) })
+}
+
+/** Default: not suspended (suspended/{email} missing). */
+function mockNotSuspended() {
+  mockSuspendedGet.mockResolvedValue({ exists: () => false, data: () => undefined })
+}
+
 // ─── classifyByEmail ──────────────────────────────────────────────────────────
 
-describe('classifyByEmail — pure classification (no Firestore)', () => {
+describe('classifyByEmail — admin-only classification (no Firestore)', () => {
+  // classifyByEmail now resolves ONLY the admin email without a lookup; every
+  // other email (including the allowed domains) returns null, because a domain
+  // user might be suspended and an allowlisted user might be a sub_admin — both
+  // require the Firestore lookups in useAllowStatus.
   const ADMIN = 'admin@thothica.com'
 
   test('admin email → "admin"', () => {
     expect(classifyByEmail(ADMIN, ADMIN)).toBe('admin')
   })
 
-  test('@thothica.com non-admin email → "allow"', () => {
-    expect(classifyByEmail('editor@thothica.com', ADMIN)).toBe('allow')
+  test('@thothica.com non-admin email → null (lookup required)', () => {
+    expect(classifyByEmail('editor@thothica.com', ADMIN)).toBeNull()
   })
 
-  test('@dpb.in email → "allow"', () => {
-    expect(classifyByEmail('reviewer@dpb.in', ADMIN)).toBe('allow')
+  test('@dpb.in email → null (lookup required)', () => {
+    expect(classifyByEmail('reviewer@dpb.in', ADMIN)).toBeNull()
   })
 
   test('@gmail.com email → null (Firestore lookup required)', () => {
@@ -95,18 +114,10 @@ describe('classifyByEmail — pure classification (no Firestore)', () => {
     expect(classifyByEmail('ADMIN@THOTHICA.COM', ADMIN)).toBe('admin')
   })
 
-  test('case-insensitive: EDITOR@THOTHICA.COM → "allow"', () => {
-    expect(classifyByEmail('EDITOR@THOTHICA.COM', ADMIN)).toBe('allow')
-  })
-
-  test('case-insensitive: REVIEWER@DPB.IN → "allow"', () => {
-    expect(classifyByEmail('REVIEWER@DPB.IN', ADMIN)).toBe('allow')
-  })
-
-  test('adminEmail undefined (env unset) — admin email is NOT matched as admin, falls to domain check', () => {
-    // When adminEmail is undefined the admin-email check is skipped entirely.
-    // 'admin@thothica.com' still gets 'allow' via the @thothica.com domain rule.
-    expect(classifyByEmail('admin@thothica.com', undefined)).toBe('allow')
+  test('adminEmail undefined (env unset) — admin email → null (admin check skipped)', () => {
+    // When adminEmail is undefined the admin-email check is skipped entirely,
+    // so even the admin address resolves to null and falls to the lookups.
+    expect(classifyByEmail('admin@thothica.com', undefined)).toBeNull()
   })
 
   test('adminEmail undefined (env unset) — @gmail.com email → null', () => {
@@ -126,6 +137,9 @@ describe('useAllowStatus — hook tests', () => {
   beforeEach(() => {
     vi.stubEnv('NEXT_PUBLIC_ADMIN_EMAIL', ADMIN_EMAIL)
     mockGetDoc.mockReset()
+    mockSuspendedGet.mockReset()
+    // Default: nobody suspended, so the allowlist/domain path decides.
+    mockNotSuspended()
   })
 
   afterEach(() => {
@@ -143,26 +157,49 @@ describe('useAllowStatus — hook tests', () => {
     expect(mockGetDoc).not.toHaveBeenCalled()
   })
 
-  // ── Rule 2: @thothica.com (no Firestore) ────────────────────────────────────
+  // ── @thothica.com domain (no allowlist doc → domain fallback → 'allow') ──────
 
-  test('@thothica.com user → "allow" without calling getDoc', async () => {
+  test('@thothica.com user, no allowlist doc → "allow" (domain fallback)', async () => {
+    mockDocMissing()
     const user = fakeUser('editor@thothica.com')
     const { result } = renderHook(() =>
       useAllowStatus(user, false),
     )
     await waitFor(() => expect(result.current).toBe('allow'))
-    expect(mockGetDoc).not.toHaveBeenCalled()
   })
 
-  // ── Rule 3: @dpb.in (no Firestore) ──────────────────────────────────────────
+  // ── @dpb.in domain (no allowlist doc → domain fallback → 'allow') ────────────
 
-  test('@dpb.in user → "allow" without calling getDoc', async () => {
+  test('@dpb.in user, no allowlist doc → "allow" (domain fallback)', async () => {
+    mockDocMissing()
     const user = fakeUser('reviewer@dpb.in')
     const { result } = renderHook(() =>
       useAllowStatus(user, false),
     )
     await waitFor(() => expect(result.current).toBe('allow'))
-    expect(mockGetDoc).not.toHaveBeenCalled()
+  })
+
+  // ── @dpb.in with a sub_admin allowlist doc → "sub_admin" ─────────────────────
+
+  test('@dpb.in user with allowlist doc (role: "sub_admin") → "sub_admin"', async () => {
+    mockDocExists({ role: 'sub_admin' })
+    const user = fakeUser('reviewer@dpb.in')
+    const { result } = renderHook(() =>
+      useAllowStatus(user, false),
+    )
+    await waitFor(() => expect(result.current).toBe('sub_admin'))
+  })
+
+  // ── Suspended domain user → "suspended" (overrides the domain allow) ─────────
+
+  test('@thothica.com user who is suspended → "suspended"', async () => {
+    mockSuspended()
+    mockDocMissing()
+    const user = fakeUser('banned@thothica.com')
+    const { result } = renderHook(() =>
+      useAllowStatus(user, false),
+    )
+    await waitFor(() => expect(result.current).toBe('suspended'))
   })
 
   // ── Rule 4: Firestore lookup — role: editor → 'allow' ───────────────────────

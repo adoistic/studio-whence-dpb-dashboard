@@ -12,11 +12,12 @@
  * the client `src/lib/auth.ts` `classifyByEmail` — and vice versa.
  *
  *   1. empty email                → deny
- *   2. email === ADMIN_EMAIL      → allow   (default adnan@thothica.com)
- *   3. email ends @thothica.com   → allow
- *   4. email ends @dpb.in         → allow
- *   5. /allowlist/{email} exists  → allow   (any role counts)
- *   6. otherwise                  → deny
+ *   2. /suspended/{email} exists  → deny    (overrides every allow below)
+ *   3. email === ADMIN_EMAIL      → allow   (default adnan@thothica.com)
+ *   4. email ends @thothica.com   → allow
+ *   5. email ends @dpb.in         → allow
+ *   6. /allowlist/{email} exists  → allow   (any role counts)
+ *   7. otherwise                  → deny
  *
  * Fail CLOSED on ANY error (missing/garbled header, verifyIdToken throws,
  * Firestore throws): return null. Never grant access on error.
@@ -97,12 +98,22 @@ function classifyByEmail(email: string): true | null {
 }
 
 /**
- * Authorize a request. Returns `{ email }` (NORMALIZED) on allow, or `null`
- * on deny. Fails closed on every error path.
+ * Authorize a request. Returns `{ email, moderator }` (email NORMALIZED) on
+ * allow, or `null` on deny. Fails closed on every error path.
+ *
+ * `moderator` is the bypass flag for the allocation gate (work-allocation
+ * feature): it is `true` when the caller is the admin (env `ADMIN_EMAIL`) OR
+ * holds an `allowlist/{email}` doc whose `role === 'sub_admin'`. Admin +
+ * sub-admins see every work; plain members are restricted to allocated works.
+ *
+ * IMPORTANT: domain users (@thothica / @dpb.in) used to short-circuit BEFORE
+ * the allowlist read. We now ALWAYS read `allowlist/{email}` once we've decided
+ * the caller is allowed, so a domain user who is also a sub_admin (an allowlist
+ * doc with `role: 'sub_admin'`) is correctly reported as a moderator.
  */
 export async function authorize(
   req: AuthRequestLike
-): Promise<{ email: string } | null> {
+): Promise<{ email: string; moderator: boolean } | null> {
   try {
     const token = extractBearer(req)
     if (!token) return null
@@ -111,17 +122,34 @@ export async function authorize(
     const email = normalize(decoded.email)
     if (!email) return null
 
-    // Rules 2–4: admin / allowed domains.
-    if (classifyByEmail(email) === true) return { email }
+    const fs = getFirestore()
 
-    // Rule 5: Firestore allowlist. Any existing doc counts as allow.
-    const snap = await getFirestore()
-      .collection('allowlist')
-      .doc(email)
-      .get()
-    if (snap.exists) return { email }
+    // Rule 2: suspension overrides every allow below — even a domain/admin
+    // email loses R2 access once a /suspended/{email} doc exists.
+    const suspendedSnap = await fs.collection('suspended').doc(email).get()
+    if (suspendedSnap.exists) return null
 
-    // Rule 6: no match → deny.
+    // Admin email → allowed AND moderator, with no allowlist read needed.
+    if (email === adminEmail()) return { email, moderator: true }
+
+    // Read the allowlist doc once. It serves two purposes now:
+    //   - it can grant access (Rule 6: any existing doc allows a non-domain
+    //     user), and
+    //   - its `role` field decides moderator status (`sub_admin`).
+    // We read it even for domain users so a sub_admin domain user is flagged.
+    const snap = await fs.collection('allowlist').doc(email).get()
+    const role = snap.exists
+      ? (snap.data?.() as { role?: string } | undefined)?.role
+      : undefined
+    const moderator = role === 'sub_admin'
+
+    // Rules 4–5: admin / allowed domains → allowed (moderator iff sub_admin).
+    if (classifyByEmail(email) === true) return { email, moderator }
+
+    // Rule 6: Firestore allowlist. Any existing doc counts as allow.
+    if (snap.exists) return { email, moderator }
+
+    // Rule 7: no match → deny.
     return null
   } catch {
     // Fail closed on any error (bad header, verify throws, Firestore throws).

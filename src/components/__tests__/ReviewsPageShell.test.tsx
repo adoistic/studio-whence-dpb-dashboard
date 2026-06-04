@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import type { FeedbackNode } from '@/lib/feedbackTypes'
 
 // ── helpers ────────────────────────────────────────────────────────────────────
@@ -17,6 +17,7 @@ const root = (over: Partial<FeedbackNode>): FeedbackNode => ({
   status: 'open',
   comicVersion: 1,
   hidden: false,
+  published: true, // default to approved so existing fixtures stay out of the pending panel
   createdAt: '2026-06-03',
   ...over,
 })
@@ -25,9 +26,15 @@ const root = (over: Partial<FeedbackNode>): FeedbackNode => ({
 
 let rootsData: FeedbackNode[] = []
 let loadingFlag = false
+let lastViewerCanModerate: boolean | undefined
 
+const setPublishedSpy = vi.fn()
 vi.mock('@/lib/feedback', () => ({
-  useAllRoots: () => ({ data: rootsData, loading: loadingFlag }),
+  useAllRoots: (viewerCanModerate: boolean) => {
+    lastViewerCanModerate = viewerCanModerate
+    return { data: rootsData, loading: loadingFlag }
+  },
+  setPublished: (...args: unknown[]) => setPublishedSpy(...args),
 }))
 
 vi.mock('@/lib/catalog', () => ({
@@ -37,9 +44,12 @@ vi.mock('@/lib/catalog', () => ({
   }),
 }))
 
+// `canModerate` mirrors the real predicate so the gated-read arg is genuinely derived.
+let allowStatus = 'admin'
 vi.mock('@/lib/auth', () => ({
   useUser: () => ({ user: { email: 'me@x.com' }, loading: false }),
-  useAllowStatus: () => 'admin',
+  useAllowStatus: () => allowStatus,
+  canModerate: (s: string) => s === 'admin' || s === 'sub_admin',
 }))
 
 vi.mock('next/link', () => ({
@@ -58,6 +68,22 @@ describe('ReviewsPageShell', () => {
   beforeEach(() => {
     rootsData = []
     loadingFlag = false
+    allowStatus = 'admin'
+    lastViewerCanModerate = undefined
+    setPublishedSpy.mockClear()
+  })
+
+  it('passes viewerCanModerate to useAllRoots: true for admin/sub_admin, false for a member', () => {
+    render(<ReviewsPageShell />)
+    expect(lastViewerCanModerate).toBe(true) // admin (default)
+
+    allowStatus = 'sub_admin'
+    render(<ReviewsPageShell />)
+    expect(lastViewerCanModerate).toBe(true)
+
+    allowStatus = 'allow'
+    render(<ReviewsPageShell />)
+    expect(lastViewerCanModerate).toBe(false)
   })
 
   it('renders a row per root with comic title and deep-link', () => {
@@ -156,5 +182,67 @@ describe('ReviewsPageShell', () => {
     expect(screen.getByText(/loading feedback/i)).toBeInTheDocument()
     expect(screen.queryByText(/no feedback matches/i)).toBeNull()
     loadingFlag = false
+  })
+
+  // ── Pending-approval panel (sub-admin) ──────────────────────────────────────
+
+  it.each(['sub_admin', 'admin'])(
+    'shows a draft root in the Pending approval panel and Approve calls setPublished (%s)',
+    (status) => {
+      allowStatus = status
+      rootsData = [
+        root({ id: 'd1', body: 'Awaiting note', published: false, authorName: 'Reviewer R' }),
+      ]
+      render(<ReviewsPageShell />)
+
+      // the draft appears in the dedicated panel (it also shows in the main list
+      // below, which moderators legitimately see in full — so scope to the panel)
+      const panel = screen.getByRole('region', { name: /pending approval/i })
+      expect(panel).toHaveTextContent(/pending approval · 1/i)
+      expect(within(panel).getByText('Awaiting note')).toBeInTheDocument()
+
+      fireEvent.click(
+        within(panel).getByRole('button', { name: /approve comment by reviewer r/i }),
+      )
+
+      expect(setPublishedSpy).toHaveBeenCalledWith(
+        'd1',
+        true,
+        expect.objectContaining({ email: 'me@x.com' }),
+      )
+    },
+  )
+
+  it('renders a terminal not-authorized card for a member (no list, no panel)', () => {
+    allowStatus = 'allow'
+    rootsData = [root({ id: 'd1', body: 'Awaiting note', published: false })]
+    render(<ReviewsPageShell />)
+
+    // The whole cross-comic reviews surface is editorial-only: a member gets the
+    // terminal gate, not the pending panel or the list.
+    expect(screen.getByText(/not authorized/i)).toBeInTheDocument()
+    expect(screen.getByText(/reviews are for editors/i)).toBeInTheDocument()
+    expect(screen.queryByText(/pending approval/i)).toBeNull()
+    expect(screen.queryByRole('heading', { name: /^reviews$/i })).toBeNull()
+    expect(lastViewerCanModerate).toBe(false)
+  })
+
+  it('renders the reviews list (not the gate) for a moderator', () => {
+    allowStatus = 'sub_admin'
+    rootsData = [root({ id: 'a1', body: 'Approved note', published: true })]
+    render(<ReviewsPageShell />)
+
+    expect(screen.queryByText(/not authorized/i)).toBeNull()
+    expect(screen.getByRole('heading', { name: /^reviews$/i })).toBeInTheDocument()
+    expect(screen.getByText('Approved note')).toBeInTheDocument()
+  })
+
+  it('does not list an approved root in the pending panel', () => {
+    allowStatus = 'admin'
+    rootsData = [root({ id: 'a1', body: 'Approved note', published: true })]
+    render(<ReviewsPageShell />)
+
+    expect(screen.getByText(/pending approval · 0/i)).toBeInTheDocument()
+    expect(screen.getByText(/nothing awaiting approval/i)).toBeInTheDocument()
   })
 })

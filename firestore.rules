@@ -10,15 +10,80 @@ service cloud.firestore {
       );
     }
     function isAdmin() {
-      return isSignedIn() && userEmail() == 'adnan@thothica.com';
+      return isSignedIn() && userEmail() == 'adnan@thothica.com' && !isSuspended();
     }
+    function isSuspended() {
+      return isSignedIn() && exists(/databases/$(database)/documents/suspended/$(userEmail()));
+    }
+    function hasAllowDoc() {
+      return isSignedIn() && exists(/databases/$(database)/documents/allowlist/$(userEmail()));
+    }
+    // isAllowlisted EXCLUDES suspended users and includes admin.
     function isAllowlisted() {
-      return isDomainAllowed() ||
-             (isSignedIn() && exists(/databases/$(database)/documents/allowlist/$(userEmail())));
+      return !isSuspended() && (isAdmin() || isDomainAllowed() || hasAllowDoc());
+    }
+    function isSubAdmin() {
+      return isAdmin() ||
+        (isAllowlisted() && hasAllowDoc()
+          && get(/databases/$(database)/documents/allowlist/$(userEmail())).data.role == 'sub_admin');
+    }
+
+    // ── Work allocation (per-member grants; admin-written) ──
+    // A member sees only ALLOCATED works. admin + sub_admins bypass via isSubAdmin().
+    // GOTCHA discipline: guard the get() with exists() (hasAlloc), and read every
+    // map field with .get(field, default) so an absent list never throws.
+    function hasAlloc() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/allocations/$(userEmail()));
+    }
+    function allocDoc() {
+      return get(/databases/$(database)/documents/allocations/$(userEmail())).data;
+    }
+    // COMIC access uses RAW `figures` (an explicit figure grant unlocks all of
+    // that figure's comics; an explicit comic grant unlocks just that comic). A
+    // comic grant must NOT cascade to the figure's sibling comics via
+    // figures_effective — that set is for RESEARCH access only (figureResearchAllowed).
+    function comicAllowed(cid, line, subject) {
+      return isSubAdmin() || (hasAlloc() && (
+           allocDoc().get('comics', []).hasAny([cid])
+        || allocDoc().get('lines', []).hasAny([line])
+        || allocDoc().get('figures', []).hasAny([subject]) ));
+    }
+    function figureResearchAllowed(fline, fslug) {
+      return isSubAdmin() || (hasAlloc() && (
+           allocDoc().get('lines', []).hasAny([fline])
+        || allocDoc().get('figures_effective', []).hasAny([fslug]) ));
+    }
+    // FEEDBACK gate. A feedback doc carries `comicId` (`{line}__{slug}`); the
+    // `line` is DERIVED from comicId (its prefix), never read from the separate
+    // `line` field. This matters for LIST queries: a member's per-comic feedback
+    // query filters on `comicId` (+ published/hidden) but NOT on `line`, and a
+    // `list` rule that reads an UNCONSTRAINED field (resource.data.line) is
+    // rejected by Firestore. comicId is in the query filter, so deriving the line
+    // from it keeps the rule list-safe. `subject_slug` isn't on the feedback doc,
+    // so the figure branch looks it up from the comic doc.
+    // Uses RAW `figures` (consistent with comicAllowed): a single-comic grant
+    // reaches that comic's feedback via `comics`, a figure grant via `figures`, a
+    // line grant via `lines`. A comic grant must NOT cascade to sibling comics'
+    // feedback, so this does NOT use figures_effective.
+    function feedbackLineOf(cid) {
+      return cid.split('__')[0];
+    }
+    function feedbackAllocAllowed(cid) {
+      return isSubAdmin() || (hasAlloc() && (
+           allocDoc().get('comics', []).hasAny([cid])
+        || allocDoc().get('lines', []).hasAny([feedbackLineOf(cid)])
+        || (exists(/databases/$(database)/documents/comics/$(cid))
+            && allocDoc().get('figures', []).hasAny([get(/databases/$(database)/documents/comics/$(cid)).data.get('subject_slug','')]))
+      ));
     }
 
     match /allowlist/{email} {
       allow read: if isAllowlisted();
+      allow write: if isAdmin();
+    }
+    match /suspended/{email} {
+      allow read: if isSubAdmin();
       allow write: if isAdmin();
     }
     match /access_requests/{email} {
@@ -29,31 +94,73 @@ service cloud.firestore {
       allow create: if isSignedIn();
       allow read: if isAdmin();
     }
+    // A member may read ONLY their own allocation doc; admin reads any. Only admin writes.
+    match /allocations/{email} {
+      allow read:  if isSignedIn() && (userEmail() == email || isAdmin());
+      allow write: if isAdmin();
+    }
 
     // ── B2.7 catalog (read-only for allowlisted clients; written only by the
     //    publish Action's Admin SDK, which bypasses rules) ──
     match /meta/{d}      { allow read: if isAllowlisted(); allow write: if false; }
     match /lines/{d}     { allow read: if isAllowlisted(); allow write: if false; }
+    // Figure docs DO carry a `line` field (written by the content publish
+    // pipeline, tools/publish_to_firestore.py). The doc id `f` IS the
+    // subject_slug, so the research gate is driven by `f` via figures_effective;
+    // the `lines` branch lights up via resource.data.get('line','') so a member
+    // holding only a `lines` grant reaches that line's figure research.
     match /figures/{f}   {
-      allow read: if isAllowlisted(); allow write: if false;
-      match /sources/{s} { allow read: if isAllowlisted(); allow write: if false; }
+      allow read: if isAllowlisted()
+        && figureResearchAllowed(resource.data.get('line', ''), f);
+      allow write: if false;
+      match /sources/{s} {
+        allow read: if isAllowlisted()
+          && exists(/databases/$(database)/documents/figures/$(f))
+          && figureResearchAllowed(
+               get(/databases/$(database)/documents/figures/$(f)).data.get('line', ''), f);
+        allow write: if false;
+      }
     }
     match /comics/{c} {
-      allow read: if isAllowlisted(); allow write: if false;
-      match /versions/{v} { allow read: if isAllowlisted(); allow write: if false; }
+      allow read: if isAllowlisted()
+        && comicAllowed(c, resource.data.line, resource.data.get('subject_slug', ''));
+      allow write: if false;
+      // Versions gate on the PARENT comic doc (re-read it; the wildcard `c` is in
+      // scope inside this nested match).
+      match /versions/{v} {
+        allow read: if isAllowlisted()
+          && exists(/databases/$(database)/documents/comics/$(c))
+          && comicAllowed(c,
+               get(/databases/$(database)/documents/comics/$(c)).data.line,
+               get(/databases/$(database)/documents/comics/$(c)).data.get('subject_slug', ''));
+        allow write: if false;
+      }
     }
     match /people/{p}    { allow read: if isAllowlisted(); allow write: if false; }
 
     // ── Feedback (live source of truth; client-written under these rules) ──
     match /feedback/{id} {
-      allow read: if isAllowlisted();
+      allow read: if isAllowlisted() && (
+        isSubAdmin()
+        || (resource.data.published == true && resource.data.hidden == false
+            && feedbackAllocAllowed(resource.data.comicId))
+      );
       allow create: if isAllowlisted()
         && request.resource.data.authorEmail == userEmail()
         && request.resource.data.hidden == false
+        && feedbackAllocAllowed(request.resource.data.comicId)
         && (request.resource.data.parentId == null
-              ? request.resource.data.status == 'open' : true);
-      allow update: if isAdmin()
-        || (isSignedIn()
+              ? request.resource.data.status == 'open' : true)
+        // Non-moderators cannot self-publish a root. A reply may be created
+        // published ONLY when its parent doc is already published (so a member
+        // replying to a published comment stays visible to themselves); a reply
+        // to a draft stays draft.
+        && (isSubAdmin()
+            || request.resource.data.published == false
+            || (request.resource.data.parentId != null
+                && get(/databases/$(database)/documents/feedback/$(request.resource.data.parentId)).data.published == true));
+      allow update: if isSubAdmin()
+        || (isAllowlisted()
             && resource.data.authorEmail == userEmail()
             && request.resource.data.authorEmail == resource.data.authorEmail
             && request.resource.data.parentId == resource.data.parentId
@@ -61,8 +168,13 @@ service cloud.firestore {
             && request.resource.data.comicVersion == resource.data.comicVersion
             && request.resource.data.createdAt == resource.data.createdAt
             && request.resource.data.status == resource.data.status
-            && request.resource.data.hidden == resource.data.hidden);
-      allow delete: if isAdmin() || (isAllowlisted() && resource.data.authorEmail == userEmail());
+            && request.resource.data.hidden == resource.data.hidden
+            && request.resource.data.published == resource.data.published
+            // `.get(...)` (not `.category`) so a doc with no category field —
+            // accessing an absent property throws — compares cleanly: an author
+            // may not mutate category, but a category-less doc still edits fine.
+            && request.resource.data.get('category', null) == resource.data.get('category', null));
+      allow delete: if isSubAdmin() || (isAllowlisted() && resource.data.authorEmail == userEmail());
     }
 
     match /_internal/{d} { allow read, write: if false; }

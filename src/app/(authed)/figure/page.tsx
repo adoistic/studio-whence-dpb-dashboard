@@ -2,7 +2,7 @@
 
 import { useFigure } from '@/lib/catalog'
 import { FigurePageShell } from '@/components/FigurePageShell'
-import { LoadingState, ErrorState, NotFoundState } from '@/components/QuietStates'
+import { LoadingState, NotFoundState } from '@/components/QuietStates'
 import { normalizeSubjectSlug } from '@/lib/slugs'
 
 // Served for every /figures/<slug> URL via the Hosting rewrite (/figures/* →
@@ -29,8 +29,11 @@ export default function FigurePage() {
   const { data, loading, error } = useFigure(slug)
 
   if (loading) return <LoadingState />
-  if (error) return <ErrorState />
-  if (!data) return <NotFoundState title="Figure not found" detail={`No figure matches “${slug}”.`} />
+  // Under the allocation rules, reading a figure the member isn't allocated
+  // throws permission-denied, so useFigure sets `error`. Surface that (and a
+  // genuinely missing doc) as the same clean not-found, so we never leak whether
+  // an un-allocated figure exists.
+  if (error || !data) return <NotFoundState title="Figure not found" detail={`No figure matches “${slug}”.`} />
 
   const figure = data.figure
   const { file, line } = paramsFromUrl()

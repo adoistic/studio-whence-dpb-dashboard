@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { useComicFeedback } from '@/lib/feedback'
 import { serializeScript, serializeScriptWithComments } from '@/components/feedback/copyScript'
 import { ClipboardIcon } from '@/components/feedback/icons'
@@ -14,8 +15,15 @@ export interface CopyScriptToolbarProps {
 type Which = 'plain' | 'comments'
 
 export function CopyScriptToolbar({ comicId, comicTitle, draftText }: CopyScriptToolbarProps) {
-  const { data: threads } = useComicFeedback(comicId)
+  // Moderators can copy the full (draft + hidden) thread set; members get only
+  // the published, non-hidden comments their gated query is allowed to read.
+  const { user, loading: authLoading } = useUser()
+  const canMod = canModerate(useAllowStatus(user, authLoading))
+  const { data: threads } = useComicFeedback(comicId, canMod)
   const [copied, setCopied] = useState<Which | null>(null)
+  // Moderators may opt to include drafts in the copied bundle; members only ever
+  // have approved comments anyway, so the toggle is hidden + forced off for them.
+  const [includeDrafts, setIncludeDrafts] = useState(false)
 
   const disabled = draftText === null
 
@@ -24,7 +32,10 @@ export function CopyScriptToolbar({ comicId, comicTitle, draftText }: CopyScript
     const text =
       which === 'plain'
         ? serializeScript(draftText)
-        : serializeScriptWithComments(draftText, threads, { title: comicTitle })
+        : serializeScriptWithComments(draftText, threads, {
+            title: comicTitle,
+            includeDrafts: canMod ? includeDrafts : false,
+          })
     try {
       await navigator.clipboard.writeText(text)
       setCopied(which)
@@ -56,6 +67,17 @@ export function CopyScriptToolbar({ comicId, comicTitle, draftText }: CopyScript
         <ClipboardIcon />
         {copied === 'comments' ? 'Copied ✓' : 'Copy script + comments'}
       </button>
+      {canMod && (
+        <label className="inline-flex items-center gap-1.5 font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
+          <input
+            type="checkbox"
+            checked={includeDrafts}
+            onChange={(e) => setIncludeDrafts(e.target.checked)}
+            className="h-3.5 w-3.5 rounded-[2px] border-brand-pale-dusk text-brand-indigo focus:ring-brand-lavender/40"
+          />
+          Include drafts
+        </label>
+      )}
     </div>
   )
 }

@@ -2,10 +2,10 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { useAllRoots } from '@/lib/feedback'
+import { useAllRoots, setPublished } from '@/lib/feedback'
 import { useComics } from '@/lib/catalog'
-import { useUser, useAllowStatus } from '@/lib/auth'
-import { visibleTo, anchorLabel, type Anchor, type Status } from '@/lib/feedbackTypes'
+import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
+import { visibleTo, anchorLabel, isDraft, type Anchor, type Status } from '@/lib/feedbackTypes'
 import { CommentIcon, PinIcon } from '@/components/feedback/icons'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -103,15 +103,17 @@ function Chip({
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function ReviewsPageShell() {
-  // Data
-  const { data: roots, loading } = useAllRoots()
-  const { data: comics } = useComics()
-
   // Identity
   const { user, loading: authLoading } = useUser()
   const status_raw = useAllowStatus(user ?? null, authLoading)
-  const isAdmin = status_raw === 'admin'
+  // Moderators (admin + sub_admin) read every root (drafts + hidden); members
+  // get only published, non-hidden via the gated query.
+  const canMod = canModerate(status_raw)
   const currentEmail = user?.email ?? ''
+
+  // Data
+  const { data: roots, loading } = useAllRoots(canMod)
+  const { data: comics } = useComics()
 
   // Build comic title map: `${line}__${slug}` → title
   const titleByComicId = new Map(comics?.map((c) => [`${c.line}__${c.slug}`, c.title]) ?? [])
@@ -123,10 +125,36 @@ export function ReviewsPageShell() {
 
   // Apply filters
   const filtered = (roots ?? [])
-    .filter((r) => visibleTo(r, isAdmin))
+    .filter((r) => visibleTo(r, canMod))
     .filter((r) => statusFilter === 'all' || r.status === statusFilter)
     .filter((r) => !mine || r.authorEmail === currentEmail)
     .filter((r) => !anchoredOnly || r.anchors.length > 0)
+
+  // Pending-approval queue — moderators only. Members never receive drafts, but
+  // we still gate the whole panel behind canMod so it never renders for them.
+  // The realtime onSnapshot list re-emits after setPublished, so an approved
+  // root drops out of `pending` automatically (no manual refresh).
+  const pending = canMod ? (roots ?? []).filter((r) => isDraft(r)) : []
+
+  // ── Authorization gate ──────────────────────────────────────────────────────
+  // The cross-comic reviews list is editorial-only: a member's mixed-comic
+  // feedback query would be rejected by the allocation rules, and members
+  // comment per-comic on their allocated comic pages instead. Once status has
+  // resolved to a non-moderator, render a terminal card (no redirect), the same
+  // gate style AdminPanel uses.
+  const statusResolved = status_raw !== 'loading'
+  if (statusResolved && !canMod) {
+    return (
+      <div className="mx-auto max-w-[640px] px-6 py-24">
+        <div className="rounded-lg border border-brand-pale-dusk bg-brand-pale-dusk/30 px-6 py-8 text-center">
+          <h1 className="font-serif font-light text-brand-umber text-[1.6rem]">Not authorized</h1>
+          <p className="mt-2 font-serif text-brand-umber/70">
+            Reviews are for editors.
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-[1200px] px-6 pb-24 pt-12">
@@ -145,6 +173,82 @@ export function ReviewsPageShell() {
           All top-level feedback across every comic, newest first.
         </p>
       </div>
+
+      {/* ── Pending approval (moderators only) ─────────────────────────── */}
+      {canMod && (
+        <section
+          aria-label="Pending approval"
+          className="mb-8 rounded-xl border border-brand-gold/40 bg-brand-gold/5 px-5 py-4"
+        >
+          <div className="flex items-center gap-2">
+            <span aria-hidden className="block h-px w-5 bg-brand-gold" />
+            <h2 className="font-sans text-[0.7rem] uppercase tracking-label text-brand-gold">
+              Pending approval · {pending.length}
+            </h2>
+          </div>
+
+          {pending.length === 0 ? (
+            <p className="mt-3 font-serif text-sm text-brand-umber/60">
+              Nothing awaiting approval.
+            </p>
+          ) : (
+            <ol className="mt-3 flex flex-col gap-2">
+              {pending.map((r) => {
+                const href = `${comicPath(r.comicId)}#feedback-${r.id}`
+                const title = titleByComicId.get(r.comicId) ?? r.comicId
+                const author = r.authorName || r.authorEmail
+
+                return (
+                  <li
+                    key={r.id}
+                    className="flex flex-wrap items-start gap-x-3 gap-y-2 rounded-lg border border-brand-gold/30 bg-brand-cream/40 px-4 py-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      {/* Row 1: comic title (deep-link) + anchor summary + Draft tag */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          href={href}
+                          className="font-sans text-[0.68rem] uppercase tracking-label text-brand-indigo hover:underline"
+                        >
+                          {title}
+                        </Link>
+                        <span className="inline-flex items-center gap-1 font-sans text-[0.65rem] text-brand-slate">
+                          {anchorSummary(r.anchors)}
+                        </span>
+                        <span className="inline-flex items-center rounded-full border border-brand-gold/50 bg-brand-gold/10 px-2 py-0.5 font-sans text-[0.6rem] uppercase tracking-label text-brand-gold">
+                          Draft
+                        </span>
+                      </div>
+
+                      {/* Row 2: body */}
+                      <p className="mt-1 font-serif text-sm leading-snug text-brand-umber">
+                        {truncate(r.body)}
+                      </p>
+
+                      {/* Row 3: author */}
+                      <p className="mt-1 font-sans text-[0.65rem] text-brand-slate">{author}</p>
+                    </div>
+
+                    <button
+                      type="button"
+                      aria-label={`Approve comment by ${author}`}
+                      onClick={() =>
+                        setPublished(r.id, true, {
+                          email: user?.email ?? '',
+                          name: user?.displayName ?? user?.email ?? '',
+                        })
+                      }
+                      className="inline-flex items-center rounded-full border border-brand-indigo bg-brand-indigo px-4 py-1.5 font-sans text-[0.7rem] uppercase tracking-label text-brand-cream transition-colors hover:bg-brand-indigo/90"
+                    >
+                      Approve
+                    </button>
+                  </li>
+                )
+              })}
+            </ol>
+          )}
+        </section>
+      )}
 
       {/* ── Filters ────────────────────────────────────────────────────── */}
       <div className="mb-8 flex flex-wrap items-center gap-2">

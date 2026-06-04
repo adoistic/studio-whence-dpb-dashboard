@@ -1,8 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { useUser, useAllowStatus } from '@/lib/auth'
-import { useComicFeedback, addReply, setStatus, hideComment, deleteComment } from '@/lib/feedback'
+import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
+import { useComicFeedback, addReply, setStatus, setPublished, editComment, hideComment, deleteComment } from '@/lib/feedback'
 import { useComicVersions } from '@/lib/useComicVersions'
 import {
   visibleTo,
@@ -49,19 +49,21 @@ export function CommentsView({
   const { user, loading: authLoading } = useUser()
   const allowStatus = useAllowStatus(user, authLoading)
   const isAdmin = allowStatus === 'admin'
+  // Moderation (see drafts + hidden, status/hide/delete-any) — admins + sub-admins.
+  const canMod = canModerate(allowStatus)
   const currentEmail = user?.email ?? ''
   const author = {
     email: currentEmail,
     name: user?.displayName ?? currentEmail,
-    role: isAdmin ? 'admin' : 'allow',
+    role: isAdmin ? 'admin' : canMod ? 'sub_admin' : 'allow',
   }
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const { data: threads } = useComicFeedback(comicId)
+  const { data: threads } = useComicFeedback(comicId, canMod)
   const { data: versions } = useComicVersions(comicId)
 
   // ── Visibility + badge numbering (over the full visible set) ───────────────
-  const visible = threads.filter((t) => visibleTo(t.root, isAdmin))
+  const visible = threads.filter((t) => visibleTo(t.root, canMod))
   const badges = assignBadges(visible)
 
   // ── Draft-derived parsing (all in useMemo — no ref reads during render) ─────
@@ -140,7 +142,7 @@ export function CommentsView({
     return [...anchored, ...general]
     // `visible` is derived fresh each render; key the memo on the stable inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threads, isAdmin, statusFilter, categoryFilter, refOrder])
+  }, [threads, canMod, statusFilter, categoryFilter, refOrder])
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -246,17 +248,28 @@ export function CommentsView({
                 <CommentThread
                   thread={t}
                   badge={badges.get(t.root.id)}
-                  isAdmin={isAdmin}
+                  canModerate={canMod}
                   currentEmail={currentEmail}
                   changedSince={changedSince(t.root, comicVersion, versions)}
                   knownRefs={knownRefs}
-                  onReply={async (body) => {
-                    await addReply({ comicId, line, parentId: t.root.id, body, comicVersion }, author)
+                  onReply={async (body, published) => {
+                    // Replies inherit the parent root's published state by default
+                    // (a member only ever sees published roots, so their reply
+                    // becomes visible immediately). A moderator's explicit
+                    // publish-toggle overrides the inheritance.
+                    await addReply(
+                      { comicId, line, parentId: t.root.id, body, comicVersion, published: published ?? t.root.published === true },
+                      author,
+                    )
                   }}
                   onSetStatus={(s) => setStatus(t.root.id, s)}
                   onHide={(h) => hideComment(t.root.id, h)}
                   onDelete={(id) => deleteComment(id)}
                   onJumpToBeat={onJumpInDraft}
+                  onApprove={() => setPublished(t.root.id, true, { email: author.email, name: author.name })}
+                  onEdit={async (body) => {
+                    await editComment(t.root.id, { body })
+                  }}
                 />
               </article>
             )

@@ -48,11 +48,17 @@ const resolved: Thread = {
 }
 
 let threadData: Thread[] = []
+let lastViewerCanModerate: boolean | undefined
 
 vi.mock('@/lib/feedback', () => ({
-  useComicFeedback: () => ({ data: threadData, loading: false }),
+  useComicFeedback: (_comicId: string, viewerCanModerate: boolean) => {
+    lastViewerCanModerate = viewerCanModerate
+    return { data: threadData, loading: false }
+  },
   addReply: vi.fn().mockResolvedValue(undefined),
   setStatus: vi.fn(),
+  setPublished: vi.fn(),
+  editComment: vi.fn().mockResolvedValue(undefined),
   hideComment: vi.fn(),
   deleteComment: vi.fn(),
 }))
@@ -61,9 +67,12 @@ vi.mock('@/lib/useComicVersions', () => ({
   useComicVersions: () => ({ data: [], loading: false }),
 }))
 
+// `canModerate` mirrors the real predicate; the per-test role drives moderation UI.
+let allowStatus = 'allow'
 vi.mock('@/lib/auth', () => ({
   useUser: () => ({ user: { email: 'me@x.com', displayName: 'Me' }, loading: false }),
-  useAllowStatus: () => 'allow',
+  useAllowStatus: () => allowStatus,
+  canModerate: (s: string) => s === 'admin' || s === 'sub_admin',
 }))
 
 import { CommentsView } from '@/components/feedback/CommentsView'
@@ -82,6 +91,8 @@ const props = {
 
 beforeEach(() => {
   threadData = []
+  allowStatus = 'allow'
+  lastViewerCanModerate = undefined
   onJumpInDraft.mockClear()
 })
 
@@ -125,5 +136,22 @@ describe('CommentsView', () => {
     threadData = []
     render(<CommentsView {...props} />)
     expect(screen.getByText(/no comments yet/i)).toBeInTheDocument()
+  })
+
+  it('passes viewerCanModerate=false for a member and true for a sub_admin', () => {
+    threadData = [general]
+    const { unmount } = render(<CommentsView {...props} />)
+    expect(lastViewerCanModerate).toBe(false)
+    unmount()
+    allowStatus = 'sub_admin'
+    render(<CommentsView {...props} />)
+    expect(lastViewerCanModerate).toBe(true)
+  })
+
+  it('a sub_admin sees the moderation status control (not admin-only)', () => {
+    allowStatus = 'sub_admin'
+    threadData = [general]
+    render(<CommentsView {...props} />)
+    expect(screen.getByRole('combobox', { name: /comment status/i })).toBeInTheDocument()
   })
 })

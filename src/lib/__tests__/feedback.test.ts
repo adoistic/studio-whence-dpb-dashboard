@@ -15,7 +15,7 @@ vi.mock('firebase/firestore', () => ({
   serverTimestamp: () => 'TS',
 }))
 
-import { addComment, addReply, setStatus } from '@/lib/feedback'
+import { addComment, addReply, setStatus, setPublished } from '@/lib/feedback'
 
 beforeEach(() => { calls.addDoc = []; calls.updateDoc = [] })
 
@@ -26,6 +26,14 @@ describe('feedback actions', () => {
     expect(calls.addDoc[0]).toMatchObject({
       comicId: 'c', parentId: null, authorEmail: 'a@b.com', status: 'open', hidden: false, comicVersion: 2,
     })
+  })
+  it('addComment defaults published to false (a member comment is a draft)', async () => {
+    await addComment({ comicId: 'c', line: 'biographies', anchors: [], body: 'hi', comicVersion: 2 }, author)
+    expect(calls.addDoc[0]).toMatchObject({ published: false })
+  })
+  it('addComment honours an explicit published=true (publish-direct)', async () => {
+    await addComment({ comicId: 'c', line: 'biographies', anchors: [], body: 'hi', comicVersion: 2, published: true }, author)
+    expect(calls.addDoc[0]).toMatchObject({ published: true })
   })
   it('addComment writes the given category (defaults to fact when omitted)', async () => {
     await addComment({ comicId: 'c', line: 'biographies', anchors: [], body: 'hi', comicVersion: 2, category: 'tone' }, author)
@@ -39,8 +47,23 @@ describe('feedback actions', () => {
     expect(calls.addDoc[0]).toMatchObject({ parentId: 'root1' })
     expect(calls.addDoc[0]).not.toHaveProperty('status')
   })
+  it('addReply defaults published to false (a member reply is a draft too)', async () => {
+    await addReply({ comicId: 'c', line: 'biographies', parentId: 'root1', body: 'r', comicVersion: 2 }, author)
+    expect(calls.addDoc[0]).toMatchObject({ published: false })
+  })
   it('setStatus updates only status', async () => {
     await setStatus('id1', 'resolved')
     expect(calls.updateDoc[0]).toMatchObject({ status: 'resolved' })
+  })
+  it('setPublished(true) sets published + stamps the approver', async () => {
+    await setPublished('id1', true, { email: 'mod@x.com', name: 'Mod' })
+    expect(calls.updateDoc[0]).toMatchObject({ published: true, approvedBy: 'mod@x.com' })
+    expect(calls.updateDoc[0]).toHaveProperty('approvedAt')
+  })
+  it('setPublished(false) unpublishes without stamping an approver', async () => {
+    await setPublished('id1', false)
+    expect(calls.updateDoc[0]).toMatchObject({ published: false })
+    expect(calls.updateDoc[0]).not.toHaveProperty('approvedBy')
+    expect(calls.updateDoc[0]).not.toHaveProperty('approvedAt')
   })
 })

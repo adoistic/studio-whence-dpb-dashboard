@@ -62,9 +62,16 @@ export interface FeedbackNode {
   category?: Category
   comicVersion: number
   hidden: boolean
+  /** Approval gate. Missing is treated as a draft for display; seeded/backfilled docs are `true`. */
+  published?: boolean
   createdAt: unknown
   updatedAt?: unknown
   editedAt?: unknown | null
+}
+
+/** A comment is a draft until explicitly published (a moderator approving it). */
+export function isDraft(n: FeedbackNode): boolean {
+  return n.published !== true
 }
 
 export interface Thread {

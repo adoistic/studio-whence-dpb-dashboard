@@ -25,21 +25,41 @@ import LinePage from '../line/page'
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
 let mockUseLines: () => Async<Line[]>
-let mockUseComics: () => Async<Comic[]>
 let mockUseFigures: () => Async<Figure[]>
 let mockUsePeople: () => Async<PersonDoc[]>
 
 vi.mock('@/lib/catalog', () => ({
   useLines: () => mockUseLines(),
-  useComics: () => mockUseComics(),
-  useFigures: () => mockUseFigures(),
   usePeople: () => mockUsePeople(),
 }))
+
+// The page now reads the gated catalog (useVisibleComics/useVisibleFigures) and
+// resolves the viewer's moderation status. Mock both so the unit stays focused on
+// the page's routing + line-filter logic; the gating itself is covered in
+// visibleCatalog.test.ts.
+vi.mock('@/lib/visibleCatalog', () => ({
+  useVisibleComics: (...a: unknown[]) => mockUseVisibleComics(...a),
+  useVisibleFigures: () => mockUseFigures(),
+}))
+vi.mock('@/lib/auth', () => ({
+  useUser: () => mockUseUser(),
+  useAllowStatus: () => mockStatus,
+  canModerate: (s: string) => s === 'admin' || s === 'sub_admin',
+}))
+
+let mockUseVisibleComics: (...a: unknown[]) => Async<Comic[]>
+let mockUseUser: () => { user: { email: string } | null; loading: boolean }
+let mockStatus: string
 
 // Stub LinePageShell — renders just the line title so "line title appears" holds,
 // without dragging in image resolution / ComicsTable / PeopleTable.
 vi.mock('@/components/LinePageShell', () => ({
-  LinePageShell: ({ line }: { line: { title: string } }) => <div>{line.title}</div>,
+  LinePageShell: ({ line }: { line: { title: string; comics: { slug: string }[] } }) => (
+    <div>
+      <div>{line.title}</div>
+      {line.comics.map((c) => <div key={c.slug}>comic:{c.slug}</div>)}
+    </div>
+  ),
 }))
 
 // Stub the intro registry — the page guards on it, so an empty map is fine.
@@ -75,10 +95,13 @@ function setPathname(pathname: string) {
 
 beforeEach(() => {
   setPathname('/')
-  // Defaults: the secondary hooks resolve empty/loaded; tests override useLines.
-  mockUseComics = () => loaded<Comic[]>([])
+  // Defaults: a moderator viewer; the secondary hooks resolve empty/loaded;
+  // tests override useLines / the visible-comic set as needed.
+  mockUseVisibleComics = () => loaded<Comic[]>([])
   mockUseFigures = () => loaded<Figure[]>([])
   mockUsePeople = () => loaded<PersonDoc[]>(peopleDocs)
+  mockUseUser = () => ({ user: { email: 'mod@x.com' }, loading: false })
+  mockStatus = 'admin'
 })
 
 // ─── Tests ──────────────────────────────────────────────────────────────────
@@ -134,5 +157,23 @@ describe('LinePage — data-driven /line routing', () => {
     // Exactly one role="alert" — the empty-then-filled sr-only live region, which
     // announces reliably once the mount effect populates it.
     expect(screen.getByRole('alert')).toHaveTextContent(/couldn.t load/i)
+  })
+
+  test('a member sees only their visible comics, filtered to the line', () => {
+    setPathname('/biographies')
+    mockUseLines = () => loaded(lineDocs)
+    mockUseUser = () => ({ user: { email: 'm@x.com' }, loading: false })
+    mockStatus = 'allow' // a regular member
+    // The gated read returns a comic in this line and one in another line; the
+    // page must surface only the in-line comic.
+    mockUseVisibleComics = () => loaded<Comic[]>([
+      { slug: '01-a', line: 'biographies' } as unknown as Comic,
+      { slug: '02-b', line: 'awareness' } as unknown as Comic,
+    ])
+
+    render(<LinePage />)
+
+    expect(screen.getByText('comic:01-a')).toBeInTheDocument()
+    expect(screen.queryByText('comic:02-b')).not.toBeInTheDocument()
   })
 })
