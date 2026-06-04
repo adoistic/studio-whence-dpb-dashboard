@@ -170,6 +170,54 @@ describe("GET /content", () => {
     expect(res.headers["Access-Control-Allow-Origin"]).toBe(ALLOWED_ORIGIN);
   });
 
+  test("admin (moderator) → getObject('content.json'), 200 with its body", async () => {
+    authorize.mockResolvedValue({ email: "adnan@thothica.com", moderator: true });
+    const buf = Buffer.from('{"catalog":true}');
+    getObject.mockResolvedValue({ body: buf, contentType: "application/json" });
+    const req = makeReq({
+      method: "GET",
+      path: "/content",
+      authorization: "Bearer tok",
+    });
+    const res = new FakeRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(getObject).toHaveBeenCalledWith("content.json");
+    expect(res.sentBody).toBe(buf);
+  });
+
+  test("sub_admin (moderator) → 200 with body", async () => {
+    authorize.mockResolvedValue({ email: "sub@dpb.in", moderator: true });
+    const buf = Buffer.from("{}");
+    getObject.mockResolvedValue({ body: buf, contentType: "application/json" });
+    const req = makeReq({
+      method: "GET",
+      path: "/content",
+      authorization: "Bearer tok",
+    });
+    const res = new FakeRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+    expect(getObject).toHaveBeenCalledWith("content.json");
+    expect(res.sentBody).toBe(buf);
+  });
+
+  test("plain member (moderator:false) → 403, getObject never called (CORS header present)", async () => {
+    authorize.mockResolvedValue({ email: "m@gmail.com", moderator: false });
+    const req = makeReq({
+      method: "GET",
+      path: "/content",
+      origin: ALLOWED_ORIGIN,
+      authorization: "Bearer tok",
+    });
+    const res = new FakeRes();
+    await handler(req, res);
+    expect(res.statusCode).toBe(403);
+    expect(res.jsonBody).toEqual({ error: "forbidden" });
+    expect(getObject).not.toHaveBeenCalled();
+    expect(res.headers["Access-Control-Allow-Origin"]).toBe(ALLOWED_ORIGIN);
+  });
+
   test("unauthorized (authorize → null) → 403, getObject never called", async () => {
     authorize.mockResolvedValue(null);
     const req = makeReq({

@@ -96,6 +96,13 @@ export const dataApi = onRequest(
       res.status(403).json({ error: "forbidden" });
       return;
     }
+    // The full catalog manifest is moderator-only (admin + sub-admins). The
+    // dashboard reads the Firestore catalog now, so /content is kept solely as a
+    // moderator/rollback fallback; a plain member must NOT pull the whole catalog.
+    if (!auth.moderator) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
     try {
       // HARD-CODED key — never through safeKey/presign (see module doc).
       const { body, contentType } = await getObject("content.json");
