@@ -90,6 +90,19 @@ beforeAll(async () => {
       figures_effective: ['sachin-tendulkar', 'dhirubhai-ambani'],
       updatedBy: 'adnan@thothica.com', updatedAt: '2026-06-03',
     })
+    // A member granted ONE comic by id (no raw figure grant). The granted
+    // comic's subject (sachin-tendulkar) lands in figures_effective so the
+    // figure's RESEARCH is unlocked — but the figure's OTHER comics must stay
+    // locked (a comic grant must not cascade to sibling comics).
+    await setDoc(doc(db, 'allowlist/comicmember@dpb.in'), { role: 'allow' })
+    await setDoc(doc(db, 'allocations/comicmember@dpb.in'), {
+      comics: ['biographies__c1'], lines: [], figures: [],
+      figures_effective: ['sachin-tendulkar'],
+      updatedBy: 'adnan@thothica.com', updatedAt: '2026-06-03',
+    })
+    // The granted comic + a SIBLING comic with the same subject (NOT granted by id).
+    await setDoc(doc(db, 'comics/biographies__c1'), { line: 'biographies', subject_slug: 'sachin-tendulkar', status: 'draft' })
+    await setDoc(doc(db, 'comics/biographies__c2'), { line: 'biographies', subject_slug: 'sachin-tendulkar', status: 'draft' })
     // A member with NO allocation doc (allowlisted only) → must see no IP.
     await setDoc(doc(db, 'allowlist/noalloc@dpb.in'), { role: 'allow' })
     // Catalog seed docs for allocation assertions.
@@ -328,6 +341,7 @@ describe('firestore.rules — roles & approval', () => {
 
 describe('firestore.rules — work allocation', () => {
   const member   = () => env.authenticatedContext('al-m', { email: 'member@dpb.in' }).firestore()
+  const comicMember = () => env.authenticatedContext('al-cm', { email: 'comicmember@dpb.in' }).firestore()
   const noAlloc  = () => env.authenticatedContext('al-n', { email: 'noalloc@dpb.in' }).firestore()
   const subAdmin = () => env.authenticatedContext('al-sa', { email: 'sub@dpb.in' }).firestore()
   const admin    = () => env.authenticatedContext('al-ad', { email: 'adnan@thothica.com' }).firestore()
@@ -343,6 +357,25 @@ describe('firestore.rules — work allocation', () => {
   it('member is DENIED a comic outside every grant', async () => {
     await assertFails(getDoc(doc(member(), 'comics/awareness__y')))   // line awareness not granted
     await assertFails(getDoc(doc(member(), 'comics/indic__02')))      // line indic not granted, id not granted
+  })
+  it('a RAW figure grant unlocks ALL of that figure’s comics', async () => {
+    // member@dpb.in has figures:['sachin-tendulkar'] — both sibling comics with
+    // that subject are readable (an explicit figure grant cascades to its comics).
+    await assertSucceeds(getDoc(doc(member(), 'comics/biographies__c1')))
+    await assertSucceeds(getDoc(doc(member(), 'comics/biographies__c2')))
+  })
+
+  // ── A COMIC grant must NOT cascade to the figure's SIBLING comics ──
+  // comicmember@dpb.in was granted ONLY biographies__c1 by id (figures:[]); the
+  // subject sachin-tendulkar is in figures_effective (research follows), but
+  // figures_effective must NOT unlock sibling comic biographies__c2.
+  it('comic grant unlocks the granted comic but NOT its sibling', async () => {
+    await assertSucceeds(getDoc(doc(comicMember(), 'comics/biographies__c1')))   // granted by id
+    await assertFails(getDoc(doc(comicMember(), 'comics/biographies__c2')))      // sibling, subject only in figures_effective → DENIED
+  })
+  it('comic grant DOES unlock the figure’s research (figures_effective)', async () => {
+    await assertSucceeds(getDoc(doc(comicMember(), 'figures/sachin-tendulkar')))
+    await assertSucceeds(getDoc(doc(comicMember(), 'figures/sachin-tendulkar/sources/book-a')))
   })
 
   // ── Version subcollection inherits the parent comic's gate ──

@@ -107,6 +107,7 @@ beforeEach(() => {
   // as a MEMBER override these explicitly. Moderator tests never consult them.
   getAllocation.mockResolvedValue({
     lines: [],
+    figures: [],
     figures_effective: [],
     comics: [],
   });
@@ -534,6 +535,7 @@ describe("allocation gate — POST /resolve", () => {
     authorize.mockResolvedValue({ email: "m@gmail.com", moderator: false });
     getAllocation.mockResolvedValue({
       lines: [],
+      figures: ["sachin-tendulkar"],
       figures_effective: ["sachin-tendulkar"],
       comics: [],
     });
@@ -616,6 +618,7 @@ describe("allocation gate — GET /read", () => {
     authorize.mockResolvedValue({ email: "m@gmail.com", moderator: false });
     getAllocation.mockResolvedValue({
       lines: ["biographies"],
+      figures: [],
       figures_effective: [],
       comics: [],
     });
@@ -633,6 +636,7 @@ describe("allocation gate — GET /read", () => {
     authorize.mockResolvedValue({ email: "m@gmail.com", moderator: false });
     getAllocation.mockResolvedValue({
       lines: [],
+      figures: [],
       figures_effective: [],
       comics: [],
     });

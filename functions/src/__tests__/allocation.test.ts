@@ -118,10 +118,29 @@ describe('getAllocation', () => {
   test('present doc → arrays, missing fields default to []', async () => {
     allocGet.mockResolvedValue({
       exists: true,
+      data: () => ({
+        lines: ['biographies'],
+        figures: ['sachin-tendulkar'],
+        figures_effective: ['sachin-tendulkar', 'dhirubhai-ambani'],
+        comics: ['biographies__a'],
+      }),
+    })
+    expect(await getAllocation('m@x.com')).toEqual({
+      lines: ['biographies'],
+      figures: ['sachin-tendulkar'],
+      figures_effective: ['sachin-tendulkar', 'dhirubhai-ambani'],
+      comics: ['biographies__a'],
+    })
+  })
+
+  test('missing figures / figures_effective default to []', async () => {
+    allocGet.mockResolvedValue({
+      exists: true,
       data: () => ({ lines: ['biographies'], comics: ['biographies__a'] }),
     })
     expect(await getAllocation('m@x.com')).toEqual({
       lines: ['biographies'],
+      figures: [],
       figures_effective: [],
       comics: ['biographies__a'],
     })
@@ -130,10 +149,11 @@ describe('getAllocation', () => {
   test('non-array fields are coerced to []', async () => {
     allocGet.mockResolvedValue({
       exists: true,
-      data: () => ({ lines: 'oops', figures_effective: null, comics: 5 }),
+      data: () => ({ lines: 'oops', figures: {}, figures_effective: null, comics: 5 }),
     })
     expect(await getAllocation('m@x.com')).toEqual({
       lines: [],
+      figures: [],
       figures_effective: [],
       comics: [],
     })
@@ -162,6 +182,7 @@ describe('comicSubject', () => {
 describe('isKeyAllowedForMember', () => {
   const alloc = (over: Partial<Allocation> = {}): Allocation => ({
     lines: [],
+    figures: [],
     figures_effective: [],
     comics: [],
     ...over,
@@ -215,17 +236,31 @@ describe('isKeyAllowedForMember', () => {
     expect(ok).toBe(true)
   })
 
-  test('draft key: figure grant matched via comic-doc subject lookup', async () => {
+  test('draft key: RAW figure grant matched via comic-doc subject lookup', async () => {
     const deps = {
       comicSubject: vi.fn(async () => 'sachin-tendulkar'),
     }
     const ok = await isKeyAllowedForMember(
       'drafts/biographies/01-the-debut.html',
-      alloc({ figures_effective: ['sachin-tendulkar'] }),
+      alloc({ figures: ['sachin-tendulkar'] }),
       deps
     )
     expect(ok).toBe(true)
     expect(deps.comicSubject).toHaveBeenCalledWith('biographies__01-the-debut')
+  })
+
+  test('draft key: figures_effective does NOT grant the comic (sibling-comic leak)', async () => {
+    // A single-comic grant adds the subject to figures_effective. That must NOT
+    // unlock the figure's OTHER (sibling) comics — only the comic-id grant or a
+    // RAW figure grant may. Here the member was granted a sibling comic (so the
+    // subject is in figures_effective) but NOT this comic and NOT the raw figure.
+    const deps = { comicSubject: vi.fn(async () => 'sachin-tendulkar') }
+    const ok = await isKeyAllowedForMember(
+      'drafts/biographies/02-the-sibling.html',
+      alloc({ comics: ['biographies__01-the-debut'], figures_effective: ['sachin-tendulkar'] }),
+      deps
+    )
+    expect(ok).toBe(false)
   })
 
   test('draft key: no comic-doc lookup when a line grant already allows', async () => {
@@ -239,13 +274,36 @@ describe('isKeyAllowedForMember', () => {
     expect(deps.comicSubject).not.toHaveBeenCalled()
   })
 
-  test('draft key: subject lookup misses → deny', async () => {
-    const deps = { comicSubject: vi.fn(async () => 'someone-else') }
+  test('draft key: no comic-doc lookup when RAW figures is empty', async () => {
+    // figures_effective is non-empty but figures is empty → the comic branch
+    // never looks up the subject (it would only test RAW figures).
+    const deps = { comicSubject: vi.fn() }
     const ok = await isKeyAllowedForMember(
-      'drafts/biographies/01-the-debut.html',
+      'drafts/biographies/02-the-sibling.html',
       alloc({ figures_effective: ['sachin-tendulkar'] }),
       deps
     )
     expect(ok).toBe(false)
+    expect(deps.comicSubject).not.toHaveBeenCalled()
+  })
+
+  test('draft key: subject lookup misses → deny', async () => {
+    const deps = { comicSubject: vi.fn(async () => 'someone-else') }
+    const ok = await isKeyAllowedForMember(
+      'drafts/biographies/01-the-debut.html',
+      alloc({ figures: ['sachin-tendulkar'] }),
+      deps
+    )
+    expect(ok).toBe(false)
+  })
+
+  test('research key: figures_effective grants (a comic grant unlocks research)', async () => {
+    // The RESEARCH branch still uses figures_effective: a comic grant adds the
+    // subject there, so the figure's research library is readable.
+    const ok = await isKeyAllowedForMember(
+      'research/biographies/03/_books/sachin-tendulkar/a.md',
+      alloc({ comics: ['biographies__01-the-debut'], figures_effective: ['sachin-tendulkar'] })
+    )
+    expect(ok).toBe(true)
   })
 })

@@ -32,9 +32,15 @@ export interface KeyScope {
   comicId?: string
 }
 
-/** A member's allocation grants. Missing fields default to empty arrays. */
+/** A member's allocation grants. Missing fields default to empty arrays.
+ *
+ * `figures` is the RAW explicit figure grants; `figures_effective` is
+ * `figures ∪ subjects-of-granted-comics`. COMIC access (draft/comic/image-comic
+ * keys) tests RAW `figures`; RESEARCH access tests `figures_effective`. A single
+ * comic grant must unlock the figure's research library but NOT its sibling comics. */
 export interface Allocation {
   lines: string[]
+  figures: string[]
   figures_effective: string[]
   comics: string[]
 }
@@ -134,7 +140,7 @@ export function scopeOfKey(key: string): KeyScope {
 }
 
 /**
- * Read a member's allocation doc (`allocations/{email}`). Returns the three
+ * Read a member's allocation doc (`allocations/{email}`). Returns the four
  * grant arrays (missing fields default to `[]`), or `null` if the doc is absent.
  */
 export async function getAllocation(email: string): Promise<Allocation | null> {
@@ -142,6 +148,7 @@ export async function getAllocation(email: string): Promise<Allocation | null> {
   if (!snap.exists) return null
   const data = (snap.data?.() ?? {}) as {
     lines?: unknown
+    figures?: unknown
     figures_effective?: unknown
     comics?: unknown
   }
@@ -149,6 +156,7 @@ export async function getAllocation(email: string): Promise<Allocation | null> {
     Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
   return {
     lines: arr(data.lines),
+    figures: arr(data.figures),
     figures_effective: arr(data.figures_effective),
     comics: arr(data.comics),
   }
@@ -169,18 +177,23 @@ export async function comicSubject(comicId: string): Promise<string | null> {
 /**
  * Decide whether a member with allocation `alloc` may fetch the R2 object `key`.
  *
- * Allow when ANY grant matches the key's scope:
- *   - `alloc.comics` includes `scope.comicId`   (draft keys), OR
- *   - `alloc.lines` includes `scope.line`,       OR
- *   - `alloc.figures_effective` includes `scope.subject`.
+ * Two scope shapes with DIFFERENT figure-grant semantics:
  *
- * For a DRAFT key the subject isn't in the path, so when the line/comic grants
- * don't already allow it we look up the comic's subject (one extra read) and
- * test that against `figures_effective`.
+ *   - COMIC-keyed scope (carries `comicId` — draft / image-comic keys): allow if
+ *       `alloc.comics` includes `scope.comicId`, OR
+ *       `alloc.lines`  includes `scope.line`,    OR
+ *       RAW `alloc.figures` includes the comic's subject (looked up from the
+ *       comic doc when not in the path). A comic grant unlocks that comic only —
+ *       it must NOT cascade to the figure's sibling comics via figures_effective.
+ *
+ *   - RESEARCH scope (carries `subject`, no `comicId`): allow if
+ *       `alloc.lines` includes `scope.line`, OR
+ *       `alloc.figures_effective` includes `scope.subject` (so a comic grant
+ *       unlocks the figure's research library).
  *
  * Fail-closed: empty scope `{}` → deny; missing `alloc` → deny.
- * Read budget: 0 extra reads for non-draft keys; ≤1 extra (the comic doc) for
- * draft keys, and only when line/comic grants didn't already allow.
+ * Read budget: 0 extra reads for non-comic keys; ≤1 extra (the comic doc) for
+ * comic keys, and only when line/comic grants didn't already allow.
  */
 export async function isKeyAllowedForMember(
   key: string,
@@ -192,21 +205,24 @@ export async function isKeyAllowedForMember(
   // Empty scope → unattributable → deny.
   if (!scope.line && !scope.subject && !scope.comicId) return false
 
-  // comic-id grant (draft keys carry a comicId).
-  if (scope.comicId && alloc.comics.includes(scope.comicId)) return true
-  // line grant.
-  if (scope.line && alloc.lines.includes(scope.line)) return true
-  // figure grant (subject straight from the path, when present).
-  if (scope.subject && alloc.figures_effective.includes(scope.subject)) {
-    return true
+  // ── COMIC-keyed scope (carries a comicId): RAW `figures`, not figures_effective ──
+  if (scope.comicId) {
+    if (alloc.comics.includes(scope.comicId)) return true
+    if (scope.line && alloc.lines.includes(scope.line)) return true
+    // Comic key with no subject in the path: resolve the comic's subject and
+    // test it against the RAW figure grants (an explicit figure grant unlocks
+    // all of that figure's comics; a sibling comic grant does NOT).
+    if (alloc.figures.length > 0) {
+      const subject = await deps.comicSubject(scope.comicId)
+      if (subject && alloc.figures.includes(subject)) return true
+    }
+    return false
   }
 
-  // Draft key with no subject in the path: resolve the comic's subject and test
-  // it against the figure grants ("research follows per-comic": a figure grant
-  // unlocks that figure's comics too).
-  if (scope.comicId && !scope.subject && alloc.figures_effective.length > 0) {
-    const subject = await deps.comicSubject(scope.comicId)
-    if (subject && alloc.figures_effective.includes(subject)) return true
+  // ── RESEARCH scope (subject from a research path): figures_effective ──
+  if (scope.line && alloc.lines.includes(scope.line)) return true
+  if (scope.subject && alloc.figures_effective.includes(scope.subject)) {
+    return true
   }
 
   return false

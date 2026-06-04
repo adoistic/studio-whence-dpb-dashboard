@@ -39,11 +39,15 @@ service cloud.firestore {
     function allocDoc() {
       return get(/databases/$(database)/documents/allocations/$(userEmail())).data;
     }
+    // COMIC access uses RAW `figures` (an explicit figure grant unlocks all of
+    // that figure's comics; an explicit comic grant unlocks just that comic). A
+    // comic grant must NOT cascade to the figure's sibling comics via
+    // figures_effective — that set is for RESEARCH access only (figureResearchAllowed).
     function comicAllowed(cid, line, subject) {
       return isSubAdmin() || (hasAlloc() && (
            allocDoc().get('comics', []).hasAny([cid])
         || allocDoc().get('lines', []).hasAny([line])
-        || allocDoc().get('figures_effective', []).hasAny([subject]) ));
+        || allocDoc().get('figures', []).hasAny([subject]) ));
     }
     function figureResearchAllowed(fline, fslug) {
       return isSubAdmin() || (hasAlloc() && (
