@@ -1,6 +1,6 @@
 'use client'
 
-import { TINGALAND_CAST, TINGALAND_SETTINGS, SAMPLE_PAGES } from '@/lib/images'
+import { TINGALAND_CAST, TINGALAND_SETTINGS, SAMPLE_PAGES, STYLE_EXPLORATION } from '@/lib/images'
 import { useResolved } from '@/lib/useResolved'
 
 function SubHead({ children }: { children: React.ReactNode }) {
@@ -19,6 +19,7 @@ export function TingalandGallery() {
     ...TINGALAND_CAST.map((c) => c.rel),
     ...TINGALAND_SETTINGS.map((s) => s.rel),
     ...SAMPLE_PAGES.map((p) => p.rel),
+    ...STYLE_EXPLORATION.flatMap((s) => s.pages.map((p) => p.rel)),
   ])
   return (
     <div className="flex flex-col gap-14">
@@ -96,6 +97,37 @@ export function TingalandGallery() {
             ))}
           </div>
         </div>
+      </div>
+
+      {/* Style exploration — the first four pages in three directions */}
+      <div className="flex flex-col gap-10">
+        <SubHead>Style exploration · first four pages, three directions</SubHead>
+        {STYLE_EXPLORATION.map((set) => (
+          <div key={set.style} className="flex flex-col gap-4">
+            <SubHead>{set.style} · {set.note}</SubHead>
+            <div className="-mx-6 overflow-x-auto px-6 no-scrollbar">
+              <div className="flex min-w-max gap-5 pb-1">
+                {set.pages.map((page) => (
+                  <figure key={page.rel} className="group w-[min(60vw,210px)] shrink-0">
+                    <div className="aspect-[3/4] overflow-hidden rounded-brand border border-brand-pale-dusk bg-brand-deep shadow-[0_30px_50px_-35px_rgba(30,26,58,0.5)]">
+                      {urls[page.rel] && (
+                        <img
+                          src={urls[page.rel]}
+                          alt={`${set.style} — ${page.caption}`}
+                          loading="lazy"
+                          className="h-full w-full object-cover transition-transform duration-[1200ms] ease-out group-hover:scale-[1.04]"
+                        />
+                      )}
+                    </div>
+                    <figcaption className="mt-3 font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
+                      {page.caption}
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )

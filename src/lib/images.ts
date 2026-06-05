@@ -14,6 +14,42 @@ export const SAMPLE_PAGES: SampleImage[] = [
   { rel: 'images/samples/01-tingaland-rhymes/sample-page-pat-a-cake.jpg', caption: 'Pat-a-Cake' },
 ]
 
+// First four pages rendered in three alternate style directions — a style-pick
+// comparison shown alongside the headline Pixar 3D. R2 keys only (bytes in R2).
+export type StyleSet = { style: string; note: string; pages: SampleImage[] }
+export const STYLE_EXPLORATION: StyleSet[] = [
+  {
+    style: '2D flat',
+    note: 'Bold flat-colour cartoon',
+    pages: [
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-2d-flat-01.jpg', caption: 'Title' },
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-2d-flat-02.jpg', caption: 'Dedication' },
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-2d-flat-03.jpg', caption: 'Twinkle Twinkle' },
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-2d-flat-04.jpg', caption: 'Mary Had a Little Lamb' },
+    ],
+  },
+  {
+    style: 'Coloured pencil',
+    note: 'Warm hand-drawn pencil',
+    pages: [
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-colored-pencil-01.jpg', caption: 'Title' },
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-colored-pencil-02.jpg', caption: 'Dedication' },
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-colored-pencil-03.jpg', caption: 'Twinkle Twinkle' },
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-colored-pencil-04.jpg', caption: 'Mary Had a Little Lamb' },
+    ],
+  },
+  {
+    style: 'Watercolour',
+    note: 'Lush premium watercolour',
+    pages: [
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-watercolor-01.jpg', caption: 'Title' },
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-watercolor-02.jpg', caption: 'Dedication' },
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-watercolor-03.jpg', caption: 'Twinkle Twinkle' },
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-watercolor-04.jpg', caption: 'Mary Had a Little Lamb' },
+    ],
+  },
+]
+
 export const HERO_BACKDROP = 'images/toddlers/tingaland/settings/tingaland-landscape-night-pixar-3d-background.jpg'
 
 export type LineVisual = {
