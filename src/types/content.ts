@@ -40,6 +40,13 @@ export interface Comic {
   // Future-proofing (not yet in data)
   sample_image?: string
   artifacts?: Record<string, string>
+  // Client-facing docs (concept-note, sources-and-quotes, script, …) for this
+  // comic, published by the Firestore catalog pipeline (not content.json).
+  docs?: {
+    generatedAt: string
+    items: { type: string; label: string; readKey: string; downloadKey: string; bytes: number }[]
+    bundleKey: string; bundleBytes: number; zipKey: string; zipBytes: number
+  }
 }
 
 export interface ResearchFile {

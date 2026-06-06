@@ -31,6 +31,10 @@ export const useHeadline = () => useAsync<CatalogMeta>(async () => {
   if (!v) throw new Error('catalog meta missing'); return v
 }, [])
 
+export interface MethodologyDocs { readKey: string; downloadKey: string; bytes: number; generatedAt: string }
+export const useMethodology = () => useAsync<MethodologyDocs | null>(async () =>
+  docData<MethodologyDocs>(await getDoc(doc(db, 'meta', 'methodology'))) ?? null, [])
+
 export const useLines = () => useAsync<Line[]>(async () => listData<Line>(await getDocs(collection(db, 'lines'))), [])
 
 export const useComic = (line: string, slug: string) =>

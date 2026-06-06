@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor } from '@testing-library/react'
-import { useHeadline, useComic, useComics, useFigure, usePeople } from '@/lib/catalog'
+import { useHeadline, useComic, useComics, useFigure, usePeople, useMethodology } from '@/lib/catalog'
 
 const mockGetDoc = vi.fn()
 const mockGetDocs = vi.fn()
@@ -47,6 +47,20 @@ describe('catalog hooks', () => {
     const { result } = renderHook(() => usePeople('biographies'))
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.data?.[0].stage).toBe('approved')
+  })
+  it('useMethodology reads meta/methodology and returns its data', async () => {
+    mockGetDoc.mockResolvedValue({ exists: () => true, data: () => ({ readKey: 'docs/methodology/x.read.md', downloadKey: 'docs/methodology/x.download.md', bytes: 42, generatedAt: '2026-06-06' }) })
+    const { result } = renderHook(() => useMethodology())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.data?.readKey).toBe('docs/methodology/x.read.md')
+    expect(result.current.data?.bytes).toBe(42)
+  })
+  it('useMethodology returns null when the doc is absent', async () => {
+    mockGetDoc.mockResolvedValue({ exists: () => false, data: () => ({}) })
+    const { result } = renderHook(() => useMethodology())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.data).toBeNull()
+    expect(result.current.error).toBeFalsy()
   })
   it('surfaces an error state when a read throws', async () => {
     mockGetDoc.mockRejectedValue(new Error('denied'))
