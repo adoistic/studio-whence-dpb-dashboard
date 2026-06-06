@@ -5,6 +5,7 @@ import { useUser, useAllowStatus } from '@/lib/auth'
 import { Topbar } from '@/components/Topbar'
 import { FooterWithData } from '@/components/FooterWithData'
 import { Eyebrow } from '@/components/Eyebrow'
+import { SignOutButton } from '@/components/SignOutButton'
 
 export default function AuthedLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -41,6 +42,10 @@ export default function AuthedLayout({ children }: { children: React.ReactNode }
           <p className="mt-3 text-brand-ink/80">
             Your access has been suspended. Contact the administrator.
           </p>
+          {/* A suspended user is otherwise stuck — give them a way to log out. */}
+          <div className="mt-6">
+            <SignOutButton />
+          </div>
         </div>
       </main>
     )

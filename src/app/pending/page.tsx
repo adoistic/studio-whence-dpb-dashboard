@@ -6,6 +6,7 @@ import { db } from '@/lib/firebase'
 import { useUser } from '@/lib/auth'
 import { BrandLockup } from '@/components/BrandLockup'
 import { Eyebrow } from '@/components/Eyebrow'
+import { SignOutButton } from '@/components/SignOutButton'
 
 export default function PendingPage() {
   const { user } = useUser()
@@ -55,6 +56,14 @@ export default function PendingPage() {
             </a>{' '}
             to register your request.
           </p>
+        )}
+
+        {/* A signed-in user awaiting access still needs a way out — to switch
+            accounts or simply log off — so always surface Sign out here. */}
+        {email && (
+          <div className="mt-2">
+            <SignOutButton />
+          </div>
         )}
       </div>
     </main>

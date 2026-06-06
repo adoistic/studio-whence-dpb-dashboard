@@ -2,10 +2,9 @@
 
 import { useEffect, useId, useRef, useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { signOut } from 'firebase/auth'
+import { usePathname } from 'next/navigation'
 import { BrandLockup } from '@/components/BrandLockup'
-import { auth } from '@/lib/firebase'
+import { SignOutButton } from '@/components/SignOutButton'
 import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { useLines } from '@/lib/catalog'
 
@@ -54,7 +53,6 @@ function MenuItem({
 
 export function Topbar() {
   const pathname = usePathname()
-  const router = useRouter()
   const { user, loading } = useUser()
   const allowStatus = useAllowStatus(user, loading)
   const canMod = canModerate(allowStatus)
@@ -63,12 +61,6 @@ export function Topbar() {
   const [open, setOpen] = useState(false)
   const menuId = useId()
   const containerRef = useRef<HTMLDivElement>(null)
-
-  async function handleSignOut() {
-    setOpen(false)
-    await signOut(auth)
-    router.replace('/login')
-  }
 
   // Close on Escape and on outside click while the menu is open.
   useEffect(() => {
@@ -187,13 +179,7 @@ export function Topbar() {
                   />
                   {user.email}
                 </span>
-                <button
-                  type="button"
-                  onClick={handleSignOut}
-                  className="rounded-md px-3 py-2 text-left font-sans text-[0.7rem] uppercase tracking-label text-brand-slate transition-colors hover:bg-brand-indigo/5 hover:text-brand-indigo"
-                >
-                  Sign out
-                </button>
+                <SignOutButton className="rounded-md px-3 py-2 text-left font-sans text-[0.7rem] uppercase tracking-label text-brand-slate transition-colors hover:bg-brand-indigo/5 hover:text-brand-indigo" />
               </>
             )}
           </nav>

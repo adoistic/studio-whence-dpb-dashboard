@@ -31,12 +31,22 @@ vi.mock('@/lib/auth', () => ({
 
 vi.mock('@/lib/firebase', () => ({
   db: {},
+  auth: {},
 }))
 
 vi.mock('firebase/firestore', () => ({
   doc: (...args: unknown[]) => mockDoc(...args),
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
   serverTimestamp: () => mockServerTimestamp(),
+}))
+
+// SignOutButton (rendered when a user is signed in) depends on these.
+vi.mock('firebase/auth', () => ({
+  signOut: vi.fn(),
+}))
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: vi.fn() }),
 }))
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -82,5 +92,26 @@ describe('/pending page', () => {
     expect(payload.resolution).toBeNull()
     expect(payload).toHaveProperty('requested_at')
     expect(payload).toHaveProperty('user_agent')
+  })
+
+  // ── Test 3: signed-in user sees a Sign out button (can switch accounts) ────
+
+  test('shows a Sign out button when a user/email is present', () => {
+    mockUserState = { user: { email: 'someone@gmail.com' }, loading: false }
+    render(<PendingPage />)
+
+    expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
+    // The not-signed-in "Sign in" link should NOT appear when signed in.
+    expect(screen.queryByRole('link', { name: /sign in/i })).not.toBeInTheDocument()
+  })
+
+  // ── Test 4: not-signed-in user keeps the "Sign in" link, no Sign out ───────
+
+  test('shows the Sign in link (and no Sign out) when no user is present', () => {
+    mockUserState = { user: null, loading: false }
+    render(<PendingPage />)
+
+    expect(screen.getByRole('link', { name: /sign in/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /sign out/i })).not.toBeInTheDocument()
   })
 })

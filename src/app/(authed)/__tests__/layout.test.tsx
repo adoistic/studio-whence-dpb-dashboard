@@ -35,6 +35,15 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: mockReplace }),
 }))
 
+// SignOutButton (rendered on the suspended screen) depends on these.
+vi.mock('@/lib/firebase', () => ({
+  auth: {},
+}))
+
+vi.mock('firebase/auth', () => ({
+  signOut: vi.fn(),
+}))
+
 vi.mock('@/lib/auth', () => ({
   useUser: () => mockUseUserResult,
   useAllowStatus: (_user: unknown, _loading: boolean) => mockAllowStatus,
@@ -143,6 +152,26 @@ describe('(authed)/layout — auth gate matrix', () => {
     expect(screen.getByTestId('footer')).toBeInTheDocument()
     expect(screen.queryByText(/checking access/i)).not.toBeInTheDocument()
 
+    await waitFor(() => {
+      expect(mockReplace).not.toHaveBeenCalled()
+    })
+  })
+
+  test('6. status suspended — terminal screen exposes a Sign out control, no redirect, no children', async () => {
+    mockUseUserResult = { user: { email: 'banned@thothica.com' } as User, loading: false }
+    mockAllowStatus = 'suspended'
+
+    renderLayout()
+
+    // Terminal message, not the app chrome.
+    expect(screen.getByText(/access suspended/i)).toBeInTheDocument()
+    expect(screen.queryByTestId('child')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('topbar')).not.toBeInTheDocument()
+
+    // A suspended user must still be able to log out.
+    expect(screen.getByRole('button', { name: /sign out/i })).toBeInTheDocument()
+
+    // Suspended is terminal — no redirect (avoids a loop).
     await waitFor(() => {
       expect(mockReplace).not.toHaveBeenCalled()
     })
