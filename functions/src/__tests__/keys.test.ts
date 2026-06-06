@@ -60,4 +60,23 @@ describe('safeKey', () => {
   test('rejects prefix-substring match without trailing slash (research-evil/)', () => {
     expect(safeKey('research-evil/x.md', RESOLVE_PREFIXES)).toBeNull()
   })
+
+  test('allows docs/ keys through /resolve', () => {
+    expect(
+      safeKey('docs/methodology/diamond-books.read.md', RESOLVE_PREFIXES)
+    ).toBe('docs/methodology/diamond-books.read.md')
+    expect(
+      safeKey('docs/comics/biographies/x/01-y/bundle.md', RESOLVE_PREFIXES)
+    ).toBe('docs/comics/biographies/x/01-y/bundle.md')
+  })
+
+  test('allows docs/ keys through /read', () => {
+    expect(safeKey('docs/methodology/x.md', READ_PREFIXES)).toBe(
+      'docs/methodology/x.md'
+    )
+  })
+
+  test('docs/ traversal is still rejected', () => {
+    expect(safeKey('docs/../secrets/x', RESOLVE_PREFIXES)).toBeNull()
+  })
 })

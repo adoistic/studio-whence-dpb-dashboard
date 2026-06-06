@@ -22,10 +22,11 @@ export const RESOLVE_PREFIXES = [
   'drafts/',
   'images/',
   'artifacts/',
+  'docs/',
 ] as const;
 
 /** Prefixes readable through `/read` (proxied text). Narrower than resolve. */
-export const READ_PREFIXES = ['research/', 'drafts/'] as const;
+export const READ_PREFIXES = ['research/', 'drafts/', 'docs/'] as const;
 
 /**
  * Normalize and validate an R2 object key against an allowlist of prefixes.
