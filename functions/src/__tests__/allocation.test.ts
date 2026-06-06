@@ -98,6 +98,25 @@ describe('scopeOfKey', () => {
       key: 'research/',
       expected: {},
     },
+    {
+      name: 'docs methodology → { methodology: true }',
+      key: 'docs/methodology/diamond-books.read.md',
+      expected: { methodology: true },
+    },
+    {
+      name: 'docs/comics → line + subject + comicId (subject in-path)',
+      key: 'docs/comics/biographies/sam-altman/01-the-optimist/bundle.md',
+      expected: {
+        line: 'biographies',
+        subject: 'sam-altman',
+        comicId: 'biographies__01-the-optimist',
+      },
+    },
+    {
+      name: 'docs/whatever (unrecognized) → {}',
+      key: 'docs/whatever',
+      expected: {},
+    },
   ]
 
   for (const c of cases) {
@@ -305,5 +324,48 @@ describe('isKeyAllowedForMember', () => {
       alloc({ comics: ['biographies__01-the-debut'], figures_effective: ['sachin-tendulkar'] })
     )
     expect(ok).toBe(true)
+  })
+
+  test('docs methodology: any authed member allowed (even empty allocation)', async () => {
+    const ok = await isKeyAllowedForMember(
+      'docs/methodology/x.md',
+      alloc()
+    )
+    expect(ok).toBe(true)
+  })
+
+  test('docs/comics: comic grant allows', async () => {
+    const ok = await isKeyAllowedForMember(
+      'docs/comics/biographies/sam-altman/01-the-optimist/bundle.md',
+      alloc({ comics: ['biographies__01-the-optimist'] })
+    )
+    expect(ok).toBe(true)
+  })
+
+  test('docs/comics: line grant allows', async () => {
+    const ok = await isKeyAllowedForMember(
+      'docs/comics/biographies/sam-altman/01-the-optimist/bundle.md',
+      alloc({ lines: ['biographies'] })
+    )
+    expect(ok).toBe(true)
+  })
+
+  test('docs/comics: RAW figure grant allows WITHOUT a comic-doc lookup (subject in-path)', async () => {
+    const deps = { comicSubject: vi.fn() }
+    const ok = await isKeyAllowedForMember(
+      'docs/comics/biographies/sam-altman/01-the-optimist/bundle.md',
+      alloc({ figures: ['sam-altman'] }),
+      deps
+    )
+    expect(ok).toBe(true)
+    expect(deps.comicSubject).not.toHaveBeenCalled()
+  })
+
+  test('docs/comics: empty allocation → deny', async () => {
+    const ok = await isKeyAllowedForMember(
+      'docs/comics/biographies/sam-altman/01-the-optimist/bundle.md',
+      alloc()
+    )
+    expect(ok).toBe(false)
   })
 })

@@ -30,6 +30,8 @@ export interface KeyScope {
   line?: string
   subject?: string
   comicId?: string
+  /** `docs/methodology/…` → readable by ANY authed member (no allocation needed). */
+  methodology?: boolean
 }
 
 /** A member's allocation grants. Missing fields default to empty arrays.
@@ -76,6 +78,23 @@ export function scopeOfKey(key: string): KeyScope {
   if (parts.length === 0) return {}
 
   const top = parts[0]
+
+  // ── docs/… (client-facing handoff docs) ─────────────────────────────────
+  //   docs/methodology/…                       → methodology (any authed member)
+  //   docs/comics/{line}/{subject}/{slug}/…     → that comic's allocation
+  //     (subject is IN the path, so no comic-doc lookup is needed).
+  if (top === 'docs') {
+    if (parts[1] === 'methodology') return { methodology: true }
+    if (parts[1] === 'comics') {
+      const line = parts[2]
+      const subject = parts[3]
+      const slug = parts[4]
+      if (line && subject && slug) {
+        return { line, subject, comicId: `${line}__${slug}` }
+      }
+    }
+    return {}
+  }
 
   // ── drafts/{line}/{slug}.html ───────────────────────────────────────────
   if (top === 'drafts') {
@@ -202,6 +221,10 @@ export async function isKeyAllowedForMember(
 ): Promise<boolean> {
   if (!alloc) return false
   const scope = scopeOfKey(key)
+  // Methodology docs are readable by ANY authed member — no allocation needed.
+  // (Checked BEFORE the empty-scope guard, since this scope carries no
+  // line/subject/comicId.)
+  if (scope.methodology) return true
   // Empty scope → unattributable → deny.
   if (!scope.line && !scope.subject && !scope.comicId) return false
 
@@ -209,6 +232,10 @@ export async function isKeyAllowedForMember(
   if (scope.comicId) {
     if (alloc.comics.includes(scope.comicId)) return true
     if (scope.line && alloc.lines.includes(scope.line)) return true
+    // docs/comics keys carry the subject IN the path → test RAW figures with no
+    // Firestore read. (Draft keys, where the subject is NOT in the path, still
+    // fall through to the comic-doc lookup below.)
+    if (scope.subject && alloc.figures.includes(scope.subject)) return true
     // Comic key with no subject in the path: resolve the comic's subject and
     // test it against the RAW figure grants (an explicit figure grant unlocks
     // all of that figure's comics; a sibling comic grant does NOT).
