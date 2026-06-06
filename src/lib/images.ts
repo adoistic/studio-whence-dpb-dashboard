@@ -48,6 +48,26 @@ export const STYLE_EXPLORATION: StyleSet[] = [
       { rel: 'images/samples/01-tingaland-rhymes/sample-page-watercolor-04.jpg', caption: 'Mary Had a Little Lamb' },
     ],
   },
+  {
+    style: 'Digital art',
+    note: 'Polished 2D digital illustration',
+    pages: [
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-digital-art-01.jpg', caption: 'Title' },
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-digital-art-02.jpg', caption: 'Dedication' },
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-digital-art-03.jpg', caption: 'Twinkle Twinkle' },
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-digital-art-04.jpg', caption: 'Mary Had a Little Lamb' },
+    ],
+  },
+  {
+    style: 'Gouache',
+    note: 'Opaque matte gouache',
+    pages: [
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-gouache-01.jpg', caption: 'Title' },
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-gouache-02.jpg', caption: 'Dedication' },
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-gouache-03.jpg', caption: 'Twinkle Twinkle' },
+      { rel: 'images/samples/01-tingaland-rhymes/sample-page-gouache-04.jpg', caption: 'Mary Had a Little Lamb' },
+    ],
+  },
 ]
 
 export const HERO_BACKDROP = 'images/toddlers/tingaland/settings/tingaland-landscape-night-pixar-3d-background.jpg'
