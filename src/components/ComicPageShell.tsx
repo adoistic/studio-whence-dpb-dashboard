@@ -6,6 +6,7 @@ import type { Comic } from '@/types/content'
 import { StatusPill } from '@/components/StatusPill'
 import { SectionHead } from '@/components/SectionHead'
 import { VersionTimeline } from '@/components/feedback/VersionTimeline'
+import { DocumentsPanel } from '@/components/DocumentsPanel'
 import { useGatedText } from '@/lib/useGatedText'
 import { useFigure } from '@/lib/catalog'
 import { useVisibleComics } from '@/lib/visibleCatalog'
@@ -175,6 +176,12 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
 
         {/* Version history timeline */}
         <VersionTimeline changelog={comic.changelog ?? []} version={comic.version} />
+
+        {/* Client-facing documents (concept-note, sources-and-quotes, …) —
+            renders nothing unless the catalog published a docs manifest. */}
+        <div className="mt-16">
+          <DocumentsPanel comic={comic} />
+        </div>
 
         {/* Script reader */}
         <section className="flex flex-col gap-6 pb-24 pt-16">
