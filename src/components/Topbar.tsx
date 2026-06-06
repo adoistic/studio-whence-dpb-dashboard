@@ -9,6 +9,7 @@ import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { useLines } from '@/lib/catalog'
 
 const HOME_LINK = { label: 'Home', href: '/' }
+const METHODOLOGY_LINK = { label: 'Methodology', href: '/methodology' }
 const REVIEWS_LINK = { label: 'Reviews', href: '/reviews' }
 const ADMIN_LINK = { label: 'Admin', href: '/admin' }
 
@@ -62,6 +63,12 @@ export function Topbar() {
             label={HOME_LINK.label}
             href={HOME_LINK.href}
             active={isActive(HOME_LINK.href, pathname)}
+          />
+          {/* Methodology — the pipeline playbook; visible to any authed user. */}
+          <NavItem
+            label={METHODOLOGY_LINK.label}
+            href={METHODOLOGY_LINK.href}
+            active={isActive(METHODOLOGY_LINK.href, pathname)}
           />
           {/* Reviews is the cross-comic moderation queue — moderators only.
               Members comment per-comic on their allocated comic pages. */}
