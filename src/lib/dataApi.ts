@@ -68,20 +68,33 @@ export async function fetchContent(): Promise<Content> {
   return (await res.json()) as Content
 }
 
+/** The /resolve route rejects more than 50 keys per request. */
+const RESOLVE_BATCH = 50
+
 /**
  * Resolve R2 keys to presigned URLs. Empty input short-circuits to {} with no
- * request. Throws on a non-ok response.
+ * request. Automatically chunks into batches of ≤50 keys (the server-side
+ * cap) and merges the results transparently. Throws on any non-ok response.
  */
 export async function resolveUrls(keys: string[]): Promise<Record<string, string>> {
   if (keys.length === 0) return {}
-  const res = await authedFetch('/resolve', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ keys }),
-  })
-  if (!res.ok) throw new Error(`resolve failed: ${res.status}`)
-  const data = (await res.json()) as { urls?: Record<string, string> }
-  return data.urls ?? {}
+  const batches: string[][] = []
+  for (let i = 0; i < keys.length; i += RESOLVE_BATCH) {
+    batches.push(keys.slice(i, i + RESOLVE_BATCH))
+  }
+  const maps = await Promise.all(
+    batches.map(async (batch) => {
+      const res = await authedFetch('/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keys: batch }),
+      })
+      if (!res.ok) throw new Error(`resolve failed: ${res.status}`)
+      const data = (await res.json()) as { urls?: Record<string, string> }
+      return data.urls ?? {}
+    }),
+  )
+  return Object.assign({}, ...maps)
 }
 
 /** Read a single markdown file as text. Throws on a non-ok response. */

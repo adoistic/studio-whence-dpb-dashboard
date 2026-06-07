@@ -158,6 +158,66 @@ describe('resolveUrls', () => {
     mockFetch.mockResolvedValueOnce(fakeRes({ ok: false, status: 400 }))
     await expect(resolveUrls(['images/a.jpg'])).rejects.toThrow(/400/)
   })
+
+  test('≤50 keys → exactly ONE POST call (no unnecessary batching)', async () => {
+    const keys = Array.from({ length: 50 }, (_, i) => `images/page-${i}.jpg`)
+    const urls = Object.fromEntries(keys.map((k) => [k, `https://signed/${k}`]))
+    mockFetch.mockResolvedValueOnce(fakeRes({ ok: true, status: 200, json: { urls } }))
+
+    const result = await resolveUrls(keys)
+
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    const [, init] = mockFetch.mock.calls[0]
+    const body = JSON.parse((init as RequestInit).body as string) as { keys: string[] }
+    expect(body.keys.length).toBe(50)
+    expect(result).toEqual(urls)
+  })
+
+  test('>50 keys → multiple batches of ≤50, results merged', async () => {
+    // 120 keys → ceil(120/50) = 3 batches: [50, 50, 20]
+    const keys = Array.from({ length: 120 }, (_, i) => `images/page-${i}.jpg`)
+
+    // Each batch gets its own resolved urls map
+    mockFetch
+      .mockResolvedValueOnce(
+        fakeRes({
+          ok: true,
+          status: 200,
+          json: { urls: Object.fromEntries(keys.slice(0, 50).map((k) => [k, `https://signed/${k}`])) },
+        }),
+      )
+      .mockResolvedValueOnce(
+        fakeRes({
+          ok: true,
+          status: 200,
+          json: { urls: Object.fromEntries(keys.slice(50, 100).map((k) => [k, `https://signed/${k}`])) },
+        }),
+      )
+      .mockResolvedValueOnce(
+        fakeRes({
+          ok: true,
+          status: 200,
+          json: { urls: Object.fromEntries(keys.slice(100).map((k) => [k, `https://signed/${k}`])) },
+        }),
+      )
+
+    const result = await resolveUrls(keys)
+
+    // (a) exactly 3 POST calls
+    expect(mockFetch).toHaveBeenCalledTimes(3)
+
+    // (b) every batch body has keys.length <= 50
+    for (const [, init] of mockFetch.mock.calls) {
+      const body = JSON.parse((init as RequestInit).body as string) as { keys: string[] }
+      expect(body.keys.length).toBeLessThanOrEqual(50)
+    }
+
+    // (c) merged result contains entries from different batches
+    expect(result['images/page-0.jpg']).toBe('https://signed/images/page-0.jpg')    // batch 1
+    expect(result['images/page-75.jpg']).toBe('https://signed/images/page-75.jpg')  // batch 2
+    expect(result['images/page-110.jpg']).toBe('https://signed/images/page-110.jpg') // batch 3
+    expect(Object.keys(result)).toHaveLength(120)
+  })
 })
 
 // ─── readMarkdown ─────────────────────────────────────────────────────────
