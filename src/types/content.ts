@@ -47,6 +47,13 @@ export interface Comic {
     items: { type: string; label: string; readKey: string; downloadKey: string; bytes: number }[]
     bundleKey: string; bundleBytes: number; zipKey: string; zipBytes: number
   }
+  // Rendered comic art (cover + page count) published to images/comics/…;
+  // present only when the comic has art. Drives the reader + PDF download.
+  pages?: {
+    hasPages: boolean
+    count: number
+    coverKey: string | null
+  }
 }
 
 export interface ResearchFile {
