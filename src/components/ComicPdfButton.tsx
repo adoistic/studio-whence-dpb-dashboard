@@ -51,7 +51,8 @@ export function ComicPdfButton({ comic }: { comic: Comic }) {
       a.href = href; a.download = `${comic.slug}.pdf`
       document.body.appendChild(a); a.click(); a.remove()
       URL.revokeObjectURL(href)
-    } catch {
+    } catch (err) {
+      console.error('[ComicPdfButton]', err)
       setError('Could not build the PDF. Please try again.')
     } finally {
       setBusy(false)
