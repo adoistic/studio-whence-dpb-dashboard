@@ -41,7 +41,11 @@ export function ComicPdfButton({ comic }: { comic: Comic }) {
         }),
       )
       const pdfBytes = await buildComicPdf(images)
-      const blob = new Blob([pdfBytes], { type: 'application/pdf' })
+      // Copy into a fresh ArrayBuffer so the BlobPart type is a plain
+      // ArrayBuffer (pdf-lib returns Uint8Array<ArrayBufferLike>).
+      const buffer = new ArrayBuffer(pdfBytes.byteLength)
+      new Uint8Array(buffer).set(pdfBytes)
+      const blob = new Blob([buffer], { type: 'application/pdf' })
       const href = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = href; a.download = `${comic.slug}.pdf`

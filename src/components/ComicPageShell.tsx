@@ -7,6 +7,8 @@ import { StatusPill } from '@/components/StatusPill'
 import { SectionHead } from '@/components/SectionHead'
 import { VersionTimeline } from '@/components/feedback/VersionTimeline'
 import { DocumentsPanel } from '@/components/DocumentsPanel'
+import { ComicReader } from '@/components/ComicReader'
+import { ComicPdfButton } from '@/components/ComicPdfButton'
 import { useGatedText } from '@/lib/useGatedText'
 import { useFigure } from '@/lib/catalog'
 import { useVisibleComics } from '@/lib/visibleCatalog'
@@ -182,6 +184,17 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
         <div className="mt-16">
           <DocumentsPanel comic={comic} />
         </div>
+
+        {/* Read the comic — only when rendered art has been published */}
+        {comic.pages?.hasPages && (
+          <section className="flex flex-col gap-6 border-t border-brand-pale-dusk pt-16">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <SectionHead kicker="The comic" title="Read the comic" />
+              <ComicPdfButton comic={comic} />
+            </div>
+            <ComicReader comic={comic} />
+          </section>
+        )}
 
         {/* Script reader */}
         <section className="flex flex-col gap-6 pb-24 pt-16">
