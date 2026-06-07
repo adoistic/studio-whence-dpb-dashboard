@@ -117,6 +117,22 @@ describe('scopeOfKey', () => {
       key: 'docs/whatever',
       expected: {},
     },
+    {
+      name: 'images/comics cover → { line, comicId }',
+      key: 'images/comics/biographies/01-the-comic/cover.jpg',
+      expected: {
+        line: 'biographies',
+        comicId: 'biographies__01-the-comic',
+      },
+    },
+    {
+      name: 'images/comics page → { line, comicId }',
+      key: 'images/comics/biographies/01-the-comic/pages/page-03.jpg',
+      expected: {
+        line: 'biographies',
+        comicId: 'biographies__01-the-comic',
+      },
+    },
   ]
 
   for (const c of cases) {
@@ -367,5 +383,32 @@ describe('isKeyAllowedForMember', () => {
       alloc()
     )
     expect(ok).toBe(false)
+  })
+
+  test('member with the comic grant may read its page images', async () => {
+    const a: Allocation = { lines: [], figures: [], figures_effective: [], comics: ['biographies__01-the-comic'] }
+    const ok = await isKeyAllowedForMember(
+      'images/comics/biographies/01-the-comic/pages/page-01.jpg', a,
+      { comicSubject: async () => null },
+    )
+    expect(ok).toBe(true)
+  })
+
+  test('member without the grant is denied the page images', async () => {
+    const a: Allocation = { lines: ['toddlers'], figures: [], figures_effective: [], comics: [] }
+    const ok = await isKeyAllowedForMember(
+      'images/comics/biographies/01-the-comic/pages/page-01.jpg', a,
+      { comicSubject: async () => null },
+    )
+    expect(ok).toBe(false)
+  })
+
+  test('member with a line grant may read the line\'s comic page images', async () => {
+    const a: Allocation = { lines: ['biographies'], figures: [], figures_effective: [], comics: [] }
+    const ok = await isKeyAllowedForMember(
+      'images/comics/biographies/01-the-comic/cover.jpg', a,
+      { comicSubject: async () => null },
+    )
+    expect(ok).toBe(true)
   })
 })

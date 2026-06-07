@@ -111,6 +111,15 @@ export function scopeOfKey(key: string): KeyScope {
   const rel = parts.slice(1)
   if (rel.length === 0) return {}
 
+  // ── images/comics/{line}/{slug}/… (rendered comic cover + pages) ─────────
+  // The reader/PDF read these gated keys. `comics` (no underscore) is distinct
+  // from the `_comics` research marker handled below.
+  if (rel[0] === 'comics' && rel[1] && rel[2]) {
+    const line = rel[1]
+    const slug = rel[2]
+    return { line, comicId: `${line}__${slug}` }
+  }
+
   const scope: KeyScope = {}
 
   // A `drafts/{line}/{slug}` shape can also appear nested under images/artifacts.
