@@ -15,7 +15,16 @@
     { "collectionGroup": "feedback", "queryScope": "COLLECTION", "fields": [
       { "fieldPath": "parentId", "order": "ASCENDING" }, { "fieldPath": "published", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" } ] },
     { "collectionGroup": "feedback", "queryScope": "COLLECTION", "fields": [
-      { "fieldPath": "parentId", "order": "ASCENDING" }, { "fieldPath": "published", "order": "ASCENDING" }, { "fieldPath": "hidden", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" } ] }
+      { "fieldPath": "parentId", "order": "ASCENDING" }, { "fieldPath": "published", "order": "ASCENDING" }, { "fieldPath": "hidden", "order": "ASCENDING" }, { "fieldPath": "createdAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "ideas", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "author", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "ideas", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "visibility", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "ideas", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "recipients", "arrayConfig": "CONTAINS" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" } ] }
   ],
   "fieldOverrides": []
 }
