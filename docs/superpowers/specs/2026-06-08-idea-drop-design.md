@@ -296,3 +296,22 @@ Content repo:
 - Whether `recipients[]` picker reads the `allowlist` collection for the email list (it should;
   confirm read access for sub-admins to the allowlist for the picker, or provide a minimal
   members list).
+
+## 13.1 Guardrails from spec review (resolve in the plan)
+
+- **Firestore `list`-query safety.** Firestore rejects a `list` rule that reads a field the
+  query does not constrain (see the documented lesson in `firestore.rules` around the feedback
+  rules). The `ideas` read rule reads `visibility`, `author`, and `recipients`, so the inbox
+  queries (§7) must filter on exactly those fields — design the inbox queries and composite
+  indexes around this from the start, do not rediscover it at runtime.
+- **Field-level update guard.** §8's `update` rule lets the author rewrite any field, but
+  `status`/`tags` are meant to be Adnan-set. If that split must be enforced, add field-level
+  guards to the update rule (mirroring the feedback update rule), so an author cannot change
+  `status`/`tags`/`visibility` after the fact.
+- **`ideaId` minted before upload.** Image upload happens during compose, before the idea is
+  saved, and the R2 key is `ideas/<ideaId>/<file>`. The client must mint the Firestore doc id
+  up front (`doc(collection(db,'ideas'))` to get a ref/id) so the key is stable across
+  upload-then-save.
+- **Copy-out size at scale.** Base64-inlining every R2 image into one `ClipboardItem` can be
+  heavy for image-dense ideas. Set a total-size budget and degrade gracefully (e.g. fall back
+  to a presigned-URL `<img src>` in the HTML flavour beyond the budget).
