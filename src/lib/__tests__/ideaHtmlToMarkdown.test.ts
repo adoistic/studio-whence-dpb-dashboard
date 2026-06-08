@@ -14,11 +14,18 @@ describe('htmlToMarkdown', () => {
     expect(md).toMatch(/\|\s*A\s*\|\s*B\s*\|/)
     expect(md).toMatch(/\|\s*1\s*\|\s*2\s*\|/)
   })
-  it('keeps a NESTED table as raw HTML', () => {
-    const html = '<table><tr><td><table><tr><td>inner</td></tr></table></td></tr></table>'
+  it('keeps a NESTED table as raw HTML (outer has a header row)', () => {
+    // The outer table HAS a header row, so gfm would convert it to a pipe table
+    // and destroy the inner <table> — unless the nested-table is spliced out as
+    // raw HTML. This proves the extractNestedTables path, not gfm's headerless
+    // fallback.
+    const html =
+      '<table><tr><th>H</th></tr><tr><td><table><tr><td>inner</td></tr></table></td></tr></table>'
     const md = htmlToMarkdown(html)
     expect(md).toContain('<table')
     expect(md).toContain('inner')
+    // The inner content must NOT have been flattened into a pipe-table cell.
+    expect(md).not.toMatch(/\|\s*inner\s*\|/)
   })
   it('drops text alignment', () => {
     const md = htmlToMarkdown('<p style="text-align:center">hello world</p>')

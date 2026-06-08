@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { buildClipboardPayload } from '@/lib/ideaCopy'
+import { buildClipboardPayload, MAX_INLINE_BYTES } from '@/lib/ideaCopy'
 
 describe('buildClipboardPayload', () => {
   it('keeps markdown as the plain-text flavour', async () => {
@@ -19,5 +19,12 @@ describe('buildClipboardPayload', () => {
   it('leaves data: images inline untouched', async () => {
     const out = await buildClipboardPayload('![a](data:image/png;base64,QQ)', async () => ({ dataUri: '', bytes: 0 }))
     expect(out.html).toContain('data:image/png;base64,QQ')
+  })
+  it('skips inlining an image that exceeds the byte budget', async () => {
+    const resolve = vi.fn(async () => ({ dataUri: 'data:image/png;base64,ZZ', bytes: MAX_INLINE_BYTES + 1 }))
+    const out = await buildClipboardPayload('![a](r2:images/ideas/x/big.png)', resolve)
+    expect(out.html).not.toContain('data:image/png;base64,ZZ')
+    // The plain-text flavour still carries the original markdown verbatim.
+    expect(out.text).toBe('![a](r2:images/ideas/x/big.png)')
   })
 })
