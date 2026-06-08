@@ -177,6 +177,37 @@ service cloud.firestore {
       allow delete: if isSubAdmin() || (isAllowlisted() && resource.data.authorEmail == userEmail());
     }
 
+    // ── Idea Drop (moderator-authored idea cards routed to recipients) ──
+    match /ideas/{id} {
+      allow create: if (isAdmin() || isSubAdmin())
+                    && request.resource.data.author == userEmail();
+
+      // The recipients branch reads ONLY `recipients` (no visibility check), so the
+      // `recipients array-contains me` inbox list query is accepted by Firestore.
+      // Safe: recipients[] is non-empty only for `specific` ideas.
+      allow read: if isAdmin()
+                  || resource.data.author == userEmail()
+                  || (resource.data.visibility == 'all_sub_admins' && isSubAdmin())
+                  || (resource.data.visibility == 'all_approved'   && isAllowlisted())
+                  || (userEmail() in resource.data.recipients);
+
+      // Admin may change anything. The author may edit ONLY content fields —
+      // status/tags/visibility/recipients/author are frozen after create.
+      allow update: if isAdmin()
+                    || (resource.data.author == userEmail()
+                        && request.resource.data.author     == resource.data.author
+                        && request.resource.data.status     == resource.data.status
+                        && request.resource.data.tags       == resource.data.tags
+                        && request.resource.data.visibility == resource.data.visibility
+                        && request.resource.data.recipients == resource.data.recipients);
+
+      allow delete: if isAdmin() || resource.data.author == userEmail();
+    }
+
+    match /idea_reads/{email} {
+      allow read, write: if isSignedIn() && userEmail() == email;
+    }
+
     match /_internal/{d} { allow read, write: if false; }
   }
 }
