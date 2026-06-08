@@ -40,7 +40,7 @@ function makeService(): TurndownService {
     filter: 'img',
     replacement: (_content, node) => {
       const el = node as Element
-      const alt = el.getAttribute('alt') ?? ''
+      const alt = (el.getAttribute('alt') ?? '').replace(/[\[\]]/g, '')
       const key = el.getAttribute('data-r2-key')
       const src = el.getAttribute('src') ?? ''
       const url = key ? `r2:${key}` : src

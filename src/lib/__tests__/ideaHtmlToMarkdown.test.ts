@@ -44,4 +44,8 @@ describe('htmlToMarkdown', () => {
     const md = htmlToMarkdown('<p><img src="data:image/png;base64,AAAA" alt="tiny"></p>')
     expect(md).toContain('![tiny](data:image/png;base64,AAAA)')
   })
+  it('strips bracket characters from image alt text', () => {
+    const md = htmlToMarkdown('<p><img src="data:image/png;base64,AA" alt="a]b[c"></p>')
+    expect(md).toContain('![abc](data:image/png;base64,AA)')
+  })
 })
