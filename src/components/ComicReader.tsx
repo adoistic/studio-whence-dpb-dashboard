@@ -1,6 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { Comic } from '@/types/content'
 import { comicPageKeys } from '@/lib/comicPageKeys'
 import { useResolved } from '@/lib/useResolved'
@@ -8,41 +9,200 @@ import { useResolved } from '@/lib/useResolved'
 export function ComicReader({ comic }: { comic: Comic }) {
   const keys = comicPageKeys(comic)
   const urls = useResolved(keys)
-  const [i, setI] = useState(0)
   const total = keys.length
+  const [i, setI] = useState(0)
+  const [fs, setFs] = useState(false)
 
-  const prev = () => setI((n) => Math.max(0, n - 1))
-  const next = () => setI((n) => Math.min(total - 1, n + 1))
+  // Portal target only exists after mount (SSR-safe).
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
+  const prev = useCallback(() => setI((n) => Math.max(0, n - 1)), [])
+  const next = useCallback(
+    () => setI((n) => Math.min(total - 1, n + 1)),
+    [total],
+  )
+
+  // Keyboard: arrows page (always); Esc closes fullscreen.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') prev()
-      if (e.key === 'ArrowRight') next()
+      else if (e.key === 'ArrowRight') next()
+      else if (e.key === 'Escape' && fs) setFs(false)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [total])
+  }, [prev, next, fs])
+
+  // Lock body scroll while the fullscreen overlay is open.
+  useEffect(() => {
+    if (!fs) return
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = previous
+    }
+  }, [fs])
+
+  // Touch swipe (mobile + iPad): horizontal drag past a threshold pages.
+  const touchStart = useRef<{ x: number; y: number } | null>(null)
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0]
+    touchStart.current = { x: t.clientX, y: t.clientY }
+  }
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const start = touchStart.current
+    touchStart.current = null
+    if (!start) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - start.x
+    const dy = t.clientY - start.y
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy)) {
+      if (dx < 0) next()
+      else prev()
+    }
+  }
+
+  // Trackpad horizontal swipe (laptop): debounced so one gesture = one page.
+  const wheelLock = useRef(0)
+  const onWheel = (e: React.WheelEvent) => {
+    if (Math.abs(e.deltaX) <= Math.abs(e.deltaY)) return
+    if (Math.abs(e.deltaX) < 30) return
+    if (e.timeStamp - wheelLock.current < 400) return
+    wheelLock.current = e.timeStamp
+    if (e.deltaX > 0) next()
+    else prev()
+  }
 
   if (total === 0) return null
   const currentUrl = urls[keys[i]]
+  const atStart = i === 0
+  const atEnd = i === total - 1
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <div className="relative w-full max-w-[760px]">
+      {/* Inline page — click to open fullscreen */}
+      <button
+        type="button"
+        onClick={() => setFs(true)}
+        aria-label="Open full screen viewer"
+        className="group relative block w-full max-w-[760px] cursor-zoom-in"
+      >
         {currentUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={currentUrl} alt={`${comic.title} — frame ${i + 1}`} className="w-full rounded-md shadow-md" />
+          <img
+            src={currentUrl}
+            alt={`${comic.title} — frame ${i + 1}`}
+            className="w-full rounded-md shadow-md"
+          />
         ) : (
-          <div role="status" className="aspect-[2/3] w-full animate-pulse rounded-md bg-brand-pale-dusk/40" />
+          <div
+            role="status"
+            className="aspect-[2/3] w-full animate-pulse rounded-md bg-brand-pale-dusk/40"
+          />
         )}
-      </div>
+        <span className="pointer-events-none absolute bottom-3 right-3 rounded-full bg-brand-indigo/85 px-3 py-1 font-sans text-[0.62rem] uppercase tracking-label text-brand-pale-dusk opacity-0 transition-opacity group-hover:opacity-100">
+          Full screen
+        </span>
+      </button>
+
       <div className="flex items-center gap-6">
-        <button type="button" onClick={prev} disabled={i === 0} aria-label="Previous page"
-          className="rounded-full border border-brand-pale-dusk px-4 py-1.5 font-sans text-[0.72rem] uppercase tracking-label disabled:opacity-40">Prev</button>
-        <span className="font-sans text-[0.72rem] uppercase tracking-label text-brand-slate">{i + 1} / {total}</span>
-        <button type="button" onClick={next} disabled={i === total - 1} aria-label="Next page"
-          className="rounded-full border border-brand-pale-dusk px-4 py-1.5 font-sans text-[0.72rem] uppercase tracking-label disabled:opacity-40">Next</button>
+        <button
+          type="button"
+          onClick={prev}
+          disabled={atStart}
+          aria-label="Previous page"
+          className="rounded-full border border-brand-pale-dusk px-4 py-1.5 font-sans text-[0.72rem] uppercase tracking-label disabled:opacity-40"
+        >
+          Prev
+        </button>
+        <span className="font-sans text-[0.72rem] uppercase tracking-label text-brand-slate">
+          {i + 1} / {total}
+        </span>
+        <button
+          type="button"
+          onClick={next}
+          disabled={atEnd}
+          aria-label="Next page"
+          className="rounded-full border border-brand-pale-dusk px-4 py-1.5 font-sans text-[0.72rem] uppercase tracking-label disabled:opacity-40"
+        >
+          Next
+        </button>
       </div>
+
+      <button
+        type="button"
+        onClick={() => setFs(true)}
+        className="rounded-full bg-brand-indigo px-5 py-2 font-sans text-[0.72rem] font-semibold uppercase tracking-label text-brand-pale-dusk transition-opacity hover:opacity-90"
+      >
+        Full screen
+      </button>
+
+      {/* Fullscreen overlay (portal → body so no ancestor clips it) */}
+      {fs &&
+        mounted &&
+        createPortal(
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={`${comic.title} — full screen`}
+            className="fixed inset-0 z-50 flex flex-col bg-black/95"
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
+            onWheel={onWheel}
+          >
+            <div className="flex items-center justify-between px-5 py-3 text-white/80">
+              <span className="font-sans text-[0.72rem] uppercase tracking-label">
+                {i + 1} / {total}
+              </span>
+              <button
+                type="button"
+                onClick={() => setFs(false)}
+                aria-label="Close full screen"
+                className="rounded-full px-3 py-1 font-sans text-[0.85rem] text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+              >
+                ✕ Close
+              </button>
+            </div>
+
+            <div className="relative flex flex-1 items-center justify-center overflow-hidden px-2 pb-4">
+              {/* Prev hit-zone */}
+              <button
+                type="button"
+                onClick={prev}
+                disabled={atStart}
+                aria-label="Previous page"
+                className="absolute left-0 top-0 z-10 flex h-full w-1/4 items-center justify-start pl-3 text-3xl text-white/0 transition-colors hover:text-white/70 disabled:cursor-default disabled:hover:text-white/0"
+              >
+                ‹
+              </button>
+
+              {currentUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={currentUrl}
+                  alt={`${comic.title} — frame ${i + 1}`}
+                  draggable={false}
+                  className="max-h-full max-w-full select-none object-contain"
+                />
+              ) : (
+                <div role="status" className="h-2/3 w-1/2 animate-pulse rounded-md bg-white/10" />
+              )}
+
+              {/* Next hit-zone */}
+              <button
+                type="button"
+                onClick={next}
+                disabled={atEnd}
+                aria-label="Next page"
+                className="absolute right-0 top-0 z-10 flex h-full w-1/4 items-center justify-end pr-3 text-3xl text-white/0 transition-colors hover:text-white/70 disabled:cursor-default disabled:hover:text-white/0"
+              >
+                ›
+              </button>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }
