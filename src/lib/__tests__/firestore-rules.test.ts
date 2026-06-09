@@ -167,6 +167,40 @@ beforeAll(async () => {
       lines: ['biographies'], figures: [], comics: [], figures_effective: [],
       updatedBy: 'adnan@thothica.com', updatedAt: '2026-06-03',
     })
+
+    // ── Idea Drop seeds ──
+    // sub@dpb.in (sub_admin) is already seeded above; add a second sub_admin to
+    // prove a `private` idea is invisible to a DIFFERENT moderator, and a plain
+    // member for recipient/visibility reads.
+    await setDoc(doc(db, 'allowlist/sub2@dpb.in'), { role: 'sub_admin' })
+    await setDoc(doc(db, 'allowlist/mem@dpb.in'), { role: 'member' })
+    const ideaBase = {
+      title: 'An idea', bodyMarkdown: 'body', tags: ['x'], status: 'new',
+      createdAt: '2026-06-08', updatedAt: '2026-06-08',
+    }
+    // Authored by sub@dpb.in, visibility private — only author + admin may read.
+    await setDoc(doc(db, 'ideas/idea-private'), {
+      ...ideaBase, author: 'sub@dpb.in', visibility: 'private', recipients: [],
+    })
+    await setDoc(doc(db, 'ideas/idea-subadmins'), {
+      ...ideaBase, author: 'sub@dpb.in', visibility: 'all_sub_admins', recipients: [],
+    })
+    await setDoc(doc(db, 'ideas/idea-approved'), {
+      ...ideaBase, author: 'sub@dpb.in', visibility: 'all_approved', recipients: [],
+    })
+    // `specific` idea routed to mem@dpb.in.
+    await setDoc(doc(db, 'ideas/idea-specific'), {
+      ...ideaBase, author: 'sub@dpb.in', visibility: 'specific', recipients: ['mem@dpb.in'],
+    })
+    // An idea authored by sub@dpb.in for the update/delete tests.
+    await setDoc(doc(db, 'ideas/idea-edit'), {
+      ...ideaBase, author: 'sub@dpb.in', visibility: 'private', recipients: [],
+    })
+    await setDoc(doc(db, 'ideas/idea-del'), {
+      ...ideaBase, author: 'sub@dpb.in', visibility: 'private', recipients: [],
+    })
+    // Idea_reads doc owned by mem@dpb.in (for cross-user denial).
+    await setDoc(doc(db, 'idea_reads/mem@dpb.in'), { 'idea-approved': '2026-06-08' })
   })
 })
 afterAll(async () => { await env.cleanup() })
@@ -545,5 +579,117 @@ describe('firestore.rules — feedback allocation gate', () => {
   it('moderator can create feedback on any comic (bypass)', async () => {
     await assertSucceeds(setDoc(doc(subAdmin(), 'feedback/fb-create-mod'),
       fbDoc({ comicId: 'awareness__y', line: 'awareness', authorEmail: 'sub@dpb.in', published: true })))
+  })
+})
+
+describe('firestore.rules — ideas & idea_reads', () => {
+  const admin    = () => env.authenticatedContext('id-ad', { email: 'adnan@thothica.com' }).firestore()
+  const subAdmin = () => env.authenticatedContext('id-sa', { email: 'sub@dpb.in' }).firestore()
+  const subAdmin2 = () => env.authenticatedContext('id-sa2', { email: 'sub2@dpb.in' }).firestore()
+  const member   = () => env.authenticatedContext('id-m', { email: 'mem@dpb.in' }).firestore()
+  const signedOut = () => env.unauthenticatedContext().firestore()
+
+  // Defaults mirror the seeded `idea-*` docs (tags ['x'], status 'new', private)
+  // so an author-update that changes only bodyMarkdown keeps every frozen field
+  // (status/tags/visibility/recipients/author) byte-identical to the stored doc.
+  const ideaDoc = (over = {}) => ({
+    title: 'An idea', bodyMarkdown: 'b', tags: ['x'], status: 'new',
+    author: 'sub@dpb.in', visibility: 'private', recipients: [],
+    createdAt: '2026-06-08', updatedAt: '2026-06-08', ...over,
+  })
+
+  // ── CREATE ──
+  it('admin can create an idea (author == self)', async () => {
+    await assertSucceeds(setDoc(doc(admin(), 'ideas/c-admin'),
+      ideaDoc({ author: 'adnan@thothica.com' })))
+  })
+  it('sub_admin can create an idea (author == self)', async () => {
+    await assertSucceeds(setDoc(doc(subAdmin(), 'ideas/c-sub'), ideaDoc({ author: 'sub@dpb.in' })))
+  })
+  it('member CANNOT create an idea', async () => {
+    await assertFails(setDoc(doc(member(), 'ideas/c-mem'), ideaDoc({ author: 'mem@dpb.in' })))
+  })
+  it('signed-out CANNOT create an idea', async () => {
+    await assertFails(setDoc(doc(signedOut(), 'ideas/c-out'), ideaDoc()))
+  })
+  it('create with author != self is denied', async () => {
+    await assertFails(setDoc(doc(subAdmin(), 'ideas/c-forge'), ideaDoc({ author: 'someone@dpb.in' })))
+  })
+
+  // ── READ: private ──
+  it('author can read own private idea; admin can; other sub_admin + member cannot', async () => {
+    await assertSucceeds(getDoc(doc(subAdmin(), 'ideas/idea-private')))   // author
+    await assertSucceeds(getDoc(doc(admin(), 'ideas/idea-private')))      // admin
+    await assertFails(getDoc(doc(subAdmin2(), 'ideas/idea-private')))     // other moderator
+    await assertFails(getDoc(doc(member(), 'ideas/idea-private')))        // member
+  })
+
+  // ── READ: all_sub_admins ──
+  it('all_sub_admins idea: sub_admin ✅, admin ✅, member ❌', async () => {
+    await assertSucceeds(getDoc(doc(subAdmin2(), 'ideas/idea-subadmins')))
+    await assertSucceeds(getDoc(doc(admin(), 'ideas/idea-subadmins')))
+    await assertFails(getDoc(doc(member(), 'ideas/idea-subadmins')))
+  })
+
+  // ── READ: all_approved ──
+  it('all_approved idea: member ✅, sub_admin ✅', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'ideas/idea-approved')))
+    await assertSucceeds(getDoc(doc(subAdmin2(), 'ideas/idea-approved')))
+  })
+
+  // ── READ: specific ──
+  it('specific idea: a recipient ✅, a non-recipient ❌ (admin still ✅)', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'ideas/idea-specific')))     // mem is a recipient
+    await assertFails(getDoc(doc(subAdmin2(), 'ideas/idea-specific')))     // not a recipient, not author/admin
+    await assertSucceeds(getDoc(doc(admin(), 'ideas/idea-specific')))      // admin
+  })
+
+  // ── UPDATE ──
+  it('author may change bodyMarkdown', async () => {
+    await assertSucceeds(setDoc(doc(subAdmin(), 'ideas/idea-edit'),
+      ideaDoc({ author: 'sub@dpb.in', bodyMarkdown: 'edited' })))
+  })
+  it('author CANNOT change status', async () => {
+    await assertFails(setDoc(doc(subAdmin(), 'ideas/idea-edit'),
+      ideaDoc({ author: 'sub@dpb.in', status: 'shipped' })))
+  })
+  it('admin CAN change status', async () => {
+    await assertSucceeds(setDoc(doc(admin(), 'ideas/idea-edit'),
+      ideaDoc({ author: 'sub@dpb.in', status: 'shipped' })))
+  })
+
+  // ── DELETE ──
+  it('author can delete; admin can delete; unrelated member cannot', async () => {
+    await assertFails(deleteDoc(doc(member(), 'ideas/idea-del')))         // unrelated
+    await assertSucceeds(deleteDoc(doc(subAdmin(), 'ideas/idea-del')))    // author
+  })
+  it('admin can delete an idea', async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'ideas/idea-del2'),
+        ideaDoc({ author: 'sub@dpb.in' }))
+    })
+    await assertSucceeds(deleteDoc(doc(admin(), 'ideas/idea-del2')))
+  })
+
+  // ── idea_reads/{email} ──
+  it('idea_reads: owner reads + writes own; another user cannot', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'idea_reads/mem@dpb.in')))
+    await assertSucceeds(setDoc(doc(member(), 'idea_reads/mem@dpb.in'), { 'idea-x': '2026-06-08' }))
+    await assertFails(getDoc(doc(subAdmin(), 'idea_reads/mem@dpb.in')))
+    await assertFails(setDoc(doc(subAdmin(), 'idea_reads/mem@dpb.in'), { 'idea-x': '2026-06-08' }))
+  })
+
+  // ── LIST-query safety (critical) ──
+  it('member: recipients array-contains me list query is accepted', async () => {
+    const q = query(collection(member(), 'ideas'), where('recipients', 'array-contains', 'mem@dpb.in'))
+    await assertSucceeds(getDocs(q))
+  })
+  it('member: visibility == all_approved list query is accepted', async () => {
+    const q = query(collection(member(), 'ideas'), where('visibility', '==', 'all_approved'))
+    await assertSucceeds(getDocs(q))
+  })
+  it('member: visibility == all_sub_admins list query is DENIED', async () => {
+    const q = query(collection(member(), 'ideas'), where('visibility', '==', 'all_sub_admins'))
+    await assertFails(getDocs(q))
   })
 })

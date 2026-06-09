@@ -7,10 +7,12 @@ import { BrandLockup } from '@/components/BrandLockup'
 import { SignOutButton } from '@/components/SignOutButton'
 import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { useLines } from '@/lib/catalog'
+import { useUnreadIdeaCount } from '@/lib/ideas'
 
 const HOME_LINK = { label: 'Home', href: '/' }
 const METHODOLOGY_LINK = { label: 'Methodology', href: '/methodology' }
 const REVIEWS_LINK = { label: 'Reviews', href: '/reviews' }
+const IDEAS_LINK = { label: 'Ideas', href: '/ideas' }
 const ADMIN_LINK = { label: 'Admin', href: '/admin' }
 
 function isActive(href: string, pathname: string): boolean {
@@ -23,18 +25,20 @@ function MenuItem({
   href,
   active,
   onNavigate,
+  badge,
 }: {
   label: string
   href: string
   active: boolean
   onNavigate: () => void
+  badge?: number
 }) {
   return (
     <Link
       href={href}
       onClick={onNavigate}
       aria-current={active ? 'page' : undefined}
-      className={`relative flex items-center rounded-md px-3 py-2 font-sans text-[0.7rem] uppercase tracking-label transition-colors duration-200 ${
+      className={`relative flex items-center gap-2 rounded-md px-3 py-2 font-sans text-[0.7rem] uppercase tracking-label transition-colors duration-200 ${
         active
           ? 'bg-brand-indigo/5 text-brand-indigo'
           : 'text-brand-slate hover:bg-brand-indigo/5 hover:text-brand-indigo'
@@ -47,6 +51,14 @@ function MenuItem({
         />
       )}
       {label}
+      {badge !== undefined && badge > 0 && (
+        <span
+          aria-label={`${badge} unread`}
+          className="ml-auto inline-flex min-w-5 items-center justify-center rounded-full bg-brand-indigo px-1.5 py-0.5 text-[0.6rem] font-semibold leading-none text-white"
+        >
+          {badge}
+        </span>
+      )}
     </Link>
   )
 }
@@ -57,6 +69,8 @@ export function Topbar() {
   const allowStatus = useAllowStatus(user, loading)
   const canMod = canModerate(allowStatus)
   const { data: lines } = useLines()
+  const email = (user?.email ?? '').trim().toLowerCase()
+  const unreadIdeas = useUnreadIdeaCount(allowStatus, email)
 
   const [open, setOpen] = useState(false)
   const menuId = useId()
@@ -151,6 +165,14 @@ export function Topbar() {
                 onNavigate={closeMenu}
               />
             )}
+            {/* Ideas inbox — any authed user; unread badge from their inbox. */}
+            <MenuItem
+              label={IDEAS_LINK.label}
+              href={IDEAS_LINK.href}
+              active={isActive(IDEAS_LINK.href, pathname)}
+              onNavigate={closeMenu}
+              badge={unreadIdeas}
+            />
             {(lines ?? []).map((line) => (
               <MenuItem
                 key={line.slug}

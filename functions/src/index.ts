@@ -3,8 +3,8 @@ import type { Request } from "firebase-functions/v2/https";
 import type { Response } from "express";
 
 import { authorize } from "./auth";
-import { safeKey, RESOLVE_PREFIXES, READ_PREFIXES } from "./keys";
-import { getObject, presignGet } from "./r2";
+import { safeKey, RESOLVE_PREFIXES, READ_PREFIXES, WRITE_PREFIXES } from "./keys";
+import { getObject, presignGet, presignPut } from "./r2";
 import {
   getAllocation,
   isKeyAllowedForMember,
@@ -221,6 +221,32 @@ export const dataApi = onRequest(
       } else {
         res.status(500).json({ error: "read failed" });
       }
+    }
+    return;
+  }
+
+  // ── POST /upload-url ───────────────────────────────────────────────────────
+  if (req.method === "POST" && route === "upload-url") {
+    const auth = await authorize(req);
+    if (!auth) { res.status(403).json({ error: "forbidden" }); return; }
+    if (!auth.moderator) { res.status(403).json({ error: "forbidden" }); return; }
+
+    let parsed: unknown = req.body;
+    if (typeof parsed === "string") { try { parsed = JSON.parse(parsed); } catch { parsed = undefined; } }
+    const b = parsed as { ideaId?: unknown; filename?: unknown; contentType?: unknown } | undefined;
+    const ideaId = String(b?.ideaId ?? "");
+    const filename = String(b?.filename ?? "").split(/[\\/]/).pop()?.replace(/[^a-zA-Z0-9._-]/g, "_") ?? "";
+    const contentType = String(b?.contentType ?? "");
+    if (!ideaId || !filename || !contentType.startsWith("image/")) {
+      res.status(400).json({ error: "bad request" }); return;
+    }
+    const key = safeKey(`images/ideas/${ideaId}/${filename}`, WRITE_PREFIXES);
+    if (key === null) { res.status(403).json({ error: "forbidden" }); return; }
+    try {
+      const url = await presignPut(key, contentType);
+      res.status(200).json({ url, key });
+    } catch {
+      res.status(500).json({ error: "upload-url failed" });
     }
     return;
   }

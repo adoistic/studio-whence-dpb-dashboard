@@ -47,6 +47,10 @@ vi.mock('@/lib/catalog', () => ({
   useLines: () => mockUseLines(),
 }))
 
+vi.mock('@/lib/ideas', () => ({
+  useUnreadIdeaCount: () => 0,
+}))
+
 vi.mock('@/lib/firebase', () => ({
   auth: {},
 }))

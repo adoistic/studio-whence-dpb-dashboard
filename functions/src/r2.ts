@@ -17,7 +17,7 @@
  * tests and for cold-start ordering where secrets are injected at runtime.
  */
 
-import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 /** The default presign TTL, in seconds (10 minutes). */
@@ -69,6 +69,25 @@ export function presignGet(
     Key: key,
   })
   return getSignedUrl(s3, command, { expiresIn })
+}
+
+/**
+ * Generate a short-lived presigned PUT URL for an R2 object key. The client
+ * PUTs the bytes directly to R2. `contentType` is bound into the signature so
+ * the upload must use the same Content-Type.
+ */
+export function presignPut(
+  key: string,
+  contentType: string,
+  ttlSeconds = 600,
+): Promise<string> {
+  const s3 = client()
+  const command = new PutObjectCommand({
+    Bucket: process.env.R2_BUCKET!,
+    Key: key,
+    ContentType: contentType,
+  })
+  return getSignedUrl(s3, command, { expiresIn: ttlSeconds })
 }
 
 /**

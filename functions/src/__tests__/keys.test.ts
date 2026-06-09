@@ -1,5 +1,17 @@
-import { describe, expect, test } from 'vitest'
-import { safeKey, RESOLVE_PREFIXES, READ_PREFIXES } from '../keys'
+import { describe, expect, it, test } from 'vitest'
+import { safeKey, RESOLVE_PREFIXES, READ_PREFIXES, WRITE_PREFIXES } from '../keys'
+
+describe('WRITE_PREFIXES', () => {
+  it('accepts an idea image key', () => {
+    expect(safeKey('images/ideas/abc/p.png', WRITE_PREFIXES)).toBe('images/ideas/abc/p.png')
+  })
+  it('rejects a non-idea key', () => {
+    expect(safeKey('research/x.md', WRITE_PREFIXES)).toBeNull()
+  })
+  it('rejects traversal', () => {
+    expect(safeKey('images/ideas/../secrets/x', WRITE_PREFIXES)).toBeNull()
+  })
+})
 
 describe('safeKey', () => {
   test('rejects traversal', () => {

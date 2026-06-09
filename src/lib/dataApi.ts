@@ -103,3 +103,30 @@ export async function readMarkdown(key: string): Promise<string> {
   if (!res.ok) throw new Error(`read failed: ${res.status}`)
   return await res.text()
 }
+
+/** Ask the Function for a presigned PUT URL for an idea image. */
+export async function requestUploadUrl(
+  ideaId: string, filename: string, contentType: string,
+): Promise<{ url: string; key: string }> {
+  const res = await authedFetch('/upload-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ideaId, filename, contentType }),
+  })
+  if (!res.ok) throw new Error(`upload-url failed: ${res.status}`)
+  return (await res.json()) as { url: string; key: string }
+}
+
+/** Upload bytes to a presigned PUT URL (direct to R2, no auth header). */
+export async function uploadToR2(url: string, file: File): Promise<void> {
+  const res = await fetch(url, { method: 'PUT', headers: { 'Content-Type': file.type }, body: file })
+  if (!res.ok) throw new Error(`r2 upload failed: ${res.status}`)
+}
+
+/** Convenience: presign + upload, returning the stored key. */
+export async function uploadIdeaImage(ideaId: string, file: File): Promise<string> {
+  const filename = (file.name.split(/[\\/]/).pop() ?? 'image').replace(/[^a-zA-Z0-9._-]/g, '_')
+  const { url, key } = await requestUploadUrl(ideaId, filename, file.type || 'application/octet-stream')
+  await uploadToR2(url, file)
+  return key
+}
