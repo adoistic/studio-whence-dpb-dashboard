@@ -81,8 +81,9 @@ export function LinePageShell({ line, introMdx, people }: LinePageShellProps) {
           {seriesCount > 1 && <Stat value={seriesCount} label="series" />}
         </div>
 
-        {/* Toddlers: the Tingaland production gallery (hidden until gated image channel lands) */}
-        {line.slug === 'toddlers' && TINGALAND_CAST.length > 0 && (
+        {/* Tingaland production gallery — shows on the (future) tingaland line, not the
+            Diamond Activity Books line that now occupies the `toddlers` slug. */}
+        {line.slug === 'tingaland' && TINGALAND_CAST.length > 0 && (
           <section className="flex flex-col gap-8 pt-20">
             <SectionHead kicker="Tingaland" title="The world, drawn" />
             <TingalandGallery />

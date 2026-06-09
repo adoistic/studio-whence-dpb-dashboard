@@ -82,7 +82,7 @@ export const LINE_VISUALS: Record<string, LineVisual> = {
   biographies: { image: 'images/characters/little-chanakya/little-chanakya-turnaround.jpg', note: 'Retold by Little Chanakya' },
   awareness: { note: 'Eight subjects, kid- and teen-facing' },
   indic: { note: 'The epics and the sacred texts' },
-  toddlers: { image: 'images/toddlers/tingaland/settings/tingaland-landscape-day-pixar-3d-background.jpg', note: 'Diamond Junior · Tingaland' },
+  toddlers: { image: 'images/comics/toddlers/numbers/cover.jpg', note: 'Diamond Books · early-learning workbooks' },
 }
 
 export type NamedImage = { rel: string; name: string }
