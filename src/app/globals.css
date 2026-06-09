@@ -674,3 +674,15 @@
 @media (prefers-reduced-motion: reduce) {
   .comic-script .cs-unit-select { transition: none; }
 }
+
+/* Idea Drop composer — make the whole editor box a focus target. The Tiptap
+   contenteditable is only as tall as its content, so without this a click in
+   the empty lower area of the box focuses the wrapper, not the editor, and the
+   user can't type or paste. Filling the height makes the full box editable. */
+.idea-editor .ProseMirror {
+  min-height: 7rem;
+  outline: none;
+}
+.idea-editor .ProseMirror p {
+  margin: 0;
+}

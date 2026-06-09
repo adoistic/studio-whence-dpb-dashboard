@@ -1,9 +1,8 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useEditor, EditorContent, type Editor } from '@tiptap/react'
 import { StarterKit } from '@tiptap/starter-kit'
-import { Link } from '@tiptap/extension-link'
 import { Image } from '@tiptap/extension-image'
 import { Table } from '@tiptap/extension-table'
 import { TableRow } from '@tiptap/extension-table-row'
@@ -64,8 +63,9 @@ export function makeIdeaEditor() {
     // a hydration mismatch (Tiptap renders nothing on the server otherwise).
     immediatelyRender: false,
     extensions: [
-      StarterKit,
-      Link.configure({ openOnClick: false }),
+      // StarterKit v3 already bundles the Link extension — configure it here
+      // rather than registering a duplicate (which logs a warning).
+      StarterKit.configure({ link: { openOnClick: false } }),
       IdeaImage,
       Table.configure({ resizable: false }),
       TableRow,
@@ -96,7 +96,10 @@ export function IdeaComposer({
   author: { email: string; name: string }
   onPosted?: () => void
 }) {
-  const ideaId = useRef<string>(newIdeaRef().id).current
+  // Mint the idea id once, before any image upload, so R2 keys are stable.
+  // useState's lazy initializer runs exactly once and is render-safe (unlike
+  // reading a ref's .current during render).
+  const [ideaId] = useState<string>(() => newIdeaRef().id)
 
   const [title, setTitle] = useState('')
   const [visibility, setVisibility] = useState<Visibility>('private')
@@ -155,7 +158,16 @@ export function IdeaComposer({
       <div
         onPaste={onPaste}
         onDrop={onDrop}
-        className="mb-3 min-h-[8rem] rounded-md border border-brand-pale-dusk bg-white px-3 py-2 text-sm text-brand-umber"
+        onMouseDown={(e) => {
+          // Clicking the box's padding/empty area focuses the editor too — the
+          // contenteditable doesn't cover the wrapper's padding. Only act when
+          // the click isn't already inside the editor, and keep the default so
+          // text selection inside the editor still works.
+          if (editor && !(e.target as HTMLElement).closest('.ProseMirror')) {
+            editor.commands.focus('end')
+          }
+        }}
+        className="idea-editor mb-3 min-h-[8rem] cursor-text rounded-md border border-brand-pale-dusk bg-white px-3 py-2 text-sm text-brand-umber"
       >
         <EditorContent editor={editor} />
       </div>
