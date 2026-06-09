@@ -33,9 +33,17 @@ export function useIdeaImagePaste(args: {
       // rejects a non-image contentType.
       if (!file.type.startsWith('image/')) return
 
+      // The server re-derives the stored object key in /upload-url and returns
+      // it from uploadIdeaImage. That server key — not routeImage's local
+      // derivation — is the single source of truth for the R2 reference, so the
+      // recorded data-r2-key / r2:token can never drift from where the bytes
+      // actually live. We capture it here as the upload runs.
+      let serverKey: string | null = null
       const routed = await routeImage(file, {
         ideaId,
-        upload: (f) => uploadIdeaImage(ideaId, f).then(() => {}),
+        upload: async (f) => {
+          serverKey = await uploadIdeaImage(ideaId, f)
+        },
         toDataUri: fileToDataUri,
       })
 
@@ -44,22 +52,24 @@ export function useIdeaImagePaste(args: {
         return
       }
 
-      // r2: record the image and insert a node carrying the r2 key + a preview.
+      // r2: use the server-authoritative key (fall back to routeImage's local
+      // key only if the upload somehow returned nothing).
+      const key = serverKey ?? routed.key
       const img: R2Image = {
-        token: routed.token,
-        key: routed.key,
+        token: `r2:${key}`,
+        key,
         filename: routed.filename,
         contentType: routed.contentType,
       }
       onR2Image(img)
       let preview = ''
       try {
-        const urls = await resolveUrls([routed.key])
-        preview = urls[routed.key] ?? ''
+        const urls = await resolveUrls([key])
+        preview = urls[key] ?? ''
       } catch {
         preview = ''
       }
-      insertImage({ src: preview, 'data-r2-key': routed.key })
+      insertImage({ src: preview, 'data-r2-key': key })
     },
     [ideaId, insertImage, onR2Image],
   )

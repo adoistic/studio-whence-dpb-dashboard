@@ -22,6 +22,7 @@ it('copy writes to the clipboard', async () => {
   global.ClipboardItem = class { constructor(public items: any) {} }
   Object.assign(navigator, { clipboard: { write } })
   render(<IdeaView idea={idea} role="allow" viewerEmail="m@dpb.in" />)
+  expect(screen.queryByLabelText(/status/i)).toBeNull()
   fireEvent.click(screen.getByRole('button', { name: /copy/i }))
   await waitFor(() => expect(write).toHaveBeenCalled())
 })
