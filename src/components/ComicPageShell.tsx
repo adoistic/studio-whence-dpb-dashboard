@@ -79,7 +79,10 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
     [fig.data],
   )
   const tip = useProvenanceMarkers(scriptRef, citationMap, draft.text)
-  const hasFigure = comic.line === 'biographies' && !!figureSlug && !!fig.data
+  // A subject's research/comics tabs show whenever a figure doc actually exists
+  // for it — biographies figures and Practical Indic subjects (e.g. swami-ramdev)
+  // alike. The indic epics have no figure doc, so fig.data stays falsy for them.
+  const hasFigure = !!figureSlug && !!fig.data
 
   // ── Draft ⇄ Comments view ────────────────────────────────────────────────
   const [view, setView] = useState<'draft' | 'comments'>('draft')

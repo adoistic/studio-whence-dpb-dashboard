@@ -66,6 +66,11 @@ describe('scopeOfKey', () => {
       expected: { line: 'indic' },
     },
     {
+      name: 'Practical Indic research → line normalised to indic + subject',
+      key: 'research/Indic/Practical-Indic/swami-ramdev/mera-jeevan-mera-mission/chapters/09-4.md',
+      expected: { line: 'indic', subject: 'swami-ramdev' },
+    },
+    {
       name: 'image under _books → line + subject',
       key: 'images/biographies/03-Cricket-Legends/_books/sachin-tendulkar/refs/face.png',
       expected: { line: 'biographies', subject: 'sachin-tendulkar' },

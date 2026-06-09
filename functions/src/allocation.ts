@@ -149,6 +149,16 @@ export function scopeOfKey(key: string): KeyScope {
     return scope
   }
 
+  // … or after `Practical-Indic/{subject}` (the Practical Indic program). The
+  // repo path is capitalised `Indic/Practical-Indic/{subject}/…`, but the line
+  // slug is `indic`, so normalise the line here too.
+  const piIdx = rel.indexOf('Practical-Indic')
+  if (piIdx !== -1 && rel[piIdx + 1]) {
+    scope.line = 'indic'
+    scope.subject = rel[piIdx + 1]
+    return scope
+  }
+
   // … or after `_comics/{subject?}` (subject is the segment BEFORE `_comics`).
   const comicsIdx = rel.indexOf('_comics')
   if (comicsIdx > 0) {
