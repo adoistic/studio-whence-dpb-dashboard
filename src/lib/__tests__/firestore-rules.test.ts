@@ -693,3 +693,27 @@ describe('firestore.rules — ideas & idea_reads', () => {
     await assertFails(getDocs(q))
   })
 })
+
+describe('firestore.rules — access gate self-checks', () => {
+  // The (authed) layout's useAllowStatus runs, for EVERY signed-in non-admin
+  // user, Promise.all([getDoc(suspended/{email}), getDoc(allowlist/{email})]).
+  // If EITHER read is denied, the Promise.all rejects and the gate fails closed
+  // to /pending. So a plain member MUST be able to read its OWN suspended doc
+  // (absent → "not suspended") and its OWN allowlist doc — otherwise a correctly
+  // allowlisted member is wrongly bounced to the "Access pending" screen.
+  const domainMember = () => env.authenticatedContext('gate-d', { email: 'member@dpb.in' }).firestore()
+  const gmailMember  = () => env.authenticatedContext('gate-g', { email: 'mr.ankitgzb@gmail.com' }).firestore()
+
+  it('a domain member can read its OWN suspended doc (absent → not suspended)', async () => {
+    await assertSucceeds(getDoc(doc(domainMember(), 'suspended/member@dpb.in')))
+  })
+  it('an allowlisted gmail member can read its OWN suspended doc', async () => {
+    await assertSucceeds(getDoc(doc(gmailMember(), 'suspended/mr.ankitgzb@gmail.com')))
+  })
+  it('a member can read its OWN allowlist doc', async () => {
+    await assertSucceeds(getDoc(doc(domainMember(), 'allowlist/member@dpb.in')))
+  })
+  it("a member still CANNOT read someone ELSE's suspended doc", async () => {
+    await assertFails(getDoc(doc(domainMember(), 'suspended/banned@thothica.com')))
+  })
+})

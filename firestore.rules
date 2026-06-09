@@ -83,7 +83,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
     match /suspended/{email} {
-      allow read: if isSubAdmin();
+      // A user may read its OWN suspended doc — the client access gate
+      // (useAllowStatus) reads suspended/{email} for every signed-in user to
+      // learn whether it is suspended; without this self-read that getDoc is
+      // denied, the gate's Promise.all rejects, and a correctly-allowlisted
+      // member is wrongly failed-closed to /pending. sub_admins read any.
+      allow read: if isSubAdmin() || (isSignedIn() && userEmail() == email);
       allow write: if isAdmin();
     }
     match /access_requests/{email} {
