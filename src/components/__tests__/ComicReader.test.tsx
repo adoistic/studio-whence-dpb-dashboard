@@ -59,4 +59,51 @@ describe('ComicReader', () => {
     fireEvent.touchEnd(dialog, { changedTouches: [{ clientX: 300, clientY: 110 }] })
     expect(within(dialog).getByText('1 / 3')).toBeInTheDocument()
   })
+
+  // ── Page-level comments (reader → drawer) ────────────────────────────────
+  test('hides the comment button on the cover frame, shows it on pages, cover-aware numbering', async () => {
+    const onCommentPage = vi.fn()
+    render(<ComicReader comic={comic} onCommentPage={onCommentPage} />)
+    // Frame 1 of 3 = the cover → no comment affordance.
+    await screen.findByText('1 / 3')
+    expect(screen.queryByRole('button', { name: /comments on page/i })).not.toBeInTheDocument()
+    // Advance to frame 2 = script page 1.
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }))
+    const btn = await screen.findByRole('button', { name: 'Comments on page 1' })
+    fireEvent.click(btn)
+    expect(onCommentPage).toHaveBeenCalledWith(1)
+  })
+
+  test('shows the per-page thread count and numbers pages without a cover from 1', async () => {
+    const noCover: Comic = {
+      ...comic,
+      pages: { hasPages: true, count: 2, coverKey: null },
+    }
+    const onCommentPage = vi.fn()
+    render(
+      <ComicReader
+        comic={noCover}
+        onCommentPage={onCommentPage}
+        pageCounts={new Map([[1, 3]])}
+      />,
+    )
+    // Frame 1 of 2 = page 1 (no cover) with 3 threads.
+    const btn = await screen.findByRole('button', { name: 'Comments on page 1' })
+    expect(btn).toHaveTextContent('3 comments · page 1')
+    fireEvent.click(screen.getByRole('button', { name: 'Next page' }))
+    expect(await screen.findByRole('button', { name: 'Comments on page 2' })).toHaveTextContent(
+      'Comment on page 2',
+    )
+  })
+
+  test('fullscreen toolbar comment button closes the overlay and fires the callback', async () => {
+    const onCommentPage = vi.fn()
+    render(<ComicReader comic={comic} onCommentPage={onCommentPage} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Next page' }))
+    fireEvent.click(screen.getAllByRole('button', { name: 'Full screen' })[0])
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Comments on page 1' }))
+    expect(onCommentPage).toHaveBeenCalledWith(1)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
 })

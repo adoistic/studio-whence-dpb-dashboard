@@ -54,6 +54,17 @@ vi.mock('@/components/feedback/CopyScriptToolbar', () => ({
   ),
 }))
 
+// The shell reads live feedback (for the reader's per-page comment counts) and
+// renders the page-comments drawer; both touch Firestore — mock at the seams.
+vi.mock('@/lib/feedback', () => ({
+  useComicFeedback: () => ({ data: [], loading: false }),
+}))
+vi.mock('@/components/feedback/PageCommentsPanel', () => ({
+  PageCommentsPanel: (props: { comicId: string; page: number }) => (
+    <div data-testid="page-comments-panel" data-comic-id={props.comicId} data-page={props.page} />
+  ),
+}))
+
 const comic: Comic = {
   title: 'The Sky-High Dreamer',
   subject: 'J.R.D. Tata',

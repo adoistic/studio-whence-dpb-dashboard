@@ -4,14 +4,26 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Comic } from '@/types/content'
 import { comicPageKeys } from '@/lib/comicPageKeys'
+import { readerPageNumber } from '@/lib/readerPages'
 import { useResolved } from '@/lib/useResolved'
 
-export function ComicReader({ comic }: { comic: Comic }) {
+export interface ComicReaderProps {
+  comic: Comic
+  /** page number → comment-thread count, for the per-page badge. */
+  pageCounts?: Map<number, number>
+  /** Open the page-comments drawer for a page. Omit to hide the affordance. */
+  onCommentPage?: (page: number) => void
+}
+
+export function ComicReader({ comic, pageCounts, onCommentPage }: ComicReaderProps) {
   const keys = comicPageKeys(comic)
   const urls = useResolved(keys)
   const total = keys.length
   const [i, setI] = useState(0)
   const [fs, setFs] = useState(false)
+  // Which script page the current frame shows (null on the cover frame).
+  const page = readerPageNumber(!!comic.pages?.coverKey, i)
+  const pageCommentCount = page != null ? (pageCounts?.get(page) ?? 0) : 0
 
   // Portal target only exists after mount (SSR-safe).
   const [mounted, setMounted] = useState(false)
@@ -130,13 +142,34 @@ export function ComicReader({ comic }: { comic: Comic }) {
         </button>
       </div>
 
-      <button
-        type="button"
-        onClick={() => setFs(true)}
-        className="rounded-full bg-brand-indigo px-5 py-2 font-sans text-[0.72rem] font-semibold uppercase tracking-label text-brand-pale-dusk transition-opacity hover:opacity-90"
-      >
-        Full screen
-      </button>
+      <div className="flex flex-wrap items-center justify-center gap-3">
+        <button
+          type="button"
+          onClick={() => setFs(true)}
+          className="rounded-full bg-brand-indigo px-5 py-2 font-sans text-[0.72rem] font-semibold uppercase tracking-label text-brand-pale-dusk transition-opacity hover:opacity-90"
+        >
+          Full screen
+        </button>
+        {onCommentPage && page != null && (
+          <button
+            type="button"
+            onClick={() => onCommentPage(page)}
+            aria-label={`Comments on page ${page}`}
+            className="inline-flex items-center gap-2 rounded-full border border-brand-indigo/40 bg-white px-5 py-2 font-sans text-[0.72rem] font-semibold uppercase tracking-label text-brand-indigo transition-colors hover:bg-brand-indigo hover:text-brand-pale-dusk"
+          >
+            <svg aria-hidden viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-current">
+              <path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v6a1.5 1.5 0 0 1-1.5 1.5H6.4L3.2 13.9A.7.7 0 0 1 2 13.35V3.5Z" />
+            </svg>
+            {pageCommentCount > 0 ? (
+              <>
+                {pageCommentCount} comment{pageCommentCount === 1 ? '' : 's'} · page {page}
+              </>
+            ) : (
+              <>Comment on page {page}</>
+            )}
+          </button>
+        )}
+      </div>
 
       {/* Fullscreen overlay (portal → body so no ancestor clips it) */}
       {fs &&
@@ -155,14 +188,32 @@ export function ComicReader({ comic }: { comic: Comic }) {
               <span className="font-sans text-[0.72rem] uppercase tracking-label">
                 {i + 1} / {total}
               </span>
-              <button
-                type="button"
-                onClick={() => setFs(false)}
-                aria-label="Close full screen"
-                className="rounded-full px-3 py-1 font-sans text-[0.85rem] text-white/80 transition-colors hover:bg-white/15 hover:text-white"
-              >
-                ✕ Close
-              </button>
+              <div className="flex items-center gap-2">
+                {onCommentPage && page != null && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFs(false)
+                      onCommentPage(page)
+                    }}
+                    aria-label={`Comments on page ${page}`}
+                    className="inline-flex items-center gap-2 rounded-full px-3 py-1 font-sans text-[0.72rem] uppercase tracking-label text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+                  >
+                    <svg aria-hidden viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-current">
+                      <path d="M2 3.5A1.5 1.5 0 0 1 3.5 2h9A1.5 1.5 0 0 1 14 3.5v6a1.5 1.5 0 0 1-1.5 1.5H6.4L3.2 13.9A.7.7 0 0 1 2 13.35V3.5Z" />
+                    </svg>
+                    {pageCommentCount > 0 ? `${pageCommentCount} · comment` : 'Comment'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setFs(false)}
+                  aria-label="Close full screen"
+                  className="rounded-full px-3 py-1 font-sans text-[0.85rem] text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+                >
+                  ✕ Close
+                </button>
+              </div>
             </div>
 
             <div className="relative flex flex-1 items-center justify-center overflow-hidden px-2 pb-4">

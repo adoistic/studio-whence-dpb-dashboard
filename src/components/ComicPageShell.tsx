@@ -22,6 +22,10 @@ import { CommentGutter } from '@/components/feedback/CommentGutter'
 import { CommentsView } from '@/components/feedback/CommentsView'
 import { CopyScriptToolbar } from '@/components/feedback/CopyScriptToolbar'
 import { indexUnits } from '@/components/feedback/anchorRef'
+import { PageCommentsPanel } from '@/components/feedback/PageCommentsPanel'
+import { useComicFeedback } from '@/lib/feedback'
+import { visibleTo } from '@/lib/feedbackTypes'
+import { countThreadsByPage } from '@/lib/readerPages'
 
 // Memoized so tooltip-state re-renders of ComicPageShell don't re-parse the
 // draft. React 19 recreates dangerouslySetInnerHTML child nodes on every host
@@ -89,6 +93,17 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
   // When a comment in the Comments view is clicked, switch to the Draft view and
   // remember which beat to scroll to once it's mounted.
   const [pendingJumpRef, setPendingJumpRef] = useState<string | null>(null)
+
+  // ── Page-level comments on the READER ─────────────────────────────────────
+  // The reader and the script share page numbering, so reader comments anchor
+  // to the same `pN` refs the draft view uses. The drawer is scoped to one page.
+  const comicId = `${comic.line}__${comic.slug}`
+  const [commentPage, setCommentPage] = useState<number | null>(null)
+  const { data: fbThreads } = useComicFeedback(comicId, canMod)
+  const pageCounts = useMemo(
+    () => countThreadsByPage(fbThreads.filter((t) => visibleTo(t.root, canMod))),
+    [fbThreads, canMod],
+  )
 
   function jumpInDraft(ref: string) {
     setView('draft')
@@ -195,8 +210,21 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
               <SectionHead kicker="The comic" title="Read the comic" />
               <ComicPdfButton comic={comic} />
             </div>
-            <ComicReader comic={comic} />
+            <ComicReader comic={comic} pageCounts={pageCounts} onCommentPage={setCommentPage} />
           </section>
+        )}
+
+        {/* Page-scoped comments drawer (opened from the reader) */}
+        {commentPage != null && (
+          <PageCommentsPanel
+            comicId={comicId}
+            line={comic.line}
+            comicVersion={comic.version ?? 0}
+            page={commentPage}
+            draftText={draft.text}
+            onJumpInDraft={jumpInDraft}
+            onClose={() => setCommentPage(null)}
+          />
         )}
 
         {/* Script reader */}
