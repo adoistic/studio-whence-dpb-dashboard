@@ -30,6 +30,18 @@ vi.mock('@aws-sdk/client-s3', () => {
       this.input = input
     }
   }
+  class FakePutObjectCommand {
+    input: Record<string, unknown>
+    constructor(input: Record<string, unknown>) {
+      this.input = input
+    }
+  }
+  class FakeDeleteObjectCommand {
+    input: Record<string, unknown>
+    constructor(input: Record<string, unknown>) {
+      this.input = input
+    }
+  }
   return {
     // Exposed for assertions (not part of the real SDK surface).
     __configs: configs,
@@ -43,6 +55,8 @@ vi.mock('@aws-sdk/client-s3', () => {
       }
     },
     GetObjectCommand: FakeGetObjectCommand,
+    PutObjectCommand: FakePutObjectCommand,
+    DeleteObjectCommand: FakeDeleteObjectCommand,
   }
 })
 
@@ -55,6 +69,8 @@ type PresignGet = (key: string, expiresIn?: number) => Promise<string>
 type GetObject = (
   key: string
 ) => Promise<{ body: Buffer; contentType: string | undefined }>
+type PutObject = (key: string, body: string, contentType: string) => Promise<void>
+type DeleteObject = (key: string) => Promise<void>
 type CommandCtor = new (input: Record<string, unknown>) => {
   input: Record<string, unknown>
 }
@@ -246,5 +262,91 @@ describe('getObject', () => {
     await expect((getObjectFresh as GetObject)('research/x.md')).rejects.toThrow(
       /R2 not configured/
     )
+  })
+})
+
+describe('putObject / deleteObject', () => {
+  const ORIGINAL_ENV = { ...process.env }
+
+  beforeEach(async () => {
+    vi.resetModules()
+    process.env.R2_ENDPOINT = 'https://acct.r2.cloudflarestorage.com'
+    process.env.R2_ACCESS_KEY_ID = 'test-access-key'
+    process.env.R2_SECRET_ACCESS_KEY = 'test-secret-key'
+    process.env.R2_BUCKET = 'studio-whence-dpb'
+
+    const clientS3 = await import('@aws-sdk/client-s3')
+    s3Send = (clientS3 as unknown as { __send: ReturnType<typeof vi.fn> }).__send
+    s3ClientConfigs = (clientS3 as unknown as { __configs: unknown[] }).__configs
+    s3Send.mockReset()
+    s3ClientConfigs.length = 0
+  })
+
+  afterEach(() => {
+    process.env = { ...ORIGINAL_ENV }
+  })
+
+  test('putObject sends a PutObjectCommand with the right Bucket, Key, Body, and ContentType', async () => {
+    s3Send.mockResolvedValue({})
+    const clientS3 = await import('@aws-sdk/client-s3')
+    const FakePutObjectCommand = (
+      clientS3 as unknown as { PutObjectCommand: CommandCtor }
+    ).PutObjectCommand
+    const { putObject } = await import('../r2')
+    await (putObject as PutObject)(
+      'captures/abc/transcript.md',
+      '# Test',
+      'text/markdown'
+    )
+    expect(s3Send).toHaveBeenCalledTimes(1)
+    const command = s3Send.mock.calls[0][0]
+    expect(command).toBeInstanceOf(FakePutObjectCommand)
+    expect((command as { input: Record<string, unknown> }).input).toMatchObject({
+      Bucket: 'studio-whence-dpb',
+      Key: 'captures/abc/transcript.md',
+      Body: '# Test',
+      ContentType: 'text/markdown',
+    })
+  })
+
+  test('deleteObject sends a DeleteObjectCommand with the right Bucket and Key', async () => {
+    s3Send.mockResolvedValue({})
+    const clientS3 = await import('@aws-sdk/client-s3')
+    const FakeDeleteObjectCommand = (
+      clientS3 as unknown as { DeleteObjectCommand: CommandCtor }
+    ).DeleteObjectCommand
+    const { deleteObject } = await import('../r2')
+    await (deleteObject as DeleteObject)('captures/abc/transcript.md')
+    expect(s3Send).toHaveBeenCalledTimes(1)
+    const command = s3Send.mock.calls[0][0]
+    expect(command).toBeInstanceOf(FakeDeleteObjectCommand)
+    expect((command as { input: Record<string, unknown> }).input).toMatchObject({
+      Bucket: 'studio-whence-dpb',
+      Key: 'captures/abc/transcript.md',
+    })
+  })
+
+  test('putObject throws with a clear error when R2 env vars are missing', async () => {
+    vi.resetModules()
+    vi.stubEnv('R2_ENDPOINT', '')
+    vi.stubEnv('R2_ACCESS_KEY_ID', '')
+    vi.stubEnv('R2_SECRET_ACCESS_KEY', '')
+    vi.stubEnv('R2_BUCKET', '')
+    const { putObject: putObjectFresh } = await import('../r2')
+    await expect(
+      (putObjectFresh as PutObject)('captures/x/transcript.md', '# hi', 'text/markdown')
+    ).rejects.toThrow(/R2 not configured/)
+  })
+
+  test('deleteObject throws with a clear error when R2 env vars are missing', async () => {
+    vi.resetModules()
+    vi.stubEnv('R2_ENDPOINT', '')
+    vi.stubEnv('R2_ACCESS_KEY_ID', '')
+    vi.stubEnv('R2_SECRET_ACCESS_KEY', '')
+    vi.stubEnv('R2_BUCKET', '')
+    const { deleteObject: deleteObjectFresh } = await import('../r2')
+    await expect(
+      (deleteObjectFresh as DeleteObject)('captures/x/transcript.md')
+    ).rejects.toThrow(/R2 not configured/)
   })
 })

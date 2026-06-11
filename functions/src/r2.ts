@@ -17,7 +17,7 @@
  * tests and for cold-start ordering where secrets are injected at runtime.
  */
 
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 /** The default presign TTL, in seconds (10 minutes). */
@@ -106,6 +106,34 @@ export function presignPut(
  * @returns   `{ body, contentType }` — `body` is a Buffer of the object bytes,
  *            `contentType` is the object's stored Content-Type (or undefined).
  */
+/** Write a small text object inline (capture transcripts). */
+export async function putObject(
+  key: string,
+  body: string,
+  contentType: string
+): Promise<void> {
+  const s3 = client()
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET!,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    })
+  )
+}
+
+/** Delete one object (idea-delete cleanup of capture transcripts). */
+export async function deleteObject(key: string): Promise<void> {
+  const s3 = client()
+  await s3.send(
+    new DeleteObjectCommand({
+      Bucket: process.env.R2_BUCKET!,
+      Key: key,
+    })
+  )
+}
+
 export async function getObject(
   key: string
 ): Promise<{ body: Buffer; contentType: string | undefined }> {
