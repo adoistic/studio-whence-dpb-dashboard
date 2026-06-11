@@ -104,6 +104,14 @@ export async function readMarkdown(key: string): Promise<string> {
   return await res.text()
 }
 
+/** Read one captured ChatGPT-share transcript (markdown) for an idea. */
+export async function readIdeaCapture(ideaId: string, captureId: string): Promise<string> {
+  const qs = `ideaId=${encodeURIComponent(ideaId)}&captureId=${encodeURIComponent(captureId)}`
+  const res = await authedFetch(`/idea-capture?${qs}`)
+  if (!res.ok) throw new Error(`idea-capture failed: ${res.status}`)
+  return res.text()
+}
+
 /** Ask the Function for a presigned PUT URL for an idea image. */
 export async function requestUploadUrl(
   ideaId: string, filename: string, contentType: string,
