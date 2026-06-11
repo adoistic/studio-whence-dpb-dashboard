@@ -98,13 +98,17 @@ function classifyByEmail(email: string): true | null {
 }
 
 /**
- * Authorize a request. Returns `{ email, moderator }` (email NORMALIZED) on
- * allow, or `null` on deny. Fails closed on every error path.
+ * Authorize a request. Returns `{ email, moderator, admin }` (email NORMALIZED)
+ * on allow, or `null` on deny. Fails closed on every error path.
  *
  * `moderator` is the bypass flag for the allocation gate (work-allocation
  * feature): it is `true` when the caller is the admin (env `ADMIN_EMAIL`) OR
  * holds an `allowlist/{email}` doc whose `role === 'sub_admin'`. Admin +
  * sub-admins see every work; plain members are restricted to allocated works.
+ *
+ * `admin` is `true` only for the single ADMIN_EMAIL caller. It is used by
+ * idea-visibility checks and other routes that need to distinguish the single
+ * admin from sub-admins (both of whom are `moderator: true`).
  *
  * IMPORTANT: domain users (@thothica / @dpb.in) used to short-circuit BEFORE
  * the allowlist read. We now ALWAYS read `allowlist/{email}` once we've decided
@@ -113,7 +117,7 @@ function classifyByEmail(email: string): true | null {
  */
 export async function authorize(
   req: AuthRequestLike
-): Promise<{ email: string; moderator: boolean } | null> {
+): Promise<{ email: string; moderator: boolean; admin: boolean } | null> {
   try {
     const token = extractBearer(req)
     if (!token) return null
@@ -129,8 +133,9 @@ export async function authorize(
     const suspendedSnap = await fs.collection('suspended').doc(email).get()
     if (suspendedSnap.exists) return null
 
-    // Admin email → allowed AND moderator, with no allowlist read needed.
-    if (email === adminEmail()) return { email, moderator: true }
+    // Admin email → allowed AND moderator AND admin, with no allowlist read needed.
+    const isAdmin = email === adminEmail()
+    if (isAdmin) return { email, moderator: true, admin: true }
 
     // Read the allowlist doc once. It serves two purposes now:
     //   - it can grant access (Rule 6: any existing doc allows a non-domain
@@ -144,10 +149,10 @@ export async function authorize(
     const moderator = role === 'sub_admin'
 
     // Rules 4–5: admin / allowed domains → allowed (moderator iff sub_admin).
-    if (classifyByEmail(email) === true) return { email, moderator }
+    if (classifyByEmail(email) === true) return { email, moderator, admin: false }
 
     // Rule 6: Firestore allowlist. Any existing doc counts as allow.
-    if (snap.exists) return { email, moderator }
+    if (snap.exists) return { email, moderator, admin: false }
 
     // Rule 7: no match → deny.
     return null

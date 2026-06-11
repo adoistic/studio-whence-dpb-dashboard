@@ -207,6 +207,19 @@ service cloud.firestore {
                         && request.resource.data.recipients == resource.data.recipients);
 
       allow delete: if isAdmin() || resource.data.author == userEmail();
+
+      // ── ChatGPT share captures (subcollection) ──
+      // Read mirrors the PARENT idea's read rule via get(); writes are
+      // function/sweeper-only (Admin SDK bypasses rules).
+      match /captures/{captureId} {
+        allow read: if isAdmin()
+          || (exists(/databases/$(database)/documents/ideas/$(id)) && (
+                 get(/databases/$(database)/documents/ideas/$(id)).data.author == userEmail()
+              || (get(/databases/$(database)/documents/ideas/$(id)).data.visibility == 'all_sub_admins' && isSubAdmin())
+              || (get(/databases/$(database)/documents/ideas/$(id)).data.visibility == 'all_approved'   && isAllowlisted())
+              || (userEmail() in get(/databases/$(database)/documents/ideas/$(id)).data.recipients)));
+        allow write: if false;
+      }
     }
 
     match /idea_reads/{email} {

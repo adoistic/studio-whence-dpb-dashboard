@@ -8,6 +8,7 @@ import { buildClipboardPayload, type ImageResolver } from '@/lib/ideaCopy'
 import { resolveUrls } from '@/lib/dataApi'
 import { formatRelative } from '@/lib/dates'
 import { IdeaMarkdown } from '@/components/ideas/IdeaMarkdown'
+import { IdeaCaptures } from '@/components/ideas/IdeaCaptures'
 
 const STATUS_OPTIONS: IdeaStatus[] = ['new', 'triaged', 'actioned', 'archived']
 const STATUS_LABEL: Record<IdeaStatus, string> = {
@@ -105,6 +106,7 @@ export function IdeaView({
       </header>
 
       <IdeaMarkdown markdown={idea.bodyMarkdown} />
+      <IdeaCaptures ideaId={idea.id} />
 
       {isAdmin && (
         <footer className="mt-5 flex flex-wrap items-end gap-4 border-t border-brand-pale-dusk pt-4">

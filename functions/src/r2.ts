@@ -1,5 +1,5 @@
 /**
- * r2.ts — short-lived presigned R2 GET URLs.
+ * r2.ts — R2 accessor: presigned GET/PUT + inline get/put/delete.
  *
  * `/resolve` hands the client a presigned GET URL for an R2 object (after
  * `authorize` + `safeKey` have passed) so the browser can fetch the asset
@@ -17,7 +17,7 @@
  * tests and for cold-start ordering where secrets are injected at runtime.
  */
 
-import { GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 /** The default presign TTL, in seconds (10 minutes). */
@@ -120,4 +120,32 @@ export async function getObject(
   if (!response.Body) throw new Error(`R2 returned no body for key: ${key}`)
   const bytes = await response.Body.transformToByteArray()
   return { body: Buffer.from(bytes), contentType: response.ContentType }
+}
+
+/** Write a small text object inline (capture transcripts). */
+export async function putObject(
+  key: string,
+  body: string,
+  contentType: string
+): Promise<void> {
+  const s3 = client()
+  await s3.send(
+    new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET!,
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+    })
+  )
+}
+
+/** Delete one object (idea-delete cleanup of capture transcripts). */
+export async function deleteObject(key: string): Promise<void> {
+  const s3 = client()
+  await s3.send(
+    new DeleteObjectCommand({
+      Bucket: process.env.R2_BUCKET!,
+      Key: key,
+    })
+  )
 }

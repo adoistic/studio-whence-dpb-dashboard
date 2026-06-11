@@ -5,6 +5,9 @@ import { describe, it, expect, vi } from 'vitest'
 // not initialize Firebase under jsdom. The grouping assertion is unaffected.
 vi.mock('@/lib/ideas', () => ({ markIdeaSeen: vi.fn() }))
 vi.mock('@/lib/dataApi', () => ({ resolveUrls: vi.fn(async () => ({})) }))
+// IdeaView → IdeaCaptures transitively imports the real @/lib/firebase via its
+// live hook — stub the component so the import chain stays firebase-free.
+vi.mock('@/components/ideas/IdeaCaptures', () => ({ IdeaCaptures: () => null }))
 
 import { groupByDate } from '@/components/ideas/IdeaInbox'
 

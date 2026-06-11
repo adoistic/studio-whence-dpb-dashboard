@@ -31,3 +31,21 @@ export interface Idea {
 export interface IdeaReads {
   seen: Record<string, boolean> // ideaId -> true
 }
+
+export type CaptureStatus = 'pending' | 'captured' | 'failed'
+
+/** A captured ChatGPT share conversation, at ideas/{ideaId}/captures/{shareId}. */
+export interface IdeaCapture {
+  id: string            // == shareId
+  url: string
+  shareId: string
+  status: CaptureStatus
+  error: string | null
+  title: string | null
+  model: string | null
+  messageCount: number | null
+  charCount: number | null
+  r2Key: string | null
+  createdAt: Timestamp | null
+  capturedAt: Timestamp | null
+}

@@ -201,6 +201,15 @@ beforeAll(async () => {
     })
     // Idea_reads doc owned by mem@dpb.in (for cross-user denial).
     await setDoc(doc(db, 'idea_reads/mem@dpb.in'), { 'idea-approved': '2026-06-08' })
+
+    // ── ChatGPT share-capture seeds (ideas/{id}/captures/{shareId}) ──
+    // Written ONLY by the Admin SDK in production (trigger + sweeper bypass
+    // rules); seeded here the same way. Reads must mirror the PARENT idea's
+    // read rule; ALL client writes are denied.
+    await setDoc(doc(db, 'ideas/idea-private/captures/cap-1'), { status: 'captured', url: 'https://chatgpt.com/share/x' })
+    await setDoc(doc(db, 'ideas/idea-subadmins/captures/cap-1'), { status: 'captured', url: 'https://chatgpt.com/share/x' })
+    await setDoc(doc(db, 'ideas/idea-approved/captures/cap-1'), { status: 'captured', url: 'https://chatgpt.com/share/x' })
+    await setDoc(doc(db, 'ideas/idea-specific/captures/cap-1'), { status: 'captured', url: 'https://chatgpt.com/share/x' })
   })
 })
 afterAll(async () => { await env.cleanup() })
@@ -691,6 +700,51 @@ describe('firestore.rules — ideas & idea_reads', () => {
   it('member: visibility == all_sub_admins list query is DENIED', async () => {
     const q = query(collection(member(), 'ideas'), where('visibility', '==', 'all_sub_admins'))
     await assertFails(getDocs(q))
+  })
+})
+
+describe('firestore.rules — idea captures subcollection', () => {
+  // All four seeded ideas are authored by sub@dpb.in. sub2@dpb.in is a second
+  // sub_admin (NOT the author); mem@dpb.in is a plain member and the sole
+  // recipient of idea-specific. Each idea carries captures/cap-1.
+  const admin     = () => env.authenticatedContext('cap-ad', { email: 'adnan@thothica.com' }).firestore()
+  const author    = () => env.authenticatedContext('cap-au', { email: 'sub@dpb.in' }).firestore()
+  const subAdmin2 = () => env.authenticatedContext('cap-sa2', { email: 'sub2@dpb.in' }).firestore()
+  const member    = () => env.authenticatedContext('cap-m', { email: 'mem@dpb.in' }).firestore()
+
+  // ── READ mirrors the PARENT idea's read rule ──
+  it('admin reads a private idea’s capture', async () => {
+    await assertSucceeds(getDoc(doc(admin(), 'ideas/idea-private/captures/cap-1')))
+  })
+  it('the idea author reads own private idea’s capture; a plain member cannot', async () => {
+    await assertSucceeds(getDoc(doc(author(), 'ideas/idea-private/captures/cap-1')))
+    await assertFails(getDoc(doc(member(), 'ideas/idea-private/captures/cap-1')))
+  })
+  it('all_sub_admins idea capture: sub_admin ✅, plain member ❌', async () => {
+    await assertSucceeds(getDoc(doc(subAdmin2(), 'ideas/idea-subadmins/captures/cap-1')))
+    await assertFails(getDoc(doc(member(), 'ideas/idea-subadmins/captures/cap-1')))
+  })
+  it('all_approved idea capture: member reads it', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'ideas/idea-approved/captures/cap-1')))
+  })
+  it('specific idea capture: the named recipient ✅, a non-recipient ❌', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'ideas/idea-specific/captures/cap-1')))     // mem is a recipient
+    await assertFails(getDoc(doc(subAdmin2(), 'ideas/idea-specific/captures/cap-1')))     // not recipient/author/admin
+  })
+
+  // ── WRITE: denied for EVERY client, including the admin (Admin SDK only) ──
+  it('no client may write a capture — not even the admin', async () => {
+    const cap = { status: 'captured', url: 'https://chatgpt.com/share/x' }
+    await assertFails(setDoc(doc(admin(), 'ideas/idea-approved/captures/cap-new'), cap))
+    await assertFails(setDoc(doc(author(), 'ideas/idea-private/captures/cap-new'), cap))
+    await assertFails(setDoc(doc(member(), 'ideas/idea-approved/captures/cap-new'), cap))
+    // Overwriting an existing capture is also denied.
+    await assertFails(setDoc(doc(admin(), 'ideas/idea-approved/captures/cap-1'), cap))
+  })
+
+  // ── LIST: the UI live-queries the whole subcollection of a readable idea ──
+  it('member LIST-queries an all_approved idea’s captures', async () => {
+    await assertSucceeds(getDocs(collection(member(), 'ideas/idea-approved/captures')))
   })
 })
 
