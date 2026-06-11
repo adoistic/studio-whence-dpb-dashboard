@@ -5,7 +5,8 @@ const h = vi.hoisted(() => ({
   presignPut: vi.fn(async () => 'https://signed.put/x'),
 }))
 vi.mock('../auth', () => ({ authorize: h.authorize }))
-vi.mock('../r2', () => ({ presignGet: vi.fn(), getObject: vi.fn(), presignPut: h.presignPut }))
+// putObject/deleteObject: ideasTrigger (re-exported by index.ts) imports them at module level.
+vi.mock('../r2', () => ({ presignGet: vi.fn(), getObject: vi.fn(), presignPut: h.presignPut, putObject: vi.fn(), deleteObject: vi.fn() }))
 vi.mock('../allocation', () => ({ getAllocation: vi.fn(), isKeyAllowedForMember: vi.fn() }))
 vi.mock('firebase-functions/v2/https', () => ({
   onRequest: (arg1: unknown, arg2?: unknown) =>

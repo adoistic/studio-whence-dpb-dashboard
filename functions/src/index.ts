@@ -308,3 +308,5 @@ export const dataApi = onRequest(
   res.status(404).json({ error: "not found" });
   }
 );
+
+export { onIdeaWritten } from "./ideasTrigger";

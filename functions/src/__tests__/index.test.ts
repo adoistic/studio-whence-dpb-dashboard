@@ -20,7 +20,14 @@ const { authorize, presignGet, getObject, getAllocation, isKeyAllowedForMember }
   }));
 
 vi.mock("../auth", () => ({ authorize }));
-vi.mock("../r2", () => ({ presignGet, getObject }));
+vi.mock("../r2", () => ({
+  presignGet,
+  getObject,
+  presignPut: vi.fn(),
+  // ideasTrigger (re-exported by index.ts) imports these at module level.
+  putObject: vi.fn(),
+  deleteObject: vi.fn(),
+}));
 vi.mock("../allocation", () => ({ getAllocation, isKeyAllowedForMember }));
 vi.mock("firebase-functions/v2/https", () => ({
   // The real call shape is `onRequest(options, handler)`, but it may also be

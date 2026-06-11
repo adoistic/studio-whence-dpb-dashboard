@@ -30,9 +30,25 @@ const {
 }));
 
 vi.mock("../auth", () => ({ authorize }));
-vi.mock("../r2", () => ({ presignGet, presignPut, getObject }));
+vi.mock("../r2", () => ({
+  presignGet,
+  presignPut,
+  getObject,
+  // ideasTrigger (re-exported by index.ts) imports these at module level.
+  putObject: vi.fn(),
+  deleteObject: vi.fn(),
+}));
 vi.mock("../allocation", () => ({ getAllocation, isKeyAllowedForMember }));
-vi.mock("../ideaStore", () => ({ getIdeaData, getCaptureData }));
+vi.mock("../ideaStore", () => ({
+  getIdeaData,
+  getCaptureData,
+  // ideasTrigger (re-exported by index.ts) imports these at module level.
+  createCapture: vi.fn(),
+  markCaptured: vi.fn(),
+  markFailed: vi.fn(),
+  listCaptureIds: vi.fn(),
+  deleteCaptureDoc: vi.fn(),
+}));
 vi.mock("firebase-functions/v2/https", () => ({
   onRequest: (arg1: unknown, arg2?: unknown) =>
     typeof arg1 === "function" ? arg1 : arg2,
