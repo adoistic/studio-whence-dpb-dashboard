@@ -117,12 +117,19 @@ describe('IdeaCaptures', () => {
     // 1. No <img> must exist — raw HTML must be escaped, not parsed.
     expect(container.querySelector('img')).toBeNull()
 
-    // 2. Any "click" anchor must not carry a javascript: href.
-    const clickLink = container.querySelector('a[href]')
-    if (clickLink) {
-      const href = clickLink.getAttribute('href') ?? ''
+    // 2. NO anchor anywhere may carry a javascript: href. (Check ALL anchors —
+    // the row header's "original ↗" link comes first in the DOM, so checking
+    // only the first <a[href]> would pass vacuously.)
+    for (const a of Array.from(container.querySelectorAll('a[href]'))) {
+      const href = a.getAttribute('href') ?? ''
       expect(href.toLowerCase().startsWith('javascript:')).toBe(false)
     }
+    // The malicious "click" link specifically must have been stripped of its
+    // javascript: href (rendered as plain text or an href-less anchor).
+    const clickAnchor = Array.from(container.querySelectorAll('a')).find(
+      (a) => a.textContent === 'click',
+    )
+    expect(clickAnchor?.getAttribute('href') ?? '').not.toMatch(/^javascript:/i)
 
     // 3. Sanity: plain text from the same transcript DID render.
     expect(screen.getByText('More safe text.')).toBeTruthy()
