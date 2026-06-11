@@ -1,5 +1,5 @@
 /**
- * r2.ts — short-lived presigned R2 GET URLs.
+ * r2.ts — R2 accessor: presigned GET/PUT + inline get/put/delete.
  *
  * `/resolve` hands the client a presigned GET URL for an R2 object (after
  * `authorize` + `safeKey` have passed) so the browser can fetch the asset
@@ -106,6 +106,22 @@ export function presignPut(
  * @returns   `{ body, contentType }` — `body` is a Buffer of the object bytes,
  *            `contentType` is the object's stored Content-Type (or undefined).
  */
+export async function getObject(
+  key: string
+): Promise<{ body: Buffer; contentType: string | undefined }> {
+  // client() throws if any R2 env var is absent — call it first so the env
+  // guard runs before we read R2_BUCKET for the command.
+  const s3 = client()
+  const command = new GetObjectCommand({
+    Bucket: process.env.R2_BUCKET!,
+    Key: key,
+  })
+  const response = await s3.send(command)
+  if (!response.Body) throw new Error(`R2 returned no body for key: ${key}`)
+  const bytes = await response.Body.transformToByteArray()
+  return { body: Buffer.from(bytes), contentType: response.ContentType }
+}
+
 /** Write a small text object inline (capture transcripts). */
 export async function putObject(
   key: string,
@@ -132,20 +148,4 @@ export async function deleteObject(key: string): Promise<void> {
       Key: key,
     })
   )
-}
-
-export async function getObject(
-  key: string
-): Promise<{ body: Buffer; contentType: string | undefined }> {
-  // client() throws if any R2 env var is absent — call it first so the env
-  // guard runs before we read R2_BUCKET for the command.
-  const s3 = client()
-  const command = new GetObjectCommand({
-    Bucket: process.env.R2_BUCKET!,
-    Key: key,
-  })
-  const response = await s3.send(command)
-  if (!response.Body) throw new Error(`R2 returned no body for key: ${key}`)
-  const bytes = await response.Body.transformToByteArray()
-  return { body: Buffer.from(bytes), contentType: response.ContentType }
 }
