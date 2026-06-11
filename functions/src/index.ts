@@ -10,6 +10,8 @@ import {
   isKeyAllowedForMember,
   type Allocation,
 } from "./allocation";
+import { canReadIdea, captureR2KeyIsConfined } from "./ideaAccess";
+import { getIdeaData, getCaptureData } from "./ideaStore";
 
 /**
  * dataApi — the gatekeeper Cloud Function for the gated data backbone.
@@ -247,6 +249,57 @@ export const dataApi = onRequest(
       res.status(200).json({ url, key });
     } catch {
       res.status(500).json({ error: "upload-url failed" });
+    }
+    return;
+  }
+
+  // ── GET /idea-capture?ideaId=&captureId= ───────────────────────────────────
+  // Serves a captured ChatGPT-share transcript from R2, gated by IDEA
+  // VISIBILITY (not work-allocation — idea data follows the idea's own ACL).
+  if (req.method === "GET" && route === "idea-capture") {
+    const auth = await authorize(req);
+    if (!auth) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+    const ideaId = String(req.query.ideaId ?? "");
+    const captureId = String(req.query.captureId ?? "").toLowerCase();
+    if (
+      !/^[A-Za-z0-9_-]{1,128}$/.test(ideaId) ||
+      !/^[0-9a-f-]{20,64}$/.test(captureId)
+    ) {
+      res.status(400).json({ error: "bad request" });
+      return;
+    }
+    try {
+      const idea = await getIdeaData(ideaId);
+      if (!idea) {
+        res.status(404).json({ error: "not found" });
+        return;
+      }
+      if (!canReadIdea(auth, idea)) {
+        res.status(403).json({ error: "forbidden" });
+        return;
+      }
+      const capture = await getCaptureData(ideaId, captureId);
+      const r2Key = capture?.r2Key;
+      if (!capture || capture.status !== "captured" || typeof r2Key !== "string") {
+        res.status(404).json({ error: "not found" });
+        return;
+      }
+      if (!captureR2KeyIsConfined(ideaId, r2Key)) {
+        res.status(403).json({ error: "forbidden" });
+        return;
+      }
+      const { body } = await getObject(r2Key);
+      res.status(200).type("text/markdown").send(body);
+    } catch (err) {
+      const name = (err as { name?: string } | null)?.name;
+      if (name === "NoSuchKey" || name === "NotFound") {
+        res.status(404).json({ error: "not found" });
+      } else {
+        res.status(500).json({ error: "idea-capture failed" });
+      }
     }
     return;
   }

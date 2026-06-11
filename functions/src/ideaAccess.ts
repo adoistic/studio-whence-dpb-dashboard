@@ -24,6 +24,10 @@ export function canReadIdea(
   if (vis === "all_sub_admins") return caller.moderator;
   if (vis === "all_approved") return true;
   if (vis === "specific") {
+    // Deliberately NARROWER than the Firestore rule: the rule's recipients
+    // branch is unconditional (a list-query concession; recipients are only
+    // ever non-empty on 'specific' ideas), while this predicate gates it under
+    // visibility === 'specific' — fail-closed direction, intentional.
     const recipients = Array.isArray(idea.recipients) ? idea.recipients : [];
     return recipients.includes(caller.email);
   }
