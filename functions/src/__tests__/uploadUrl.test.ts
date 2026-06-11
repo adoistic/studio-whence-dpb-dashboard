@@ -8,6 +8,13 @@ vi.mock('../auth', () => ({ authorize: h.authorize }))
 // putObject/deleteObject: ideasTrigger (re-exported by index.ts) imports them at module level.
 vi.mock('../r2', () => ({ presignGet: vi.fn(), getObject: vi.fn(), presignPut: h.presignPut, putObject: vi.fn(), deleteObject: vi.fn() }))
 vi.mock('../allocation', () => ({ getAllocation: vi.fn(), isKeyAllowedForMember: vi.fn() }))
+// ideaStore + the firestore trigger: ideasTrigger / the /idea-capture route
+// (re-exported by index.ts) load them at module level — stub for hermeticity.
+vi.mock('../ideaStore', () => ({
+  getIdeaData: vi.fn(), getCaptureData: vi.fn(), createCapture: vi.fn(),
+  markCaptured: vi.fn(), markFailed: vi.fn(), listCaptureIds: vi.fn(), deleteCaptureDoc: vi.fn(),
+}))
+vi.mock('firebase-functions/v2/firestore', () => ({ onDocumentWritten: () => undefined }))
 vi.mock('firebase-functions/v2/https', () => ({
   onRequest: (arg1: unknown, arg2?: unknown) =>
     typeof arg1 === 'function' ? arg1 : arg2,

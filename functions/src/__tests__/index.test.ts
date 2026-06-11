@@ -29,6 +29,21 @@ vi.mock("../r2", () => ({
   deleteObject: vi.fn(),
 }));
 vi.mock("../allocation", () => ({ getAllocation, isKeyAllowedForMember }));
+// `../ideaStore` + the firestore-trigger module are mocked so this suite stays
+// hermetic: index.ts re-exports onIdeaWritten (Task 7), which would otherwise
+// pull in firebase-admin + the real Functions runtime at module load.
+vi.mock("../ideaStore", () => ({
+  getIdeaData: vi.fn(),
+  getCaptureData: vi.fn(),
+  createCapture: vi.fn(),
+  markCaptured: vi.fn(),
+  markFailed: vi.fn(),
+  listCaptureIds: vi.fn(),
+  deleteCaptureDoc: vi.fn(),
+}));
+vi.mock("firebase-functions/v2/firestore", () => ({
+  onDocumentWritten: () => undefined,
+}));
 vi.mock("firebase-functions/v2/https", () => ({
   // The real call shape is `onRequest(options, handler)`, but it may also be
   // called as `onRequest(handler)`. The actual handler is the function arg.
