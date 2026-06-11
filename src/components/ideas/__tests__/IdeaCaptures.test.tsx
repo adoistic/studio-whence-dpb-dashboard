@@ -96,4 +96,35 @@ describe('IdeaCaptures', () => {
     render(<IdeaCaptures ideaId="idea-1" />)
     expect(screen.getByText('Capturing…')).toBeTruthy()
   })
+
+  it('sanitizes raw HTML and javascript: URLs in fetched transcripts (regression)', async () => {
+    // Both attack vectors in one transcript so a single render covers both.
+    const maliciousTranscript = [
+      'Safe surrounding text.',
+      '<img src=x onerror="alert(1)">',
+      '[click](javascript:alert(1))',
+      'More safe text.',
+    ].join('\n\n')
+
+    mockedUse.mockReturnValue({ data: [cap({ title: 'Malicious chat' })], loading: false })
+    mockedRead.mockResolvedValue(maliciousTranscript)
+
+    const { container } = render(<IdeaCaptures ideaId="idea-1" />)
+    fireEvent.click(screen.getByRole('button', { name: /read/i }))
+    // Wait for the transcript pane to become visible.
+    await screen.findByText('Safe surrounding text.')
+
+    // 1. No <img> must exist — raw HTML must be escaped, not parsed.
+    expect(container.querySelector('img')).toBeNull()
+
+    // 2. Any "click" anchor must not carry a javascript: href.
+    const clickLink = container.querySelector('a[href]')
+    if (clickLink) {
+      const href = clickLink.getAttribute('href') ?? ''
+      expect(href.toLowerCase().startsWith('javascript:')).toBe(false)
+    }
+
+    // 3. Sanity: plain text from the same transcript DID render.
+    expect(screen.getByText('More safe text.')).toBeTruthy()
+  })
 })
