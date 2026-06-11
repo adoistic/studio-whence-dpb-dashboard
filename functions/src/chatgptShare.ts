@@ -11,6 +11,10 @@
  * `loaderData["routes/share.$shareId.($action)"].serverResponse.data` with
  * `title`, `create_time`, `default_model_slug` and `linear_conversation[]`.
  *
+ * KEEP IN SYNC: this module has a byte-identical Python twin at
+ * tools/chatgpt_share.py in the content repo (the local sweeper). Any change
+ * to the parser logic or transcript format here must be mirrored there.
+ *
  * SECURITY: never fetch a raw user-supplied URL. Detection captures only the
  * shareId; the fetch URL is reconstructed via `fetchUrlFor` (host pinned to
  * chatgpt.com, id character class [0-9a-f-]).
