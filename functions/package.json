@@ -5,7 +5,7 @@
   "description": "Gated data backbone — Cloud Functions API (dataApi) fronting R2 behind Firebase auth",
   "main": "lib/index.js",
   "engines": {
-    "node": "20"
+    "node": "22"
   },
   "scripts": {
     "build": "tsc",
@@ -20,7 +20,7 @@
     "firebase-functions": "^6.1.0"
   },
   "devDependencies": {
-    "@types/node": "^20",
+    "@types/node": "^22",
     "typescript": "^5",
     "vitest": "^4.1.8"
   }
