@@ -15,6 +15,9 @@ vi.mock('@/lib/ideas', () => ({
   createIdea: vi.fn(async () => {}),
 }))
 vi.mock('@/lib/dataApi', () => ({ uploadIdeaImage: vi.fn(async () => 'k'), resolveUrls: vi.fn(async () => ({})) }))
+// IdeaView → IdeaCaptures transitively imports the real @/lib/firebase via its
+// live hook — stub the component so the import chain stays firebase-free.
+vi.mock('@/components/ideas/IdeaCaptures', () => ({ IdeaCaptures: () => null }))
 vi.mock('@tiptap/react', () => ({
   useEditor: () => ({ getHTML: () => '<p>body</p>', commands: {}, chain: () => ({ focus: () => ({ run: () => {} }) }) }),
   EditorContent: () => <div data-testid="editor" />,

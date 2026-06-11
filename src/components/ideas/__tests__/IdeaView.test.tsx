@@ -5,6 +5,9 @@ vi.mock('@/lib/ideas', () => ({ setIdeaStatus: vi.fn(), setIdeaTags: vi.fn(), de
 vi.mock('@/lib/dataApi', () => ({ resolveUrls: vi.fn(async () => ({})) }))
 vi.mock('@/lib/ideaCopy', () => ({ buildClipboardPayload: vi.fn(async () => ({ html: '<p>x</p>', text: 'x' })) }))
 vi.mock('@/components/ideas/IdeaMarkdown', () => ({ IdeaMarkdown: ({ markdown }: { markdown: string }) => <div>{markdown}</div> }))
+// IdeaCaptures transitively imports the real @/lib/firebase (via its live
+// hook), which would crash in jsdom (auth/invalid-api-key) — stub it out.
+vi.mock('@/components/ideas/IdeaCaptures', () => ({ IdeaCaptures: () => null }))
 import { setIdeaStatus } from '@/lib/ideas'
 import { IdeaView } from '@/components/ideas/IdeaView'
 
