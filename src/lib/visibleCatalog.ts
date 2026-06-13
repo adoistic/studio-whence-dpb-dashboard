@@ -159,3 +159,24 @@ export function useVisibleFigures(
     return Array.from(bySlug.values())
   }, [canModerate, email, refreshKey])
 }
+
+// ─── useOpenFigures ─────────────────────────────────────────────────────────────
+//
+// The `openResearch:true` figures of a line (the medicomics disease model). Any
+// allowlisted member may read these under the figures rule's `openResearch`
+// allowance, with NO specific allocation. Both filters are equality, so the
+// query uses Firestore's automatic single-field indexes — no composite index.
+//
+// Used to MERGE open figures into a line page for a member who isn't allocated
+// the line. Moderators already get every figure via useVisibleFigures, so a
+// merge keyed by slug must not double-count (the caller dedupes by slug).
+
+export function useOpenFigures(line: string): Async<Figure[]> {
+  return useAsync<Figure[]>(async () => {
+    if (!line) return []
+    const snap = await getDocs(
+      query(collection(db, 'figures'), where('line', '==', line), where('openResearch', '==', true)),
+    )
+    return listData<Figure>(snap)
+  }, [line])
+}

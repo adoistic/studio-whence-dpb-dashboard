@@ -72,6 +72,10 @@ export interface ResearchSource {
 export interface Figure {
   series: string
   slug: string
+  line?: string
+  // medicomics: each disease is an open-research figure any allowlisted member
+  // may read (no specific allocation required).
+  openResearch?: boolean
   sources_count: number
   words: number
   sources?: ResearchSource[]

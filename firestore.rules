@@ -114,15 +114,24 @@ service cloud.firestore {
     // subject_slug, so the research gate is driven by `f` via figures_effective;
     // the `lines` branch lights up via resource.data.get('line','') so a member
     // holding only a `lines` grant reaches that line's figure research.
+    // A figure is readable when the member's allocation grants its research
+    // (figureResearchAllowed) OR the figure is flagged `openResearch:true` — the
+    // medicomics model, where each disease is an open-research figure any
+    // allowlisted member may read. Specific comics stay allocation-gated.
     match /figures/{f}   {
       allow read: if isAllowlisted()
-        && figureResearchAllowed(resource.data.get('line', ''), f);
+        && (figureResearchAllowed(resource.data.get('line', ''), f)
+            || resource.data.get('openResearch', false) == true);
       allow write: if false;
       match /sources/{s} {
+        // Mirror the parent: allow when the member's allocation grants the
+        // figure's research OR the parent figure doc is `openResearch:true`
+        // (fetched via the existing get() on the parent figure doc).
         allow read: if isAllowlisted()
           && exists(/databases/$(database)/documents/figures/$(f))
-          && figureResearchAllowed(
-               get(/databases/$(database)/documents/figures/$(f)).data.get('line', ''), f);
+          && (figureResearchAllowed(
+                get(/databases/$(database)/documents/figures/$(f)).data.get('line', ''), f)
+              || get(/databases/$(database)/documents/figures/$(f)).data.get('openResearch', false) == true);
         allow write: if false;
       }
     }
@@ -145,9 +154,11 @@ service cloud.firestore {
     //    line/comic; written only by the capture Admin SDK, which bypasses rules) ──
     // Visibility mirrors the LOCKED decision: line-attached → any allowlisted
     // member; comic-attached → that comic's allocation (via comicAllowed, which
-    // already short-circuits for moderators/sub_admins). The conversation doc has
-    // no subject_slug, so the figure-grant branch of comicAllowed is passed '';
-    // the line + comics + moderator branches still gate access correctly.
+    // already short-circuits for moderators/sub_admins); figure-attached →
+    // any allowlisted member when `open:true` (the medicomics disease model),
+    // else the member must hold that line (or be a sub_admin). The conversation
+    // doc has no subject_slug, so the figure-grant branch of comicAllowed is
+    // passed ''; the line + comics + moderator branches still gate access correctly.
     match /aiConversations/{id} {
       allow read: if isAllowlisted() && (
            resource.data.attachTo.kind == 'line'
@@ -156,6 +167,10 @@ service cloud.firestore {
                  resource.data.attachTo.line + '__' + resource.data.attachTo.comicSlug,
                  resource.data.attachTo.line,
                  ''))
+        || (resource.data.attachTo.kind == 'figure'
+            && (resource.data.attachTo.get('open', false) == true
+                || (hasAlloc() && allocDoc().get('lines', []).hasAny([resource.data.attachTo.line]))
+                || isSubAdmin()))
         || isSubAdmin()
       );
       allow write: if false;

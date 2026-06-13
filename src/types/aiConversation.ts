@@ -2,9 +2,11 @@ import type { Timestamp } from 'firebase/firestore'
 
 /** Where an AI conversation is attached in the catalog. */
 export interface AiConversationAttachTo {
-  kind: string          // e.g. 'line' | 'comic'
+  kind: string          // e.g. 'line' | 'comic' | 'figure'
   line: string          // line slug
   comicSlug?: string    // present when attached to a specific comic
+  figureSlug?: string   // present when attached to a specific figure (e.g. a disease)
+  open?: boolean        // whether the conversation surfaces in the gated reader
 }
 
 export type AiConversationStatus = 'pending' | 'captured' | 'failed'

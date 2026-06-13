@@ -8,6 +8,8 @@
  *   - moderator (sub-admin/admin) → always.
  *   - line-attached conversation  → any allowlisted member (line-level is open).
  *   - comic-attached conversation → only a member allocated that comic.
+ *   - figure-attached conversation → any allowlisted member when `open:true`
+ *       (the medicomics disease model), else a member holding that line.
  *   - any other attach kind        → denied.
  * Fails closed on null auth.
  */
@@ -24,6 +26,8 @@ export interface AiConvAttachTo {
   kind: "comic" | "line" | "figure" | "idea";
   line: string;
   comicSlug?: string;
+  figureSlug?: string;
+  open?: boolean;
 }
 
 export interface AiConversation {
@@ -82,6 +86,19 @@ export function canReadAiConversation(
     return false;
   }
 
-  // figure / idea / anything else → denied.
+  // Figure-attached conversations: open to any allowlisted member when the
+  // attachment is flagged `open:true` (the medicomics disease model); otherwise
+  // the member must hold the conversation's line. (auth==null and moderator are
+  // handled at the top.)
+  if (attachTo.kind === "figure") {
+    if (attachTo.open === true) return true;
+    const { line } = attachTo;
+    if (line && alloc.lines.includes(line)) return true;
+    // (A figure-level grant via attachTo.figureSlug could also unlock this; the
+    // line grant is sufficient for the current medicomics use-case.)
+    return false;
+  }
+
+  // idea / anything else → denied.
   return false;
 }
