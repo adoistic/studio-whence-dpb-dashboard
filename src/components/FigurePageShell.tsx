@@ -213,7 +213,7 @@ export function FigurePageShell({
                 non-medicomics figures show nothing extra (the heading rides
                 inside the component and hides with it). */}
             <AiConversations
-              line={figure.line ?? 'medicomics'}
+              line={figure.line ?? ''}
               figureSlug={figure.slug}
               heading={{ kicker: 'Reference', title: 'AI conversation' }}
             />

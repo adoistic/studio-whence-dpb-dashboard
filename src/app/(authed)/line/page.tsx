@@ -47,7 +47,7 @@ export default function LinePage() {
   const { data: openFigures } = useOpenFigures(slug)
   const figuresBySlug = new Map<string, Figure>()
   for (const f of [...(allFigures ?? []), ...(openFigures ?? [])]) {
-    if ((f as { line?: string }).line === slug) figuresBySlug.set(f.slug, f)
+    if (f.line === slug) figuresBySlug.set(f.slug, f)
   }
   const figures = Array.from(figuresBySlug.values())
   const { data: people } = usePeople(slug)

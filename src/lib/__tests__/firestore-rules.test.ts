@@ -168,6 +168,43 @@ beforeAll(async () => {
       updatedBy: 'adnan@thothica.com', updatedAt: '2026-06-03',
     })
 
+    // ── MediComics open-research figure model seeds ──
+    // A medicomics figure flagged openResearch:true (each disease is open
+    // research any allowlisted member may read) + one source doc. And a legacy
+    // biographies figure with NO openResearch field — the default-false deny
+    // must keep it allocation-gated.
+    await setDoc(doc(db, 'figures/breast-cancer'), {
+      slug: 'breast-cancer', line: 'medicomics', openResearch: true,
+      series: 'MediComics', sources_count: 1, words: 1,
+    })
+    await setDoc(doc(db, 'figures/breast-cancer/sources/s1'), {
+      slug: 's1', kind: 'book', title: 'X', words: 1, files: [],
+    })
+    await setDoc(doc(db, 'figures/legacy-bio'), {
+      slug: 'legacy-bio', line: 'biographies', series: 'Y', sources_count: 0, words: 0,
+    })
+    // AI conversations attached to a medicomics figure: open vs closed, plus a
+    // comic-attached one that must stay allocation-gated. noalloc@dpb.in (seeded
+    // above, allowlisted with NO allocation) and a member holding the medicomics
+    // line exercise the figure branches.
+    await setDoc(doc(db, 'allowlist/medmember@dpb.in'), { role: 'allow' })
+    await setDoc(doc(db, 'allocations/medmember@dpb.in'), {
+      lines: ['medicomics'], figures: [], comics: [], figures_effective: [],
+      updatedBy: 'adnan@thothica.com', updatedAt: '2026-06-13',
+    })
+    await setDoc(doc(db, 'aiConversations/c-open'), {
+      attachTo: { kind: 'figure', line: 'medicomics', figureSlug: 'breast-cancer', open: true },
+    })
+    await setDoc(doc(db, 'aiConversations/c-closed'), {
+      attachTo: { kind: 'figure', line: 'medicomics', figureSlug: 'breast-cancer', open: false },
+    })
+    await setDoc(doc(db, 'aiConversations/c-closed-line'), {
+      attachTo: { kind: 'figure', line: 'medicomics', figureSlug: 'breast-cancer', open: false },
+    })
+    await setDoc(doc(db, 'aiConversations/c-comic'), {
+      attachTo: { kind: 'comic', line: 'medicomics', comicSlug: 'x' },
+    })
+
     // ── Idea Drop seeds ──
     // sub@dpb.in (sub_admin) is already seeded above; add a second sub_admin to
     // prove a `private` idea is invisible to a DIFFERENT moderator, and a plain
@@ -535,6 +572,47 @@ describe('firestore.rules — work allocation', () => {
     // lines:['biographies'] (no figures_effective entry) → the line branch unlocks it.
     await assertSucceeds(getDoc(doc(ctx, 'figures/bio-line-figure')))
     await assertSucceeds(getDoc(doc(ctx, 'figures/bio-line-figure/sources/book-a')))
+  })
+})
+
+describe('firestore.rules — medicomics open-research figures', () => {
+  // noalloc@dpb.in: allowlisted, NO allocation doc → the open-research baseline.
+  // medmember@dpb.in: allowlisted, holds ONLY the medicomics line.
+  // sub@dpb.in: sub_admin (bypass). Plus an unauth context.
+  const noAlloc   = () => env.authenticatedContext('mc-n', { email: 'noalloc@dpb.in' }).firestore()
+  const medMember = () => env.authenticatedContext('mc-line', { email: 'medmember@dpb.in' }).firestore()
+  const signedOut = () => env.unauthenticatedContext().firestore()
+
+  // ── figures + sources ──
+  it('a NO-allocation allowlisted member reads an openResearch figure doc + its source', async () => {
+    await assertSucceeds(getDoc(doc(noAlloc(), 'figures/breast-cancer')))
+    await assertSucceeds(getDoc(doc(noAlloc(), 'figures/breast-cancer/sources/s1')))
+  })
+  it('a non-allocated member is DENIED a figure with NO openResearch field (default-false deny)', async () => {
+    // legacy-bio carries line:'biographies' but no openResearch → biographies stays
+    // allocation-gated, and noalloc holds no allocation.
+    await assertFails(getDoc(doc(noAlloc(), 'figures/legacy-bio')))
+  })
+
+  // ── aiConversations ──
+  it('any allowlisted member reads a figure conversation flagged open:true', async () => {
+    await assertSucceeds(getDoc(doc(noAlloc(), 'aiConversations/c-open')))
+  })
+  it('a non-allocated member is DENIED a closed figure conversation', async () => {
+    await assertFails(getDoc(doc(noAlloc(), 'aiConversations/c-closed')))
+  })
+  it('a member holding the medicomics LINE reads a closed figure conversation', async () => {
+    await assertSucceeds(getDoc(doc(medMember(), 'aiConversations/c-closed-line')))
+  })
+  it('a non-allocated member is DENIED a comic-attached conversation (stays gated)', async () => {
+    await assertFails(getDoc(doc(noAlloc(), 'aiConversations/c-comic')))
+  })
+  it('unauth is denied every figure / conversation read', async () => {
+    await assertFails(getDoc(doc(signedOut(), 'figures/breast-cancer')))
+    await assertFails(getDoc(doc(signedOut(), 'figures/breast-cancer/sources/s1')))
+    await assertFails(getDoc(doc(signedOut(), 'aiConversations/c-open')))
+    await assertFails(getDoc(doc(signedOut(), 'aiConversations/c-closed')))
+    await assertFails(getDoc(doc(signedOut(), 'aiConversations/c-comic')))
   })
 })
 
