@@ -1,8 +1,8 @@
 'use client'
 
-import type { Line } from '@/types/content'
+import type { Line, Figure } from '@/types/content'
 import { useLines, usePeople } from '@/lib/catalog'
-import { useVisibleComics, useVisibleFigures } from '@/lib/visibleCatalog'
+import { useVisibleComics, useVisibleFigures, useOpenFigures } from '@/lib/visibleCatalog'
 import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { personDocToRow } from '@/lib/people'
 import { LinePageShell } from '@/components/LinePageShell'
@@ -39,7 +39,17 @@ export default function LinePage() {
   // this line via the runtime `line` field figure docs carry. usePeople(slug) is
   // already line-scoped. Members see only their allocated set; moderators see all.
   const { data: allFigures } = useVisibleFigures(canMod, email)
-  const figures = (allFigures ?? []).filter((f) => (f as { line?: string }).line === slug)
+  // Open-research figures (medicomics diseases) are readable by ANY allowlisted
+  // member with no specific allocation, so merge them in: a non-allocated member
+  // would otherwise miss them (useVisibleFigures only returns allocated +
+  // line-granted figures). Moderators already get everything via
+  // useVisibleFigures; dedupe by slug so the merge never double-counts.
+  const { data: openFigures } = useOpenFigures(slug)
+  const figuresBySlug = new Map<string, Figure>()
+  for (const f of [...(allFigures ?? []), ...(openFigures ?? [])]) {
+    if ((f as { line?: string }).line === slug) figuresBySlug.set(f.slug, f)
+  }
+  const figures = Array.from(figuresBySlug.values())
   const { data: people } = usePeople(slug)
 
   if (loading) return <LoadingState />

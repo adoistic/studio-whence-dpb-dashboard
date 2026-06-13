@@ -13,6 +13,8 @@ const conv = (
     kind: "comic" | "line" | "figure" | "idea";
     line: string;
     comicSlug?: string;
+    figureSlug?: string;
+    open?: boolean;
   }
 ) => ({ attachTo });
 
@@ -69,7 +71,48 @@ describe("canReadAiConversation — LOCKED visibility decision", () => {
     ).toBe(true);
   });
 
-  test("figure-attached (any other kind) is denied for a plain member", () =>
+  test("figure-attached + open:true is readable by a plain member (no alloc)", () =>
+    expect(
+      canReadAiConversation(
+        auth(),
+        conv({ kind: "figure", line: "medicomics", figureSlug: "obesity", open: true })
+      )
+    ).toBe(true));
+
+  test("figure-attached + open:false + no alloc is denied", () =>
+    expect(
+      canReadAiConversation(
+        auth(),
+        conv({ kind: "figure", line: "medicomics", figureSlug: "obesity", open: false })
+      )
+    ).toBe(false));
+
+  test("figure-attached + open:false is readable by a member holding that line", () =>
+    expect(
+      canReadAiConversation(
+        auth(),
+        conv({ kind: "figure", line: "medicomics", figureSlug: "obesity", open: false }),
+        { comics: [], lines: ["medicomics"] }
+      )
+    ).toBe(true));
+
+  test("figure-attached + open:true + auth null is denied", () =>
+    expect(
+      canReadAiConversation(
+        null,
+        conv({ kind: "figure", line: "medicomics", figureSlug: "obesity", open: true })
+      )
+    ).toBe(false));
+
+  test("figure-attached is readable by a moderator regardless of open flag", () =>
+    expect(
+      canReadAiConversation(
+        auth({ moderator: true }),
+        conv({ kind: "figure", line: "medicomics", figureSlug: "obesity", open: false })
+      )
+    ).toBe(true));
+
+  test("figure-attached (no open flag, no alloc) is denied for a plain member", () =>
     expect(
       canReadAiConversation(auth(), conv({ kind: "figure", line: "biographies" }))
     ).toBe(false));
