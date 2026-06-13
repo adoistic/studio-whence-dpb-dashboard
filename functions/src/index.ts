@@ -18,6 +18,7 @@ import {
   type AiConversation,
 } from "./aiConversationAccess";
 import { getAiConversationData } from "./aiConversationStore";
+import { rewriteMedikidzHtml } from "./medikidzSite";
 
 /**
  * dataApi — the gatekeeper Cloud Function for the gated data backbone.
@@ -360,6 +361,63 @@ export const dataApi = onRequest(
         res.status(404).json({ error: "not found" });
       } else {
         res.status(500).json({ error: "ai-conversation failed" });
+      }
+    }
+    return;
+  }
+
+  // ── GET /medikidz-site ─────────────────────────────────────────────────────
+  // Serves the gated Medikidz "Comic Analysis" embed: a single self-contained
+  // page from R2 (`sites/medikidz/index.html`) with every bare image path
+  // (`assets/covers|pages/…jpg`, ~195 of them, most JS-injected) rewritten to a
+  // presigned R2 URL. Visibility: ANY allowlisted member (same tier as
+  // methodology/research) — moderators always pass; members pass via the
+  // sites/ scopeOfKey branch (no allocation needed).
+  if (req.method === "GET" && route === "medikidz-site") {
+    const auth = await authorize(req);
+    if (!auth) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
+    const SITE_KEY = "sites/medikidz/index.html";
+    // Allocation gate: moderators read any valid key; a member must be allowed
+    // the site key (any allowlisted member is, via the sites/ scope). Fail closed.
+    if (!auth.moderator) {
+      let permitted = false;
+      try {
+        const alloc = await getAllocation(auth.email);
+        permitted = await isKeyAllowedForMember(SITE_KEY, alloc);
+      } catch {
+        permitted = false;
+      }
+      if (!permitted) {
+        res.status(403).json({ error: "forbidden" });
+        return;
+      }
+    }
+    try {
+      const { body } = await getObject(SITE_KEY);
+      const html = body.toString("utf-8");
+      // Presign every unique asset key once, then rewrite synchronously.
+      const cache = new Map<string, string>();
+      const uniqueKeys = new Set<string>();
+      rewriteMedikidzHtml(html, (key) => {
+        uniqueKeys.add(key);
+        return key;
+      });
+      await Promise.all(
+        [...uniqueKeys].map(async (key) => {
+          cache.set(key, await presignGet(key));
+        })
+      );
+      const rewritten = rewriteMedikidzHtml(html, (key) => cache.get(key) ?? key);
+      res.status(200).type("text/html").send(rewritten);
+    } catch (err) {
+      const name = (err as { name?: string } | null)?.name;
+      if (name === "NoSuchKey" || name === "NotFound") {
+        res.status(404).json({ error: "not found" });
+      } else {
+        res.status(500).json({ error: "medikidz-site failed" });
       }
     }
     return;

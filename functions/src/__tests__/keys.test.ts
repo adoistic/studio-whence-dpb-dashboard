@@ -105,4 +105,14 @@ describe('safeKey', () => {
   test('ai-conversations is NOT presignable via /resolve', () => {
     expect(safeKey('ai-conversations/abc.md', RESOLVE_PREFIXES)).toBeNull()
   })
+
+  test('/read allows sites/ keys (medikidz embed)', () => {
+    expect(safeKey('sites/medikidz/index.html', READ_PREFIXES)).toBe(
+      'sites/medikidz/index.html'
+    )
+  })
+
+  test('sites/ traversal is rejected via /read', () => {
+    expect(safeKey('sites/../secrets/x', READ_PREFIXES)).toBeNull()
+  })
 })

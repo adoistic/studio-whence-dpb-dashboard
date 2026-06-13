@@ -33,6 +33,7 @@ export const READ_PREFIXES = [
   'drafts/',
   'docs/',
   'ai-conversations/',
+  'sites/',
 ] as const;
 
 /** Prefixes writable through the presigned-PUT /upload-url route. Idea images only. */

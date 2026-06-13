@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import type { Line } from '@/types/content'
 import { AiConversations } from '@/components/AiConversations'
+import { ComicAnalysisTab } from '@/components/ComicAnalysisTab'
 import { ResearchLibrary } from '@/components/ResearchLibrary'
 import { ComicsTable } from '@/components/ComicsTable'
 import { PeopleTable } from '@/components/PeopleTable'
@@ -102,6 +103,15 @@ export function LinePageShell({ line, introMdx, people }: LinePageShellProps) {
           <section className="flex flex-col gap-8 pb-24 pt-20">
             <SectionHead kicker="In production" title="Comics in production" />
             <ComicsTable comics={line.comics} filename={`${line.slug}-comics-in-production.csv`} />
+          </section>
+        )}
+
+        {/* Comic Analysis embed — medicomics only (the Medikidz per-comic
+            analysis is specific to this line). Any allowlisted member may view it. */}
+        {line.slug === 'medicomics' && (
+          <section className="flex flex-col gap-8 pb-24 pt-20">
+            <SectionHead kicker="Reference" title="Comic Analysis" />
+            <ComicAnalysisTab />
           </section>
         )}
 

@@ -79,6 +79,11 @@ export function scopeOfKey(key: string): KeyScope {
 
   const top = parts[0]
 
+  // ── sites/… (gated self-contained micro-sites, e.g. the Medikidz comic
+  //   analysis embed) → readable by ANY allowlisted member (same tier as
+  //   methodology/research docs). No allocation needed. ────────────────────
+  if (top === 'sites') return { methodology: true }
+
   // ── docs/… (client-facing handoff docs) ─────────────────────────────────
   //   docs/methodology/…                       → methodology (any authed member)
   //   docs/comics/{line}/{subject}/{slug}/…     → that comic's allocation

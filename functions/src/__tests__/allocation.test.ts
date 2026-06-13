@@ -123,6 +123,11 @@ describe('scopeOfKey', () => {
       expected: { methodology: true },
     },
     {
+      name: 'sites/medikidz → { methodology: true } (any-member tier)',
+      key: 'sites/medikidz/index.html',
+      expected: { methodology: true },
+    },
+    {
       name: 'docs/research with no line → {} (deny)',
       key: 'docs/research/',
       expected: {},
@@ -368,6 +373,14 @@ describe('isKeyAllowedForMember', () => {
   test('docs research: any allowlisted member allowed (plain, unallocated)', async () => {
     const ok = await isKeyAllowedForMember(
       'docs/research/medicomics/autism/README.md',
+      alloc()
+    )
+    expect(ok).toBe(true)
+  })
+
+  test('sites/medikidz: any allowlisted member allowed (plain, unallocated)', async () => {
+    const ok = await isKeyAllowedForMember(
+      'sites/medikidz/index.html',
       alloc()
     )
     expect(ok).toBe(true)

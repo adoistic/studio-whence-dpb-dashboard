@@ -119,6 +119,17 @@ export async function readAiConversation(id: string): Promise<string> {
   return res.text()
 }
 
+/**
+ * Read the gated Medikidz "Comic Analysis" embed as a self-contained HTML
+ * string. The Function rewrites every image path to a presigned R2 URL before
+ * returning, so the returned HTML is renderable as-is inside a sandboxed iframe.
+ */
+export async function readMedikidzSite(): Promise<string> {
+  const res = await authedFetch('/medikidz-site')
+  if (!res.ok) throw new Error(`medikidz-site failed: ${res.status}`)
+  return res.text()
+}
+
 /** Ask the Function for a presigned PUT URL for an idea image. */
 export async function requestUploadUrl(
   ideaId: string, filename: string, contentType: string,
