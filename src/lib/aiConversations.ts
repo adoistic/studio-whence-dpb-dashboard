@@ -9,6 +9,23 @@ import type { AiConversation } from '@/types/aiConversation'
 // lives next to its sibling helpers in dataApi.ts.
 export { readAiConversation } from '@/lib/dataApi'
 
+// Unicode Private-Use-Area sentinels that wrap ChatGPT cite runs in exported
+// transcripts ( … , with  separating sub-parts). Mirrors the
+// Python strip_cite_tokens in tools/conversation_analysis.py.
+const PUA_RUN_RE = /[\s\S]*?/g
+// Bare fallback token not wrapped in PUA, e.g. "citeturn1view0",
+// "fileciteturn0file0".
+const BARE_TOKEN_RE = /(?:file)?cite[\w]*turn\w+/g
+
+/**
+ * Remove ChatGPT's private citation markers from `text`: strip PUA-delimited
+ * runs and any bare `citeturn…` / `fileciteturn…` tokens, then collapse any
+ * double space left behind to a single space (newlines untouched).
+ */
+export function stripCiteTokens(text: string): string {
+  return text.replace(PUA_RUN_RE, '').replace(BARE_TOKEN_RE, '').replace(/  +/g, ' ')
+}
+
 export interface AiConversationsState {
   conversations: AiConversation[]
   loading: boolean

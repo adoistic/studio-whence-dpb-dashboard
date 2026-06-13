@@ -11,6 +11,49 @@ export interface AiConversationAttachTo {
 
 export type AiConversationStatus = 'pending' | 'captured' | 'failed'
 
+/** A located span in the verbatim transcript. `line` is 1-based over the
+ *  transcript split on "\n"; `resolved:false` → render as non-clickable text. */
+export interface AnchorRef {
+  quote: string
+  charStart: number
+  charEnd: number
+  line: number
+  resolved: boolean
+}
+
+/** One chapter of the analysed conversation. */
+export interface AnalysisChapter {
+  id: string
+  title: string
+  summary: string
+  anchor: AnchorRef
+  sources?: { label: string; kind?: string }[]
+}
+
+/** A key output/deliverable surfaced from the conversation. */
+export interface AnalysisKeyOutput {
+  label: string
+  detail: string
+  anchor: AnchorRef
+}
+
+/** A source referenced in the conversation. */
+export interface AnalysisSource {
+  label: string
+  kind?: string
+}
+
+/** The structured analysis attached to a conversation doc. */
+export interface AiConversationAnalysis {
+  tldr: string
+  chapters: AnalysisChapter[]
+  keyOutputs: AnalysisKeyOutput[]
+  sources: AnalysisSource[]
+  model?: string
+  generatedAt?: string
+  schemaVersion?: number
+}
+
 /**
  * A migrated AI chat conversation, at aiConversations/{id}.
  *
@@ -28,4 +71,5 @@ export interface AiConversation {
   conversationCreatedAt: Timestamp | null
   status: AiConversationStatus
   createdAt: Timestamp | null
+  analysis?: AiConversationAnalysis
 }

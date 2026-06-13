@@ -13,7 +13,7 @@ vi.mock('firebase/firestore', () => ({
   where: vi.fn((field: string, op: string, value: unknown) => ({ __where: [field, op, value] })),
 }))
 
-import { buildConvFilters } from '@/lib/aiConversations'
+import { buildConvFilters, stripCiteTokens } from '@/lib/aiConversations'
 
 type WhereDescriptor = { __where: [string, string, unknown] }
 const clauses = (filters: unknown[]) => filters.map((f) => (f as WhereDescriptor).__where)
@@ -45,5 +45,29 @@ describe('buildConvFilters', () => {
       ['attachTo.comicSlug', '==', '01-x'],
       ['attachTo.figureSlug', '==', 'autism'],
     ])
+  })
+})
+
+describe('stripCiteTokens', () => {
+  // PUA sentinels:  opens a cite run,  closes it ( separates
+  // sub-parts inside the run). Mirrors tools/conversation_analysis.py.
+  test('removes a PUA-wrapped cite run, leaves the prose intact', () => {
+    const input = 'Obesity is rising in India.citeturn1view0 We need to act.'
+    expect(stripCiteTokens(input)).toBe('Obesity is rising in India. We need to act.')
+  })
+
+  test('removes a bare fileciteturn token outside any PUA wrapper', () => {
+    expect(stripCiteTokens('See the paper citeturn0file0 for detail.')).toBe(
+      'See the paper for detail.',
+    )
+    expect(stripCiteTokens('Quoted fileciteturn0file0 here.')).toBe('Quoted here.')
+  })
+
+  test('leaves text without cite tokens unchanged', () => {
+    expect(stripCiteTokens('Plain prose, no tokens.')).toBe('Plain prose, no tokens.')
+  })
+
+  test('does not collapse newlines', () => {
+    expect(stripCiteTokens('line one\n\nline two')).toBe('line one\n\nline two')
   })
 })
