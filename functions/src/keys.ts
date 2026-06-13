@@ -25,8 +25,15 @@ export const RESOLVE_PREFIXES = [
   'docs/',
 ] as const;
 
-/** Prefixes readable through `/read` (proxied text). Narrower than resolve. */
-export const READ_PREFIXES = ['research/', 'drafts/', 'docs/'] as const;
+/** Prefixes readable through `/read` (proxied text). Narrower than resolve.
+ * `ai-conversations/` serves transcript bytes inline like the other `/read`
+ * prefixes — it is deliberately NOT in RESOLVE_PREFIXES (never presigned). */
+export const READ_PREFIXES = [
+  'research/',
+  'drafts/',
+  'docs/',
+  'ai-conversations/',
+] as const;
 
 /** Prefixes writable through the presigned-PUT /upload-url route. Idea images only. */
 export const WRITE_PREFIXES = ['images/ideas/'] as const;

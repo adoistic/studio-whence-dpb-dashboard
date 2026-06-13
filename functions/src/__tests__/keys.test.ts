@@ -91,4 +91,18 @@ describe('safeKey', () => {
   test('docs/ traversal is still rejected', () => {
     expect(safeKey('docs/../secrets/x', RESOLVE_PREFIXES)).toBeNull()
   })
+
+  test('/read allows ai-conversations keys', () => {
+    expect(safeKey('ai-conversations/abc.md', READ_PREFIXES)).toBe(
+      'ai-conversations/abc.md'
+    )
+  })
+
+  test('ai-conversations traversal is rejected via /read', () => {
+    expect(safeKey('ai-conversations/../secret', READ_PREFIXES)).toBeNull()
+  })
+
+  test('ai-conversations is NOT presignable via /resolve', () => {
+    expect(safeKey('ai-conversations/abc.md', RESOLVE_PREFIXES)).toBeNull()
+  })
 })
