@@ -118,6 +118,16 @@ describe('scopeOfKey', () => {
       },
     },
     {
+      name: 'docs research → { methodology: true } (any-member tier)',
+      key: 'docs/research/medicomics/autism/README.md',
+      expected: { methodology: true },
+    },
+    {
+      name: 'docs/research with no line → {} (deny)',
+      key: 'docs/research/',
+      expected: {},
+    },
+    {
       name: 'docs/whatever (unrecognized) → {}',
       key: 'docs/whatever',
       expected: {},
@@ -353,6 +363,19 @@ describe('isKeyAllowedForMember', () => {
       alloc()
     )
     expect(ok).toBe(true)
+  })
+
+  test('docs research: any allowlisted member allowed (plain, unallocated)', async () => {
+    const ok = await isKeyAllowedForMember(
+      'docs/research/medicomics/autism/README.md',
+      alloc()
+    )
+    expect(ok).toBe(true)
+  })
+
+  test('bogus docs/research traversal still denied (no line segment)', async () => {
+    const ok = await isKeyAllowedForMember('docs/research/', alloc())
+    expect(ok).toBe(false)
   })
 
   test('docs/comics: comic grant allows', async () => {

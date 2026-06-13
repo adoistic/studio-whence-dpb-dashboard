@@ -85,6 +85,10 @@ export function scopeOfKey(key: string): KeyScope {
   //     (subject is IN the path, so no comic-doc lookup is needed).
   if (top === 'docs') {
     if (parts[1] === 'methodology') return { methodology: true }
+    // docs/research/{line}/…  → line-level research library, readable by ANY
+    // allowlisted member (same tier as methodology). The line is in the path but
+    // access does NOT depend on it — any authed member may read research docs.
+    if (parts[1] === 'research' && parts[2]) return { methodology: true }
     if (parts[1] === 'comics') {
       const line = parts[2]
       const subject = parts[3]

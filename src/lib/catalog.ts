@@ -35,6 +35,17 @@ export interface MethodologyDocs { readKey: string; downloadKey: string; bytes: 
 export const useMethodology = () => useAsync<MethodologyDocs | null>(async () =>
   docData<MethodologyDocs>(await getDoc(doc(db, 'meta', 'methodology'))) ?? null, [])
 
+export interface ResearchFile { label: string; readKey: string; bytes: number }
+export interface ResearchGroup { disease: string; title: string; files: ResearchFile[] }
+export interface ResearchManifest {
+  generatedAt: string
+  line: string
+  groups: ResearchGroup[]
+  topLevel: ResearchFile[]
+}
+export const useResearchManifest = (line: string) => useAsync<ResearchManifest | null>(async () =>
+  docData<ResearchManifest>(await getDoc(doc(db, 'meta', `research_${line}`))) ?? null, [line])
+
 export const useLines = () => useAsync<Line[]>(async () => listData<Line>(await getDocs(collection(db, 'lines'))), [])
 
 export const useComic = (line: string, slug: string) =>

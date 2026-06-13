@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 import type { Line } from '@/types/content'
 import { AiConversations } from '@/components/AiConversations'
+import { ResearchLibrary } from '@/components/ResearchLibrary'
 import { ComicsTable } from '@/components/ComicsTable'
 import { PeopleTable } from '@/components/PeopleTable'
 import { SectionHead } from '@/components/SectionHead'
@@ -103,6 +104,9 @@ export function LinePageShell({ line, introMdx, people }: LinePageShellProps) {
             <ComicsTable comics={line.comics} filename={`${line.slug}-comics-in-production.csv`} />
           </section>
         )}
+
+        {/* Research library for this line (self-hides when no manifest is published). */}
+        <ResearchLibrary line={line.slug} />
 
         {/* AI conversations attached to this line (e.g. migrated chat transcripts). */}
         <section className="flex flex-col gap-8 pb-24">
