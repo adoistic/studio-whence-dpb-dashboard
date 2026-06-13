@@ -1,10 +1,8 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import type { Line } from '@/types/content'
-import { AiConversations } from '@/components/AiConversations'
 import { ComicAnalysisTab } from '@/components/ComicAnalysisTab'
-import { ResearchLibrary } from '@/components/ResearchLibrary'
 import { ComicsTable } from '@/components/ComicsTable'
 import { PeopleTable } from '@/components/PeopleTable'
 import { SectionHead } from '@/components/SectionHead'
@@ -33,6 +31,16 @@ export function LinePageShell({ line, introMdx, people }: LinePageShellProps) {
   const seriesCount = new Set(line.comics.map((c) => c.series).filter(Boolean)).size
   const urls = useResolved(visual?.image ? [visual.image] : [])
   const mastheadUrl = visual?.image ? urls[visual.image] : undefined
+
+  // Lines that carry figures get a People-style table; lines without figures keep
+  // the comics-in-production table exactly as before.
+  const hasFigures = line.figures.length > 0
+  const peopleRows = people ?? derivePeople(line.figures, line.comics)
+
+  // medicomics moves its growing Diseases (figure) table and the Medikidz
+  // "Comic Analysis" embed behind a tab bar so the analysis is never buried.
+  const isMedicomics = line.slug === 'medicomics'
+  const [tab, setTab] = useState<'diseases' | 'analysis'>('diseases')
 
   return (
     <div>
@@ -77,9 +85,7 @@ export function LinePageShell({ line, introMdx, people }: LinePageShellProps) {
 
         {/* Stat row */}
         <div className="mt-12 flex flex-wrap gap-x-14 gap-y-8 border-t border-brand-pale-dusk pt-10">
-          {line.slug === 'biographies' && line.figures.length > 0 && (
-            <Stat value={line.figures.length} label="figures researched" />
-          )}
+          {hasFigures && <Stat value={line.figures.length} label="figures researched" />}
           <Stat value={line.comics.length} label="comics in production" />
           {seriesCount > 1 && <Stat value={seriesCount} label="series" />}
         </div>
@@ -93,11 +99,54 @@ export function LinePageShell({ line, introMdx, people }: LinePageShellProps) {
           </section>
         )}
 
-        {/* Biographies: one people/Stage table. Other lines: comics in production. */}
-        {line.slug === 'biographies' ? (
+        {/* Content region.
+            - medicomics: a tab bar — "Diseases" (the figure People-table) and
+              "Comic Analysis" (the Medikidz embed) — so a growing disease list
+              never buries the analysis.
+            - any other line WITH figures (e.g. biographies): one People table.
+            - lines WITHOUT figures: the comics-in-production table, as before. */}
+        {isMedicomics ? (
+          <section className="flex flex-col gap-8 pb-24 pt-20">
+            {/* Tab bar — pill toggle (same pattern as the comic reader's view tabs). */}
+            <div
+              role="tablist"
+              aria-label="Line view"
+              className="inline-flex items-center gap-0.5 self-start rounded-full border border-brand-pale-dusk bg-brand-threshold/70 p-0.5 font-sans"
+            >
+              {([
+                { key: 'diseases', label: 'Diseases' },
+                { key: 'analysis', label: 'Comic Analysis' },
+              ] as const).map(({ key, label }) => {
+                const active = tab === key
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setTab(key)}
+                    className={`rounded-full px-4 py-1.5 font-sans text-[0.72rem] font-semibold uppercase tracking-label transition-colors ${
+                      active
+                        ? 'bg-brand-indigo text-brand-pale-dusk shadow-sm'
+                        : 'text-brand-slate hover:text-brand-indigo'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+
+            {tab === 'diseases' ? (
+              <PeopleTable people={peopleRows} filename={`${line.slug}-diseases.csv`} />
+            ) : (
+              <ComicAnalysisTab />
+            )}
+          </section>
+        ) : hasFigures ? (
           <section className="flex flex-col gap-8 pb-24 pt-20">
             <SectionHead kicker="The library" title="People" />
-            <PeopleTable people={people ?? derivePeople(line.figures, line.comics)} filename={`${line.slug}-people.csv`} />
+            <PeopleTable people={peopleRows} filename={`${line.slug}-people.csv`} />
           </section>
         ) : (
           <section className="flex flex-col gap-8 pb-24 pt-20">
@@ -105,26 +154,6 @@ export function LinePageShell({ line, introMdx, people }: LinePageShellProps) {
             <ComicsTable comics={line.comics} filename={`${line.slug}-comics-in-production.csv`} />
           </section>
         )}
-
-        {/* Comic Analysis embed — medicomics only (the Medikidz per-comic
-            analysis is specific to this line). Any allowlisted member may view it. */}
-        {line.slug === 'medicomics' && (
-          <section className="flex flex-col gap-8 pb-24 pt-20">
-            <SectionHead kicker="Reference" title="Comic Analysis" />
-            <ComicAnalysisTab />
-          </section>
-        )}
-
-        {/* Research library for this line (self-hides when no manifest is published). */}
-        <ResearchLibrary line={line.slug} />
-
-        {/* AI conversations attached to this line (e.g. migrated chat transcripts). */}
-        <section className="flex flex-col gap-8 pb-24">
-          <SectionHead kicker="Reference" title="AI conversations" />
-          <AiConversations line={line.slug} />
-        </section>
-
-        {/* TODO Chunk 5: handoff download (R2 + Worker) */}
       </main>
     </div>
   )
