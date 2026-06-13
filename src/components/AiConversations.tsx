@@ -1,12 +1,26 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import rehypeSanitize from 'rehype-sanitize'
-import { useAiConversations, readAiConversation } from '@/lib/aiConversations'
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize'
+import { useAiConversations, readAiConversation, stripCiteTokens } from '@/lib/aiConversations'
+import { rehypeSourceLines } from '@/lib/rehypeSourceLines'
 import { SectionHead } from '@/components/SectionHead'
+import { ConversationAnalysis } from '@/components/ConversationAnalysis'
 import type { AiConversation } from '@/types/aiConversation'
+
+// The DEFAULT rehype-sanitize schema, widened only to keep the data-sl/data-el
+// line-range attributes that rehypeSourceLines stamps (needed for scroll-to-
+// line). Everything else stays at the strict default — no href/src/style
+// pass-through, so untrusted transcript content is still locked down.
+export const TRANSCRIPT_SCHEMA = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    '*': [...(defaultSchema.attributes?.['*'] ?? []), 'dataSl', 'dataEl'],
+  },
+}
 
 /**
  * Migrated AI chat conversations attached to a line (or a specific comic),
@@ -28,6 +42,33 @@ function ConversationRow({ conversation }: { conversation: AiConversation }) {
   const [text, setText] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const transcriptRef = useRef<HTMLDivElement>(null)
+
+  // Reuses the research-provenance scroll-to-line approach: rehypeSourceLines
+  // stamps every rendered block with data-sl/data-el (its markdown line range),
+  // so we find the block covering `line`, scroll it into view, and flash the
+  // shared .rp-hit highlight for ~1.5s.
+  const scrollTranscriptToLine = (line: number) => {
+    const root = transcriptRef.current
+    if (!root) return
+    const blocks = Array.from(root.querySelectorAll<HTMLElement>('[data-sl]'))
+    let hit: HTMLElement | null = null
+    for (const el of blocks) {
+      const sl = Number(el.getAttribute('data-sl'))
+      const el2 = Number(el.getAttribute('data-el') ?? sl)
+      if (sl <= line && line <= el2) {
+        hit = el
+        break
+      }
+      if (sl <= line) hit = el // fallback: last block starting at/before
+    }
+    if (!hit) return
+    const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    hit.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'center' })
+    hit.classList.add('rp-hit')
+    const target = hit
+    window.setTimeout(() => target.classList.remove('rp-hit'), 1600)
+  }
 
   const toggle = async () => {
     if (open) {
@@ -78,10 +119,26 @@ function ConversationRow({ conversation }: { conversation: AiConversation }) {
           )}
           {loadError && <p className="font-sans text-[0.7rem] text-red-700">{loadError}</p>}
           {text !== null && (
-            <div className="prose prose-sm max-w-none">
-              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
-                {text}
-              </ReactMarkdown>
+            <div className="flex flex-col gap-4 md:flex-row md:gap-6">
+              {conversation.analysis && (
+                <div className="md:w-72 md:flex-none md:border-r md:border-brand-pale-dusk md:pr-6">
+                  <ConversationAnalysis
+                    analysis={conversation.analysis}
+                    onJump={scrollTranscriptToLine}
+                  />
+                </div>
+              )}
+              <div
+                ref={transcriptRef}
+                className="research-prose prose prose-sm min-w-0 max-w-none flex-1"
+              >
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeSourceLines, [rehypeSanitize, TRANSCRIPT_SCHEMA]]}
+                >
+                  {stripCiteTokens(text)}
+                </ReactMarkdown>
+              </div>
             </div>
           )}
         </div>
