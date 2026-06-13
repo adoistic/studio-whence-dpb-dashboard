@@ -9,6 +9,13 @@ vi.mock('@/components/ResearchReader', () => ({
   ),
 }))
 
+// AiConversations is exercised in its own tests + the aiConversations lib tests;
+// here it is stubbed (it transitively loads @/lib/firebase) so the shell renders
+// in isolation. It still shows the figureSlug it was handed.
+vi.mock('@/components/AiConversations', () => ({
+  AiConversations: ({ figureSlug }: { figureSlug?: string }) => <div>ai-convos:{figureSlug ?? 'none'}</div>,
+}))
+
 vi.mock('next/link', () => ({
   default: ({ href, children }: { href: string; children: React.ReactNode }) => <a href={href}>{children}</a>,
 }))

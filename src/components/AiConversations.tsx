@@ -5,6 +5,7 @@ import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import rehypeSanitize from 'rehype-sanitize'
 import { useAiConversations, readAiConversation } from '@/lib/aiConversations'
+import { SectionHead } from '@/components/SectionHead'
 import type { AiConversation } from '@/types/aiConversation'
 
 /**
@@ -89,24 +90,40 @@ function ConversationRow({ conversation }: { conversation: AiConversation }) {
   )
 }
 
-export function AiConversations({ line, comicSlug }: { line: string; comicSlug?: string }) {
-  const { conversations, loading } = useAiConversations({ line, comicSlug })
+export function AiConversations({
+  line,
+  comicSlug,
+  figureSlug,
+  heading,
+}: {
+  line: string
+  comicSlug?: string
+  figureSlug?: string
+  /** Optional section heading; when given it replaces the default h3 and rides
+   *  inside the self-hide so callers don't leave an orphan heading on empty. */
+  heading?: { kicker: string; title: string }
+}) {
+  const { conversations, loading } = useAiConversations({ line, comicSlug, figureSlug })
+  const Heading = () =>
+    heading ? (
+      <SectionHead kicker={heading.kicker} title={heading.title} />
+    ) : (
+      <h3 className="mb-2 font-sans text-[0.6rem] uppercase tracking-label text-brand-slate">
+        AI Conversations
+      </h3>
+    )
   if (loading) {
     return (
-      <section className="mt-4">
-        <h3 className="mb-2 font-sans text-[0.6rem] uppercase tracking-label text-brand-slate">
-          AI Conversations
-        </h3>
+      <section className="mt-4 flex flex-col gap-3">
+        <Heading />
         <p className="font-sans text-[0.7rem] text-brand-slate">Loading…</p>
       </section>
     )
   }
   if (conversations.length === 0) return null
   return (
-    <section className="mt-4">
-      <h3 className="mb-2 font-sans text-[0.6rem] uppercase tracking-label text-brand-slate">
-        AI Conversations
-      </h3>
+    <section className="mt-4 flex flex-col gap-3">
+      <Heading />
       <ul className="flex flex-col gap-2">
         {conversations.map((c) => (
           <ConversationRow key={c.id} conversation={c} />

@@ -4,12 +4,29 @@ import { useState } from 'react'
 import type { Figure } from '@/types/content'
 import { SectionHead } from '@/components/SectionHead'
 import { ResearchReader } from '@/components/ResearchReader'
+import { AiConversations } from '@/components/AiConversations'
 import { PersonTabs } from '@/components/PersonTabs'
 import { useVisibleComics } from '@/lib/visibleCatalog'
 import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 
 function titleCaseSlug(slug: string): string {
   return slug.split('-').map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(' ')
+}
+
+/**
+ * Build the R2 read key for a selected research leaf.
+ *
+ * Biography source paths are repo-relative (`biographies/01-…/_books/…/01.md`)
+ * and live under the `research/` read-prefix, so they get `research/` prepended.
+ * Medicomics dossier paths are already FULL R2 keys (`docs/research/medicomics/
+ * autism/…/source.md`); when a path already begins with a known read-prefix
+ * (`docs/`, `research/`, `artifacts/`) it is used verbatim.
+ */
+export function researchKey(path: string | null): string | null {
+  if (path === null) return null
+  const ABSOLUTE_PREFIXES = ['docs/', 'research/', 'artifacts/']
+  if (ABSOLUTE_PREFIXES.some((prefix) => path.startsWith(prefix))) return path
+  return `research/${path}`
 }
 
 // A selectable research leaf (a chapter file or a podcast transcript).
@@ -188,8 +205,17 @@ export function FigurePageShell({
           <section className="flex flex-col gap-6 pb-24">
             <SectionHead kicker="Read" title="Research" />
             <ResearchReader
-              fileKey={selected ? `research/${selected}` : null}
+              fileKey={researchKey(selected)}
               targetLine={selected === initialFile ? targetLine : undefined}
+            />
+
+            {/* Attached AI conversation(s) — self-hides when there are none, so
+                non-medicomics figures show nothing extra (the heading rides
+                inside the component and hides with it). */}
+            <AiConversations
+              line={figure.line ?? 'medicomics'}
+              figureSlug={figure.slug}
+              heading={{ kicker: 'Reference', title: 'AI conversation' }}
             />
           </section>
         </div>

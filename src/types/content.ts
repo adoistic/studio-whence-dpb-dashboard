@@ -72,6 +72,7 @@ export interface ResearchSource {
 export interface Figure {
   series: string
   slug: string
+  line?: string
   sources_count: number
   words: number
   sources?: ResearchSource[]

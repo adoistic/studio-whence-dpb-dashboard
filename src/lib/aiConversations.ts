@@ -15,24 +15,42 @@ export interface AiConversationsState {
   error?: Error
 }
 
+export interface AiConversationsQuery {
+  line: string
+  comicSlug?: string
+  figureSlug?: string
+}
+
 /**
- * Live AI conversations attached to a line (optionally narrowed to one comic).
+ * Build the Firestore where-filters for an AI-conversations query. Pure so the
+ * filter logic is unit-testable without standing up a listener: always filters
+ * on attachTo.line, and narrows by attachTo.comicSlug / attachTo.figureSlug when
+ * those are given.
+ */
+export function buildConvFilters({ line, comicSlug, figureSlug }: AiConversationsQuery) {
+  const filters = [where('attachTo.line', '==', line)]
+  if (comicSlug) filters.push(where('attachTo.comicSlug', '==', comicSlug))
+  if (figureSlug) filters.push(where('attachTo.figureSlug', '==', figureSlug))
+  return filters
+}
+
+/**
+ * Live AI conversations attached to a line (optionally narrowed to one comic or
+ * one figure).
  *
  * Mirrors useIdeaCaptures: a single onSnapshot, newest-first. Filters on
- * attachTo.line (+ attachTo.comicSlug when given) and orders by createdAt desc.
+ * attachTo.line (+ attachTo.comicSlug / attachTo.figureSlug when given) and
+ * orders by createdAt desc.
  */
 export function useAiConversations({
   line,
   comicSlug,
-}: {
-  line: string
-  comicSlug?: string
-}): AiConversationsState {
+  figureSlug,
+}: AiConversationsQuery): AiConversationsState {
   const [state, setState] = useState<AiConversationsState>({ conversations: [], loading: true })
   useEffect(() => {
     setState({ conversations: [], loading: true })
-    const filters = [where('attachTo.line', '==', line)]
-    if (comicSlug) filters.push(where('attachTo.comicSlug', '==', comicSlug))
+    const filters = buildConvFilters({ line, comicSlug, figureSlug })
     const q = query(collection(db, 'aiConversations'), ...filters, orderBy('createdAt', 'desc'))
     return onSnapshot(
       q,
@@ -46,6 +64,6 @@ export function useAiConversations({
         }),
       (error) => setState({ conversations: [], loading: false, error }),
     )
-  }, [line, comicSlug])
+  }, [line, comicSlug, figureSlug])
   return state
 }
