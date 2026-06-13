@@ -24,6 +24,13 @@
       { "fieldPath": "createdAt", "order": "DESCENDING" } ] },
     { "collectionGroup": "ideas", "queryScope": "COLLECTION", "fields": [
       { "fieldPath": "recipients", "arrayConfig": "CONTAINS" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "aiConversations", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "attachTo.line", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" } ] },
+    { "collectionGroup": "aiConversations", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "attachTo.line", "order": "ASCENDING" },
+      { "fieldPath": "attachTo.comicSlug", "order": "ASCENDING" },
       { "fieldPath": "createdAt", "order": "DESCENDING" } ] }
   ],
   "fieldOverrides": []

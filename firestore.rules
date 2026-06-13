@@ -141,6 +141,25 @@ service cloud.firestore {
         allow write: if false;
       }
     }
+    // ── AI conversations (captured ChatGPT/Gemini/… transcripts attached to a
+    //    line/comic; written only by the capture Admin SDK, which bypasses rules) ──
+    // Visibility mirrors the LOCKED decision: line-attached → any allowlisted
+    // member; comic-attached → that comic's allocation (via comicAllowed, which
+    // already short-circuits for moderators/sub_admins). The conversation doc has
+    // no subject_slug, so the figure-grant branch of comicAllowed is passed '';
+    // the line + comics + moderator branches still gate access correctly.
+    match /aiConversations/{id} {
+      allow read: if isAllowlisted() && (
+           resource.data.attachTo.kind == 'line'
+        || (resource.data.attachTo.kind == 'comic'
+            && comicAllowed(
+                 resource.data.attachTo.line + '__' + resource.data.attachTo.comicSlug,
+                 resource.data.attachTo.line,
+                 ''))
+        || isSubAdmin()
+      );
+      allow write: if false;
+    }
     match /people/{p}    { allow read: if isAllowlisted(); allow write: if false; }
 
     // ── Feedback (live source of truth; client-written under these rules) ──

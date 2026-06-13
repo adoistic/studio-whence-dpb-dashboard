@@ -12,6 +12,12 @@ import {
 } from "./allocation";
 import { canReadIdea, captureR2KeyIsConfined } from "./ideaAccess";
 import { getIdeaData, getCaptureData } from "./ideaStore";
+import {
+  aiConvR2KeyIsConfined,
+  canReadAiConversation,
+  type AiConversation,
+} from "./aiConversationAccess";
+import { getAiConversationData } from "./aiConversationStore";
 
 /**
  * dataApi — the gatekeeper Cloud Function for the gated data backbone.
@@ -299,6 +305,61 @@ export const dataApi = onRequest(
         res.status(404).json({ error: "not found" });
       } else {
         res.status(500).json({ error: "idea-capture failed" });
+      }
+    }
+    return;
+  }
+
+  // ── GET /ai-conversation?id= ───────────────────────────────────────────────
+  // Serves a captured AI-conversation transcript (ChatGPT/Gemini/…) from R2,
+  // gated by the LOCKED visibility decision: line-attached → any allowlisted
+  // member; comic-attached → that comic's allocation; moderators → all.
+  if (req.method === "GET" && route === "ai-conversation") {
+    const auth = await authorize(req);
+    if (!auth) {
+      res.status(403).json({ error: "forbidden" });
+      return;
+    }
+    const id = String(req.query.id ?? "");
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(id)) {
+      res.status(400).json({ error: "bad request" });
+      return;
+    }
+    try {
+      const conv = await getAiConversationData(id);
+      if (!conv) {
+        res.status(404).json({ error: "not found" });
+        return;
+      }
+      if (conv.status !== "captured") {
+        res.status(404).json({ error: "not found" });
+        return;
+      }
+      // Comic-attached conversations need the member's allocation; moderators and
+      // line-attached conversations short-circuit inside the predicate, so only
+      // fetch the allocation doc for non-moderators (≤1 Firestore read).
+      let alloc = { comics: [] as string[], lines: [] as string[] };
+      if (!auth.moderator) {
+        const a = await getAllocation(auth.email);
+        if (a) alloc = { comics: a.comics, lines: a.lines };
+      }
+      if (!canReadAiConversation(auth, conv as unknown as AiConversation, alloc)) {
+        res.status(403).json({ error: "forbidden" });
+        return;
+      }
+      const r2Key = conv.r2Key;
+      if (typeof r2Key !== "string" || !aiConvR2KeyIsConfined(id, r2Key)) {
+        res.status(403).json({ error: "forbidden" });
+        return;
+      }
+      const { body } = await getObject(r2Key);
+      res.status(200).type("text/markdown").send(body);
+    } catch (err) {
+      const name = (err as { name?: string } | null)?.name;
+      if (name === "NoSuchKey" || name === "NotFound") {
+        res.status(404).json({ error: "not found" });
+      } else {
+        res.status(500).json({ error: "ai-conversation failed" });
       }
     }
     return;
