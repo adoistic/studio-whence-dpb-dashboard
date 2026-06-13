@@ -112,6 +112,13 @@ export async function readIdeaCapture(ideaId: string, captureId: string): Promis
   return res.text()
 }
 
+/** Read one migrated AI-chat transcript (markdown) by conversation id. */
+export async function readAiConversation(id: string): Promise<string> {
+  const res = await authedFetch(`/ai-conversation?id=${encodeURIComponent(id)}`)
+  if (!res.ok) throw new Error(`ai-conversation failed: ${res.status}`)
+  return res.text()
+}
+
 /** Ask the Function for a presigned PUT URL for an idea image. */
 export async function requestUploadUrl(
   ideaId: string, filename: string, contentType: string,

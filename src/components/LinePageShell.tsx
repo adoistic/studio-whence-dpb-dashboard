@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react'
 import type { Line } from '@/types/content'
+import { AiConversations } from '@/components/AiConversations'
 import { ComicsTable } from '@/components/ComicsTable'
 import { PeopleTable } from '@/components/PeopleTable'
 import { SectionHead } from '@/components/SectionHead'
@@ -102,6 +103,12 @@ export function LinePageShell({ line, introMdx, people }: LinePageShellProps) {
             <ComicsTable comics={line.comics} filename={`${line.slug}-comics-in-production.csv`} />
           </section>
         )}
+
+        {/* AI conversations attached to this line (e.g. migrated chat transcripts). */}
+        <section className="flex flex-col gap-8 pb-24">
+          <SectionHead kicker="Reference" title="AI conversations" />
+          <AiConversations line={line.slug} />
+        </section>
 
         {/* TODO Chunk 5: handoff download (R2 + Worker) */}
       </main>

@@ -1,0 +1,117 @@
+'use client'
+
+import { useState } from 'react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import rehypeSanitize from 'rehype-sanitize'
+import { useAiConversations, readAiConversation } from '@/lib/aiConversations'
+import type { AiConversation } from '@/types/aiConversation'
+
+/**
+ * Migrated AI chat conversations attached to a line (or a specific comic),
+ * rendered as an expandable list.
+ *
+ * SECURITY: transcripts are UNTRUSTED fetched content — they are rendered with
+ * react-markdown's default urlTransform and the DEFAULT rehype-sanitize schema
+ * (no r2:/data: pass-through), exactly as IdeaCaptures does. Never widen this.
+ */
+
+function formatConversationDate(c: AiConversation): string | null {
+  const ts = c.conversationCreatedAt ?? c.createdAt
+  if (!ts) return null
+  return new Date(ts.toMillis()).toLocaleDateString()
+}
+
+function ConversationRow({ conversation }: { conversation: AiConversation }) {
+  const [open, setOpen] = useState(false)
+  const [text, setText] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  const toggle = async () => {
+    if (open) {
+      setOpen(false)
+      return
+    }
+    setOpen(true)
+    if (text !== null || loading) return
+    setLoading(true)
+    setLoadError(null)
+    try {
+      setText(await readAiConversation(conversation.id))
+    } catch {
+      setLoadError('Could not load the transcript.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const date = formatConversationDate(conversation)
+  return (
+    <li className="rounded-lg border border-brand-pale-dusk bg-white/70">
+      <div className="flex w-full flex-wrap items-center gap-2 px-3 py-2">
+        <span className="min-w-0 flex-1 truncate text-sm text-brand-umber">
+          {conversation.title || conversation.id}
+        </span>
+        {conversation.model && (
+          <span className="font-sans text-[0.65rem] text-brand-slate">{conversation.model}</span>
+        )}
+        {conversation.messageCount !== null && (
+          <span className="font-sans text-[0.65rem] text-brand-slate">
+            {conversation.messageCount} messages
+          </span>
+        )}
+        {date && <span className="font-sans text-[0.65rem] text-brand-slate">{date}</span>}
+        <button
+          type="button"
+          onClick={() => void toggle()}
+          className="rounded-md border border-brand-pale-dusk px-2 py-1 font-sans text-[0.6rem] uppercase tracking-label text-brand-umber transition-colors hover:bg-brand-indigo/5"
+        >
+          {open ? 'Hide' : 'Read'}
+        </button>
+      </div>
+      {open && (
+        <div className="border-t border-brand-pale-dusk px-4 py-3">
+          {loading && (
+            <p className="font-sans text-[0.7rem] text-brand-slate">Loading transcript…</p>
+          )}
+          {loadError && <p className="font-sans text-[0.7rem] text-red-700">{loadError}</p>}
+          {text !== null && (
+            <div className="prose prose-sm max-w-none">
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeSanitize]}>
+                {text}
+              </ReactMarkdown>
+            </div>
+          )}
+        </div>
+      )}
+    </li>
+  )
+}
+
+export function AiConversations({ line, comicSlug }: { line: string; comicSlug?: string }) {
+  const { conversations, loading } = useAiConversations({ line, comicSlug })
+  if (loading) {
+    return (
+      <section className="mt-4">
+        <h3 className="mb-2 font-sans text-[0.6rem] uppercase tracking-label text-brand-slate">
+          AI Conversations
+        </h3>
+        <p className="font-sans text-[0.7rem] text-brand-slate">Loading…</p>
+      </section>
+    )
+  }
+  if (conversations.length === 0) return null
+  return (
+    <section className="mt-4">
+      <h3 className="mb-2 font-sans text-[0.6rem] uppercase tracking-label text-brand-slate">
+        AI Conversations
+      </h3>
+      <ul className="flex flex-col gap-2">
+        {conversations.map((c) => (
+          <ConversationRow key={c.id} conversation={c} />
+        ))}
+      </ul>
+    </section>
+  )
+}
