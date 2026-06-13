@@ -14,7 +14,7 @@ import type { AiConversation } from '@/types/aiConversation'
 // line-range attributes that rehypeSourceLines stamps (needed for scroll-to-
 // line). Everything else stays at the strict default — no href/src/style
 // pass-through, so untrusted transcript content is still locked down.
-const TRANSCRIPT_SCHEMA = {
+export const TRANSCRIPT_SCHEMA = {
   ...defaultSchema,
   attributes: {
     ...defaultSchema.attributes,
