@@ -1,4 +1,5 @@
 import { BrandLockup } from './BrandLockup'
+import { DiamondBooksLogo } from './DiamondBooksLogo'
 
 export function Footer({ sha, lastUpdate }: { sha?: string; lastUpdate?: string }) {
   return (
@@ -7,9 +8,14 @@ export function Footer({ sha, lastUpdate }: { sha?: string; lastUpdate?: string 
         <div className="flex flex-col gap-3">
           <BrandLockup size="md" onDark />
           <p className="font-serif italic text-xl text-brand-gold">Stories in becoming.</p>
-          <p className="max-w-xs font-sans text-[0.7rem] uppercase tracking-label text-brand-pale-dusk/55">
-            Studio Whence × Diamond Pocket Books
-          </p>
+          {/* Co-brand: this platform produces the Diamond Pocket Books / Diamond
+              Toons comic lines, so the publisher is credited here. */}
+          <div className="mt-2 flex items-center gap-3">
+            <span className="font-sans text-[0.65rem] uppercase tracking-label text-brand-pale-dusk/55">
+              Publishing partner
+            </span>
+            <DiamondBooksLogo onDark width={116} />
+          </div>
         </div>
         <div className="flex flex-col gap-1.5 font-sans text-[0.7rem] uppercase tracking-label text-brand-pale-dusk/55 md:items-end">
           {sha && <span>build · {sha.slice(0, 7)}</span>}

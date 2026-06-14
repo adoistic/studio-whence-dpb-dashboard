@@ -50,6 +50,9 @@ describe('FooterWithData', () => {
 
     // The footer still renders (the brand lockup tagline is always present)…
     expect(screen.getByText('Stories in becoming.')).toBeInTheDocument()
+    // …and the Diamond Books co-brand (publishing partner) is always credited.
+    expect(screen.getByAltText('Diamond Books')).toBeInTheDocument()
+    expect(screen.getByText(/publishing partner/i)).toBeInTheDocument()
     // …but no build/date provenance lines.
     expect(screen.queryByText(/^build · /)).not.toBeInTheDocument()
     expect(screen.queryByText(/^data refreshed · /)).not.toBeInTheDocument()

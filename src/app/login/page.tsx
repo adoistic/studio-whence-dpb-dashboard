@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation'
 import { auth, googleProvider } from '@/lib/firebase'
 import { useUser } from '@/lib/auth'
 import { BrandLockup } from '@/components/BrandLockup'
+import { DiamondBooksLogo } from '@/components/DiamondBooksLogo'
 import { Eyebrow } from '@/components/Eyebrow'
 
 export default function LoginPage() {
@@ -187,6 +188,15 @@ export default function LoginPage() {
             Sign-in failed. Try again.
           </p>
         )}
+      </div>
+
+      {/* Co-brand: the platform serves the Diamond Pocket Books / Diamond Toons
+          comic lines — credit the publisher on the entry screen. */}
+      <div className="flex flex-col items-center gap-2.5">
+        <span className="font-sans text-[0.65rem] uppercase tracking-label text-brand-lavender">
+          Publishing partner
+        </span>
+        <DiamondBooksLogo width={132} />
       </div>
     </main>
   )
