@@ -190,11 +190,11 @@ export default function LoginPage() {
         )}
       </div>
 
-      {/* Co-brand: the platform serves the Diamond Pocket Books / Diamond Toons
-          comic lines — credit the publisher on the entry screen. */}
+      {/* Co-brand: Studio Whence produces the Diamond Pocket Books / Diamond
+          Toons comic lines for Diamond (the client) — credit reads "Produced for". */}
       <div className="flex flex-col items-center gap-2.5">
         <span className="font-sans text-[0.65rem] uppercase tracking-label text-brand-lavender">
-          Publishing partner
+          Produced for
         </span>
         <DiamondBooksLogo width={132} />
       </div>

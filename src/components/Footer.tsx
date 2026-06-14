@@ -8,11 +8,12 @@ export function Footer({ sha, lastUpdate }: { sha?: string; lastUpdate?: string 
         <div className="flex flex-col gap-3">
           <BrandLockup size="md" onDark />
           <p className="font-serif italic text-xl text-brand-gold">Stories in becoming.</p>
-          {/* Co-brand: this platform produces the Diamond Pocket Books / Diamond
-              Toons comic lines, so the publisher is credited here. */}
+          {/* Co-brand: Studio Whence produces the Diamond Pocket Books / Diamond
+              Toons comic lines on a studio (fee-for-service) basis — Diamond is
+              the client/publisher, so credit reads "Produced for". */}
           <div className="mt-2 flex items-center gap-3">
             <span className="font-sans text-[0.65rem] uppercase tracking-label text-brand-pale-dusk/55">
-              Publishing partner
+              Produced for
             </span>
             <DiamondBooksLogo onDark width={116} />
           </div>
