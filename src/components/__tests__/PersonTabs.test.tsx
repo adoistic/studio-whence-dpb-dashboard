@@ -26,42 +26,14 @@ describe('PersonTabs', () => {
     expect(screen.queryByRole('link', { name: /comics/i })).not.toBeInTheDocument()
   })
   test('null figureSlug: Research renders as a non-link span', () => {
-    render(<PersonTabs figureSlug={null} comics={comics} active="comics" activeComicSlug="c1" />)
+    render(<PersonTabs figureSlug={null} comics={comics} active="comics" />)
     expect(screen.queryByRole('link', { name: /research/i })).toBeNull()
     expect(screen.getByText('Research')).toBeInTheDocument()
   })
-  test('comics-active, non-edition subject: Research links to the figure; the switcher falls back to (prefix-stripped) titles', () => {
-    render(<PersonTabs figureSlug="jrd-tata" comics={comics} active="comics" activeComicSlug="c1" />)
+  test('comics-active: Research links back to the figure; the edition switcher is NOT in the tab strip', () => {
+    render(<PersonTabs figureSlug="jrd-tata" comics={comics} active="comics" />)
     expect(screen.getByRole('link', { name: /research/i })).toHaveAttribute('href', '/figures/jrd-tata')
-    // No -standard/-premium slugs → titles, with the shared "The" prefix stripped.
-    expect(screen.getByRole('link', { name: /salt years/i })).toHaveAttribute('href', '/biographies/c2')
-    const active = screen.getByText(/sky-high dreamer/i)
-    expect(active.closest('[aria-current="page"]')).not.toBeNull()
-    // No "Standard"/"Premium" wording for a plain biography pairing.
-    expect(screen.queryByText(/standard/i)).toBeNull()
-    expect(screen.queryByText(/premium/i)).toBeNull()
-  })
-
-  const editions = [
-    { slug: '01-x-standard', line: 'medicomics', title: 'Little Chanakya and the Pink Ribbon Mystery', status: 'in-review' as const, comic_number: 1, target_length_pages: 24 },
-    { slug: '02-x-premium', line: 'medicomics', title: 'Little Chanakya and the Pink Ribbon Mystery (Understanding Breast Cancer) — Premium 48pp edition', status: 'in-review' as const, comic_number: 2, target_length_pages: 48 },
-  ]
-
-  test('comics-active, edition subject: renders an "Editions" switcher with the REAL titles, active highlighted', () => {
-    render(<PersonTabs figureSlug="breast-cancer" comics={editions} active="comics" activeComicSlug="01-x-standard" />)
-    const tablist = screen.getByRole('tablist', { name: /editions/i })
-    expect(tablist).toBeInTheDocument()
-    expect(screen.getByText(/^editions$/i)).toBeInTheDocument()
-    // The real comic titles are shown verbatim — no extrapolated "Standard"/"Premium" labels.
-    const standard = screen.getByText('Little Chanakya and the Pink Ribbon Mystery')
-    expect(standard.closest('[aria-current="page"]')).not.toBeNull() // active, non-link
-    const premium = screen.getByText(/understanding breast cancer/i)  // the premium edition's real title
-    expect(premium.closest('a')).toHaveAttribute('href', '/medicomics/02-x-premium')
-  })
-
-  test('single comic: no switcher renders', () => {
-    render(<PersonTabs figureSlug="breast-cancer" comics={[editions[0]]} active="comics" activeComicSlug="01-x-standard" />)
+    // The edition switcher moved out of the tab strip into ComicEditions (the body band).
     expect(screen.queryByRole('tablist', { name: /editions/i })).toBeNull()
-    expect(screen.queryByText(/editions/i)).toBeNull()
   })
 })

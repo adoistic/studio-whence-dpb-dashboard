@@ -17,6 +17,7 @@ import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { normalizeSubjectSlug } from '@/lib/slugs'
 import { citationMapFromSources } from '@/lib/provenance'
 import { PersonTabs } from '@/components/PersonTabs'
+import { ComicEditions } from '@/components/ComicEditions'
 import { useProvenanceMarkers } from '@/lib/useProvenanceMarkers'
 import { ProvenanceTooltip } from '@/components/ProvenanceTooltip'
 import { CommentGutter } from '@/components/feedback/CommentGutter'
@@ -177,11 +178,15 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
 
       {/* ── Person tabs (Research ⇄ Comics) — biographies w/ a figure only ── */}
       {hasFigure && (
-        <PersonTabs figureSlug={figureSlug} comics={comics} active="comics" activeComicSlug={comic.slug} />
+        <PersonTabs figureSlug={figureSlug} comics={comics} active="comics" />
       )}
 
       {/* ── Body ───────────────────────────────────────────────────── */}
       <main className="mx-auto max-w-[1100px] px-6">
+        {/* Editions band — prominent in the body so it isn't missed (it used to
+            be crammed into the tab strip right under the masthead). */}
+        <ComicEditions comics={comics} activeSlug={comic.slug} />
+
         {/* Spec row — only present fields render */}
         <div className="mt-12 flex flex-wrap gap-x-12 gap-y-7 border-t border-brand-pale-dusk pt-10">
           {comic.time_span && <Detail label="time span" value={comic.time_span} />}

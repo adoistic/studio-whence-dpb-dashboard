@@ -8,12 +8,11 @@ const ACTIVE = 'text-brand-indigo border-b-2 border-brand-gold'
 const INACTIVE = 'text-brand-slate hover:text-brand-indigo border-b-2 border-transparent'
 
 export function PersonTabs({
-  figureSlug, comics, active, activeComicSlug,
+  figureSlug, comics, active,
 }: {
   figureSlug: string | null
   comics: PersonComic[]
   active: 'research' | 'comics'
-  activeComicSlug?: string
 }) {
   const top = furthestComic(comics)
   return (
@@ -41,61 +40,6 @@ export function PersonTabs({
           <span className={`${TAB} py-3 text-brand-pale-dusk/70`}>No comic yet</span>
         )}
       </nav>
-
-      {/* Edition switcher (comic page, when a subject has several variants) */}
-      {active === 'comics' && comics.length > 1 && (
-        <EditionSwitcher comics={comics} activeComicSlug={activeComicSlug} />
-      )}
-    </div>
-  )
-}
-
-/**
- * Switcher for a subject that has several comic variants/editions (e.g. the
- * medicomics Standard + Premium editions). Shows each comic's REAL title as a
- * consistent pill — the active one filled, the others outlined links — under a
- * small "Editions" label so it reads unmistakably as a set of editions.
- */
-function EditionSwitcher({
-  comics, activeComicSlug,
-}: {
-  comics: PersonComic[]
-  activeComicSlug?: string
-}) {
-  return (
-    <div className="mx-auto max-w-[1100px] px-6 pb-4">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <span className="font-sans text-[0.62rem] uppercase tracking-label text-brand-slate">
-          Editions
-        </span>
-        <div role="tablist" aria-label="Comic editions" className="inline-flex flex-wrap gap-1.5">
-          {comics.map((c) => {
-            const isActive = c.slug === activeComicSlug
-            const base = 'rounded-full border px-4 py-1.5 font-serif text-[0.85rem] leading-tight transition-colors'
-            return isActive ? (
-              <span
-                key={c.slug}
-                role="tab"
-                aria-selected="true"
-                aria-current="page"
-                className={`${base} border-brand-indigo bg-brand-indigo text-brand-pale-dusk shadow-sm`}
-              >
-                {c.title}
-              </span>
-            ) : (
-              <Link
-                key={c.slug}
-                href={`/${c.line}/${c.slug}`}
-                role="tab"
-                aria-selected="false"
-                className={`${base} border-brand-pale-dusk text-brand-slate hover:border-brand-gold hover:text-brand-indigo`}
-              >
-                {c.title}
-              </Link>
-            )
-          })}
-        </div>
-      </div>
     </div>
   )
 }
