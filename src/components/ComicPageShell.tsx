@@ -9,6 +9,7 @@ import { VersionTimeline } from '@/components/feedback/VersionTimeline'
 import { DocumentsPanel } from '@/components/DocumentsPanel'
 import { ComicReader } from '@/components/ComicReader'
 import { ComicPdfButton } from '@/components/ComicPdfButton'
+import { ComicDocxButton } from '@/components/ComicDocxButton'
 import { useGatedText } from '@/lib/useGatedText'
 import { useFigure } from '@/lib/catalog'
 import { useVisibleComics } from '@/lib/visibleCatalog'
@@ -269,11 +270,14 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
                   )
                 })}
               </div>
-              <CopyScriptToolbar
-                comicId={`${comic.line}__${comic.slug}`}
-                comicTitle={comic.title}
-                draftText={draft.text}
-              />
+              <div className="flex flex-wrap items-center gap-3">
+                {draft.text && <ComicDocxButton comic={comic} draftHtml={draft.text} />}
+                <CopyScriptToolbar
+                  comicId={`${comic.line}__${comic.slug}`}
+                  comicTitle={comic.title}
+                  draftText={draft.text}
+                />
+              </div>
             </div>
 
             {view === 'draft' ? (
