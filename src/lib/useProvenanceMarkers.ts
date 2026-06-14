@@ -7,6 +7,16 @@ import type { TooltipState } from '@/components/ProvenanceTooltip'
 
 const MARKER_SEL = '.cs-src, .cs-src-art'
 
+// Biographies/Indic markers carry a bare repo path (`P/18.md`) that is read under
+// the `research/` namespace. MediComics markers carry a SERVED R2 key already
+// (`docs/research/medicomics/...`), which must be read as-is. Distinguish by the
+// served prefixes so each line reads from the right place.
+const SERVED_PREFIXES = ['docs/', 'research/', 'artifacts/']
+
+export function readKeyFor(key: string): string {
+  return SERVED_PREFIXES.some((p) => key.startsWith(p)) ? key : 'research/' + key
+}
+
 export function useProvenanceMarkers(
   containerRef: RefObject<HTMLElement | null>,
   citationMap: Map<string, Citation>,
@@ -28,7 +38,7 @@ export function useProvenanceMarkers(
     let text = cache.current.get(key)
     if (text == null) {
       try {
-        text = await readMarkdown('research/' + key)
+        text = await readMarkdown(readKeyFor(key))
         cache.current.set(key, text)
       } catch {
         if (activeToken.current === token) setTip((t) => (t ? { ...t, excerpt: { status: 'error' } } : t))

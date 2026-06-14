@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { useRef } from 'react'
-import { useProvenanceMarkers } from '@/lib/useProvenanceMarkers'
+import { useProvenanceMarkers, readKeyFor } from '@/lib/useProvenanceMarkers'
 import { ProvenanceTooltip } from '@/components/ProvenanceTooltip'
 
 let mockRead: (key: string) => Promise<string>
@@ -61,6 +61,28 @@ describe('useProvenanceMarkers', () => {
     expect(mockRead).toHaveBeenCalledWith('research/P/18.md')
   })
 
+  it('reads a served docs/research medicomics key as-is, not under research/', () => {
+    mockRead = vi.fn(async () => 'l1\nl2 cited\nl3')
+    const key = 'docs/research/medicomics/lung-cancer/_clinical/guidelines.md'
+    const SERVED_DRAFT =
+      '<section class="cs-page"><div class="cs-panel">' +
+      `<p class="cs-caption"><a class="cs-src" href="#" data-figure="lung-cancer" data-key="${key}" data-line="2" aria-label="source: g, line 2">source</a></p>` +
+      '</div></section>'
+    function ServedHarness() {
+      const ref = useRef<HTMLDivElement>(null)
+      const tip = useProvenanceMarkers(ref, new Map(), SERVED_DRAFT)
+      return (
+        <div>
+          <div ref={ref} className="comic-script" dangerouslySetInnerHTML={{ __html: SERVED_DRAFT }} />
+          {tip && <ProvenanceTooltip {...tip} />}
+        </div>
+      )
+    }
+    const { container } = render(<ServedHarness />)
+    fireEvent.mouseOver(container.querySelector('.cs-src')!)
+    expect(mockRead).toHaveBeenCalledWith(key)
+  })
+
   it('hides the tooltip on mouseout', () => {
     const { container } = render(<Harness />)
     const m = container.querySelector('.cs-src')!
@@ -68,5 +90,25 @@ describe('useProvenanceMarkers', () => {
     expect(container.querySelector('.prov-tip')).toBeInTheDocument()
     fireEvent.mouseOut(m)
     expect(container.querySelector('.prov-tip')).not.toBeInTheDocument()
+  })
+})
+
+describe('readKeyFor', () => {
+  it('reads a served docs/research key as-is (medicomics)', () => {
+    expect(readKeyFor('docs/research/medicomics/lung-cancer/_clinical/guidelines.md')).toBe(
+      'docs/research/medicomics/lung-cancer/_clinical/guidelines.md',
+    )
+  })
+
+  it('reads other served prefixes as-is', () => {
+    expect(readKeyFor('research/x.md')).toBe('research/x.md')
+    expect(readKeyFor('artifacts/y.md')).toBe('artifacts/y.md')
+  })
+
+  it('prefixes a bare biographies repo path with research/', () => {
+    expect(readKeyFor('biographies/04-Science-Legends/_books/x/y.md')).toBe(
+      'research/biographies/04-Science-Legends/_books/x/y.md',
+    )
+    expect(readKeyFor('P/18.md')).toBe('research/P/18.md')
   })
 })
