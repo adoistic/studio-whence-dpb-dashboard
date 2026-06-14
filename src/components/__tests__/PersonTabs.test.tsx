@@ -47,23 +47,16 @@ describe('PersonTabs', () => {
     { slug: '02-x-premium', line: 'medicomics', title: 'Little Chanakya and the Pink Ribbon Mystery (Understanding Breast Cancer) — Premium 48pp edition', status: 'in-review' as const, comic_number: 2, target_length_pages: 48 },
   ]
 
-  test('comics-active, edition subject: renders a labeled "Standard · 24 pages" / "Premium · 48 pages" switcher', () => {
+  test('comics-active, edition subject: renders an "Editions" switcher with the REAL titles, active highlighted', () => {
     render(<PersonTabs figureSlug="breast-cancer" comics={editions} active="comics" activeComicSlug="01-x-standard" />)
     const tablist = screen.getByRole('tablist', { name: /editions/i })
     expect(tablist).toBeInTheDocument()
-    // Short, distinguishing labels — not the long raw titles.
-    expect(screen.getByText('Standard')).toBeInTheDocument()
-    expect(screen.getByText('24 pages')).toBeInTheDocument()
-    expect(screen.getByText('Premium')).toBeInTheDocument()
-    expect(screen.getByText('48 pages')).toBeInTheDocument()
-    expect(screen.queryByText(/understanding breast cancer/i)).toBeNull()
-    // Active = Standard (non-link), Premium links to its slug.
-    const standard = screen.getByText('Standard')
-    expect(standard.closest('[aria-current="page"]')).not.toBeNull()
-    const premiumLink = screen.getByText('Premium').closest('a')
-    expect(premiumLink).toHaveAttribute('href', '/medicomics/02-x-premium')
-    // It says how many editions there are.
-    expect(screen.getByText(/2 editions/i)).toBeInTheDocument()
+    expect(screen.getByText(/^editions$/i)).toBeInTheDocument()
+    // The real comic titles are shown verbatim — no extrapolated "Standard"/"Premium" labels.
+    const standard = screen.getByText('Little Chanakya and the Pink Ribbon Mystery')
+    expect(standard.closest('[aria-current="page"]')).not.toBeNull() // active, non-link
+    const premium = screen.getByText(/understanding breast cancer/i)  // the premium edition's real title
+    expect(premium.closest('a')).toHaveAttribute('href', '/medicomics/02-x-premium')
   })
 
   test('single comic: no switcher renders', () => {

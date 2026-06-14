@@ -1,46 +1,6 @@
 import { describe, test, expect } from 'vitest'
-import { derivePeople, STAGE_RANK, personDocToRow, variantLabels, type PersonComic } from '../people'
+import { derivePeople, STAGE_RANK, personDocToRow } from '../people'
 import type { Figure, Comic } from '@/types/content'
-
-describe('variantLabels', () => {
-  const pc = (extra: Partial<PersonComic>): PersonComic =>
-    ({ slug: 'x', line: 'l', title: 't', status: 'draft', ...extra })
-
-  test('medicomics editions → "Standard"/"Premium" + page-count detail from target_length_pages', () => {
-    const out = variantLabels([
-      pc({ slug: '01-pink-ribbon-mystery-standard', comic_number: 1, target_length_pages: 24 }),
-      pc({ slug: '02-pink-ribbon-mystery-premium', comic_number: 2, target_length_pages: 48 }),
-    ])
-    expect(out).toEqual([
-      { primary: 'Standard', detail: '24 pages' },
-      { primary: 'Premium', detail: '48 pages' },
-    ])
-  })
-
-  test('non-edition multi-comic subject → falls back to titles with the shared prefix stripped', () => {
-    const out = variantLabels([
-      pc({ slug: 'c1', title: 'The Sky-High Dreamer' }),
-      pc({ slug: 'c2', title: 'The Salt Years' }),
-    ])
-    expect(out).toEqual([{ primary: 'Sky-High Dreamer' }, { primary: 'Salt Years' }])
-  })
-
-  test('comic_number alone does NOT classify editions (biography 1/2 keeps its titles)', () => {
-    const out = variantLabels([
-      pc({ slug: 'early-years', title: 'Early Years', comic_number: 1 }),
-      pc({ slug: 'peak-career', title: 'Peak Career', comic_number: 2 }),
-    ])
-    expect(out).toEqual([{ primary: 'Early Years' }, { primary: 'Peak Career' }])
-  })
-
-  test('editions with no page count → primary only, no detail', () => {
-    const out = variantLabels([
-      pc({ slug: 'a-standard' }),
-      pc({ slug: 'b-premium' }),
-    ])
-    expect(out).toEqual([{ primary: 'Standard' }, { primary: 'Premium' }])
-  })
-})
 
 const fig = (slug: string, extra: Partial<Figure> = {}): Figure =>
   ({ series: '01-Business-Legends', slug, sources_count: 3, words: 1000, ...extra })

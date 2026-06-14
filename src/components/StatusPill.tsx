@@ -17,10 +17,13 @@ const STATUS_DOT: Record<Status, string> = {
 }
 
 export function StatusPill({ status }: { status: Status }) {
+  // A solid light pill with dark indigo text — legible on BOTH the dark hero
+  // masthead (where the old translucent-pale pill + muted-umber text was barely
+  // readable, reading as a faint gold smudge) and on light listing pages.
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-pale-dusk bg-brand-pale-dusk/40 px-2.5 py-1">
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-pale-dusk bg-brand-cream px-2.5 py-1 shadow-sm">
       <span aria-hidden className={`inline-block h-1.5 w-1.5 rounded-full ${STATUS_DOT[status] ?? 'bg-brand-slate'}`} />
-      <span className="font-sans text-[0.65rem] uppercase tracking-label text-brand-umber">
+      <span className="font-sans text-[0.65rem] font-semibold uppercase tracking-label text-brand-indigo">
         {STATUS_LABELS[status] ?? status}
       </span>
     </span>

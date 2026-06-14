@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { furthestComic, variantLabels, type PersonComic } from '@/lib/people'
+import { furthestComic, type PersonComic } from '@/lib/people'
 
 const TAB = 'font-sans text-[0.72rem] uppercase tracking-label transition-colors'
 const ACTIVE = 'text-brand-indigo border-b-2 border-brand-gold'
@@ -51,11 +51,10 @@ export function PersonTabs({
 }
 
 /**
- * A clear, labeled segmented control for switching between a subject's comic
- * variants (e.g. the medicomics Standard 24pp / Premium 48pp editions). Each
- * control shows a SHORT distinguishing label — derived by `variantLabels` — not
- * the raw, near-identical long titles. The current variant is highlighted and
- * non-clickable; the others link to their own page.
+ * Switcher for a subject that has several comic variants/editions (e.g. the
+ * medicomics Standard + Premium editions). Shows each comic's REAL title as a
+ * consistent pill — the active one filled, the others outlined links — under a
+ * small "Editions" label so it reads unmistakably as a set of editions.
  */
 function EditionSwitcher({
   comics, activeComicSlug,
@@ -63,42 +62,25 @@ function EditionSwitcher({
   comics: PersonComic[]
   activeComicSlug?: string
 }) {
-  const labels = variantLabels(comics)
   return (
-    <div className="mx-auto max-w-[1100px] px-6 pb-3">
+    <div className="mx-auto max-w-[1100px] px-6 pb-4">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <span className="font-sans text-[0.62rem] uppercase tracking-label text-brand-slate">
-          {comics.length} editions
+          Editions
         </span>
-        <div
-          role="tablist"
-          aria-label="Comic editions"
-          className="inline-flex flex-wrap items-stretch gap-0.5 rounded-full border border-brand-pale-dusk bg-brand-pale-dusk/30 p-0.5"
-        >
-          {comics.map((c, i) => {
-            const { primary, detail } = labels[i]
+        <div role="tablist" aria-label="Comic editions" className="inline-flex flex-wrap gap-1.5">
+          {comics.map((c) => {
             const isActive = c.slug === activeComicSlug
-            const inner = (
-              <span className="flex items-baseline gap-1.5">
-                <span className="font-sans text-[0.72rem] font-semibold uppercase tracking-label">
-                  {primary}
-                </span>
-                {detail && (
-                  <span className={`font-serif text-[0.78rem] ${isActive ? 'text-brand-pale-dusk/80' : 'text-brand-slate'}`}>
-                    {detail}
-                  </span>
-                )}
-              </span>
-            )
+            const base = 'rounded-full border px-4 py-1.5 font-serif text-[0.85rem] leading-tight transition-colors'
             return isActive ? (
               <span
                 key={c.slug}
                 role="tab"
                 aria-selected="true"
                 aria-current="page"
-                className="rounded-full bg-brand-indigo px-4 py-1.5 text-brand-pale-dusk shadow-sm"
+                className={`${base} border-brand-indigo bg-brand-indigo text-brand-pale-dusk shadow-sm`}
               >
-                {inner}
+                {c.title}
               </span>
             ) : (
               <Link
@@ -106,9 +88,9 @@ function EditionSwitcher({
                 href={`/${c.line}/${c.slug}`}
                 role="tab"
                 aria-selected="false"
-                className="rounded-full px-4 py-1.5 text-brand-slate transition-colors hover:text-brand-indigo"
+                className={`${base} border-brand-pale-dusk text-brand-slate hover:border-brand-gold hover:text-brand-indigo`}
               >
-                {inner}
+                {c.title}
               </Link>
             )
           })}
