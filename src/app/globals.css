@@ -132,6 +132,12 @@
     linear-gradient(160deg, #221d44 0%, var(--brand-deep) 60%, #15112e 100%);
   color: var(--brand-pale-dusk);
   isolation: isolate;
+  /* The muted tan-gold #C4A265 reads as barely-legible on this deep indigo
+     (the small uppercase masthead eyebrow especially). Brighten the gold to a
+     more luminous tone WITHIN the dark hero/footer only — scoped here so the
+     light-background gold accents (cards, tables) keep the muted brand gold. */
+  --color-brand-gold: #E6C77E;
+  --brand-gold: #E6C77E;
 }
 .surface-deep h1,
 .surface-deep h2,
