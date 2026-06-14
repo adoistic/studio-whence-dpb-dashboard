@@ -129,6 +129,7 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
       title: c.title,
       status: c.status,
       comic_number: c.comic_number,
+      target_length_pages: c.target_length_pages,
     }))
 
   const seriesLine = [comic.series, comic.comic_number ? `Comic ${comic.comic_number}` : null]
