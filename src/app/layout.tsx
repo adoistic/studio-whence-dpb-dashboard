@@ -18,7 +18,13 @@ export const metadata: Metadata = {
   // crawlers (WhatsApp, LinkedIn, iMessage, Slack, X) ignore robots noindex,
   // so social previews still render; only search engines are discouraged.
   robots: { index: false, follow: false },
-  icons: { icon: '/brand/favicon.svg', shortcut: '/brand/favicon.svg' },
+  // SVG for modern browsers, the brand .ico is auto-served from app/favicon.ico
+  // (legacy/bookmarks), apple-touch-icon for iOS home-screen / iMessage.
+  icons: {
+    icon: '/brand/favicon.svg',
+    shortcut: '/brand/favicon.svg',
+    apple: '/brand/apple-touch-icon.png',
+  },
   openGraph: {
     type: 'website',
     siteName: 'Studio Whence',
