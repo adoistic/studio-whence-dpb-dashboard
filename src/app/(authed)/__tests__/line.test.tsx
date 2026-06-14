@@ -40,6 +40,9 @@ vi.mock('@/lib/catalog', () => ({
 vi.mock('@/lib/visibleCatalog', () => ({
   useVisibleComics: (...a: unknown[]) => mockUseVisibleComics(...a),
   useVisibleFigures: () => mockUseFigures(),
+  // Open (openResearch) figures are merged into the line page; these tests
+  // don't exercise that path, so default to none.
+  useOpenFigures: () => ({ data: [], loading: false }),
 }))
 vi.mock('@/lib/auth', () => ({
   useUser: () => mockUseUser(),
