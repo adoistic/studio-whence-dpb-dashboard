@@ -5,7 +5,7 @@ export function Footer({ sha, lastUpdate }: { sha?: string; lastUpdate?: string 
     <footer className="surface-deep grain relative mt-28 overflow-hidden">
       <div className="relative mx-auto flex max-w-[1200px] flex-col gap-10 px-6 py-16 md:flex-row md:items-end md:justify-between">
         <div className="flex flex-col gap-3">
-          <BrandLockup size="md" />
+          <BrandLockup size="md" onDark />
           <p className="font-serif italic text-xl text-brand-gold">Stories in becoming.</p>
           <p className="max-w-xs font-sans text-[0.7rem] uppercase tracking-label text-brand-pale-dusk/55">
             Studio Whence × Diamond Pocket Books
