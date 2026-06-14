@@ -114,7 +114,8 @@ export function FigurePageShell({
   const comics = (visibleComics.data ?? [])
     .filter((c) => c.subject_slug === figure.slug)
     .map((c) => ({
-      slug: c.slug, line: c.line, title: c.title, status: c.status, comic_number: c.comic_number,
+      slug: c.slug, line: c.line, title: c.title, status: c.status,
+      comic_number: c.comic_number, target_length_pages: c.target_length_pages,
     }))
 
   const sources = figure.sources ?? []

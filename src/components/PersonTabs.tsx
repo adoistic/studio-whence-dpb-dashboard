@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { furthestComic, type PersonComic } from '@/lib/people'
+import { furthestComic, variantLabels, type PersonComic } from '@/lib/people'
 
 const TAB = 'font-sans text-[0.72rem] uppercase tracking-label transition-colors'
 const ACTIVE = 'text-brand-indigo border-b-2 border-brand-gold'
@@ -42,23 +42,78 @@ export function PersonTabs({
         )}
       </nav>
 
-      {/* sibling-comic chips (comic page, when several) */}
+      {/* Edition switcher (comic page, when a subject has several variants) */}
       {active === 'comics' && comics.length > 1 && (
-        <div className="mx-auto flex max-w-[1100px] flex-wrap gap-2 px-6 pb-3">
-          {comics.map((c) => {
+        <EditionSwitcher comics={comics} activeComicSlug={activeComicSlug} />
+      )}
+    </div>
+  )
+}
+
+/**
+ * A clear, labeled segmented control for switching between a subject's comic
+ * variants (e.g. the medicomics Standard 24pp / Premium 48pp editions). Each
+ * control shows a SHORT distinguishing label — derived by `variantLabels` — not
+ * the raw, near-identical long titles. The current variant is highlighted and
+ * non-clickable; the others link to their own page.
+ */
+function EditionSwitcher({
+  comics, activeComicSlug,
+}: {
+  comics: PersonComic[]
+  activeComicSlug?: string
+}) {
+  const labels = variantLabels(comics)
+  return (
+    <div className="mx-auto max-w-[1100px] px-6 pb-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <span className="font-sans text-[0.62rem] uppercase tracking-label text-brand-slate">
+          {comics.length} editions
+        </span>
+        <div
+          role="tablist"
+          aria-label="Comic editions"
+          className="inline-flex flex-wrap items-stretch gap-0.5 rounded-full border border-brand-pale-dusk bg-brand-pale-dusk/30 p-0.5"
+        >
+          {comics.map((c, i) => {
+            const { primary, detail } = labels[i]
             const isActive = c.slug === activeComicSlug
+            const inner = (
+              <span className="flex items-baseline gap-1.5">
+                <span className="font-sans text-[0.72rem] font-semibold uppercase tracking-label">
+                  {primary}
+                </span>
+                {detail && (
+                  <span className={`font-serif text-[0.78rem] ${isActive ? 'text-brand-pale-dusk/80' : 'text-brand-slate'}`}>
+                    {detail}
+                  </span>
+                )}
+              </span>
+            )
             return isActive ? (
-              <span key={c.slug} aria-current="page" className="rounded-full border border-brand-gold bg-brand-pale-dusk/60 px-3 py-1 font-serif text-[0.8rem] text-brand-indigo">
-                {c.title}
+              <span
+                key={c.slug}
+                role="tab"
+                aria-selected="true"
+                aria-current="page"
+                className="rounded-full bg-brand-indigo px-4 py-1.5 text-brand-pale-dusk shadow-sm"
+              >
+                {inner}
               </span>
             ) : (
-              <Link key={c.slug} href={`/${c.line}/${c.slug}`} className="rounded-full border border-brand-pale-dusk px-3 py-1 font-serif text-[0.8rem] text-brand-slate hover:text-brand-indigo">
-                {c.title}
+              <Link
+                key={c.slug}
+                href={`/${c.line}/${c.slug}`}
+                role="tab"
+                aria-selected="false"
+                className="rounded-full px-4 py-1.5 text-brand-slate transition-colors hover:text-brand-indigo"
+              >
+                {inner}
               </Link>
             )
           })}
         </div>
-      )}
+      </div>
     </div>
   )
 }
