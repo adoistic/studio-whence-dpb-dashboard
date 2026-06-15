@@ -4,6 +4,7 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { Comic } from '@/types/content'
 import { StatusPill } from '@/components/StatusPill'
+import { EditablePptButton } from '@/components/EditablePptButton'
 import { SectionHead } from '@/components/SectionHead'
 import { VersionTimeline } from '@/components/feedback/VersionTimeline'
 import { DocumentsPanel } from '@/components/DocumentsPanel'
@@ -168,6 +169,7 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
                 {seriesLine}
               </span>
             )}
+            {comic.editablePpt && <EditablePptButton editablePpt={comic.editablePpt} />}
           </div>
           {comic.logline && (
             <p className="mt-5 max-w-2xl font-serif text-lg leading-relaxed text-brand-pale-dusk/80">
