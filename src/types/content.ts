@@ -37,9 +37,6 @@ export interface Comic {
   max_text_lines_per_page?: number
   art_style?: string
   language?: string
-  // Editable PowerPoint export (gated artifacts/comics/{line}/{slug}/…). Present
-  // when an editable .pptx has been published for this comic.
-  editablePpt?: { key: string; bytes: number; filename: string }
   // Future-proofing (not yet in data)
   sample_image?: string
   artifacts?: Record<string, string>
