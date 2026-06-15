@@ -54,6 +54,14 @@ export interface Comic {
     count: number
     coverKey: string | null
   }
+  // Editable PowerPoint (.pptx) copy, published to a gated comic-scoped
+  // artifacts/comics/… key. Present only for books that ship an editable export
+  // (the Diamond Activity Books). Drives the "Download as PPT (editable)" button.
+  editablePpt?: {
+    key: string
+    bytes: number
+    filename: string
+  }
 }
 
 export interface ResearchFile {

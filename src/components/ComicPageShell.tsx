@@ -9,6 +9,7 @@ import { VersionTimeline } from '@/components/feedback/VersionTimeline'
 import { DocumentsPanel } from '@/components/DocumentsPanel'
 import { ComicReader } from '@/components/ComicReader'
 import { ComicPdfButton } from '@/components/ComicPdfButton'
+import { ComicPptButton } from '@/components/ComicPptButton'
 import { ComicDocxButton } from '@/components/ComicDocxButton'
 import { useGatedText } from '@/lib/useGatedText'
 import { useFigure } from '@/lib/catalog'
@@ -215,7 +216,10 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
           <section className="flex flex-col gap-6 border-t border-brand-pale-dusk pt-16">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <SectionHead kicker="The comic" title="Read the comic" />
-              <ComicPdfButton comic={comic} />
+              <div className="flex flex-wrap items-center gap-3">
+                <ComicPdfButton comic={comic} />
+                <ComicPptButton comic={comic} />
+              </div>
             </div>
             <ComicReader comic={comic} pageCounts={pageCounts} onCommentPage={setCommentPage} />
           </section>
