@@ -12,6 +12,7 @@ import { ComicPdfButton } from '@/components/ComicPdfButton'
 import { ComicPptButton } from '@/components/ComicPptButton'
 import { ComicCmykButton } from '@/components/ComicCmykButton'
 import { ComicDocxButton } from '@/components/ComicDocxButton'
+import { AmazonModulesPanel } from '@/components/AmazonModulesPanel'
 import { useGatedText } from '@/lib/useGatedText'
 import { useFigure } from '@/lib/catalog'
 import { useVisibleComics } from '@/lib/visibleCatalog'
@@ -91,6 +92,15 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
   // for it — biographies figures and Practical Indic subjects (e.g. swami-ramdev)
   // alike. The indic epics have no figure doc, so fig.data stays falsy for them.
   const hasFigure = !!figureSlug && !!fig.data
+
+  // ── Comic PDF ⇄ A+ Modules view ──────────────────────────────────────────
+  // The "Read the comic" section toggles between the page reader (PDF) and the
+  // comic's Amazon A+ marketing modules, when both are present.
+  const hasPages = !!comic.pages?.hasPages
+  const hasModules = (comic.amazonModules?.images?.length ?? 0) > 0
+  const [comicView, setComicView] = useState<'pages' | 'modules'>(
+    hasPages ? 'pages' : 'modules',
+  )
 
   // ── Draft ⇄ Comments view ────────────────────────────────────────────────
   const [view, setView] = useState<'draft' | 'comments'>('draft')
@@ -212,18 +222,60 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
           <DocumentsPanel comic={comic} />
         </div>
 
-        {/* Read the comic — only when rendered art has been published */}
-        {comic.pages?.hasPages && (
+        {/* Read the comic — the page reader (PDF) and/or the Amazon A+ modules.
+            Renders when either has been published; a sub-tab toggles between
+            them when both are present. */}
+        {(hasPages || hasModules) && (
           <section className="flex flex-col gap-6 border-t border-brand-pale-dusk pt-16">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <SectionHead kicker="The comic" title="Read the comic" />
               <div className="flex flex-wrap items-center gap-3">
-                <ComicPdfButton comic={comic} />
-                <ComicPptButton comic={comic} />
-                <ComicCmykButton comic={comic} />
+                {/* Comic PDF ⇄ A+ Modules tab toggle — only when both exist */}
+                {hasPages && hasModules && (
+                  <div
+                    role="tablist"
+                    aria-label="Comic view"
+                    className="inline-flex items-center gap-0.5 rounded-full border border-brand-pale-dusk bg-brand-threshold/70 p-0.5 font-sans"
+                  >
+                    {([
+                      { key: 'pages', label: 'Comic PDF' },
+                      { key: 'modules', label: 'A+ Modules' },
+                    ] as const).map(({ key, label }) => {
+                      const active = comicView === key
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          role="tab"
+                          aria-selected={active}
+                          onClick={() => setComicView(key)}
+                          className={`rounded-full px-4 py-1.5 font-sans text-[0.72rem] font-semibold uppercase tracking-label transition-colors ${
+                            active
+                              ? 'bg-brand-indigo text-brand-pale-dusk shadow-sm'
+                              : 'text-brand-slate hover:text-brand-indigo'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
+                {/* Download buttons belong to the page reader */}
+                {comicView === 'pages' && hasPages && (
+                  <>
+                    <ComicPdfButton comic={comic} />
+                    <ComicPptButton comic={comic} />
+                    <ComicCmykButton comic={comic} />
+                  </>
+                )}
               </div>
             </div>
-            <ComicReader comic={comic} pageCounts={pageCounts} onCommentPage={setCommentPage} />
+            {comicView === 'pages' && hasPages ? (
+              <ComicReader comic={comic} pageCounts={pageCounts} onCommentPage={setCommentPage} />
+            ) : (
+              <AmazonModulesPanel comic={comic} />
+            )}
           </section>
         )}
 

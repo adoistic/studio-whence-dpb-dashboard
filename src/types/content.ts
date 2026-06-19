@@ -70,6 +70,13 @@ export interface Comic {
     bytes: number
     filename: string
   }
+  // Amazon A+ marketing modules (banner, image-header, "a peek inside", "why this
+  // story"), published to gated comic-scoped artifacts/comics/…/amazon-modules/…
+  // keys. Present only for comics that ship A+ modules. Drives the "A+ Modules"
+  // sub-tab on the comic page; images are resolved to presigned URLs like pages.
+  amazonModules?: {
+    images: { key: string; label: string; bytes: number; filename: string }[]
+  }
 }
 
 export interface ResearchFile {
