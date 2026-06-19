@@ -62,6 +62,14 @@ export interface Comic {
     bytes: number
     filename: string
   }
+  // Print-ready CMYK PDF copy (separated to PSO Uncoated v3 / FOGRA52), published
+  // to a gated comic-scoped artifacts/comics/… key. Present only for books that
+  // ship a CMYK export. Drives the "Download CMYK (print)" button.
+  cmykPdf?: {
+    key: string
+    bytes: number
+    filename: string
+  }
 }
 
 export interface ResearchFile {

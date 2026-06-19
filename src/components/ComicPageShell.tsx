@@ -10,6 +10,7 @@ import { DocumentsPanel } from '@/components/DocumentsPanel'
 import { ComicReader } from '@/components/ComicReader'
 import { ComicPdfButton } from '@/components/ComicPdfButton'
 import { ComicPptButton } from '@/components/ComicPptButton'
+import { ComicCmykButton } from '@/components/ComicCmykButton'
 import { ComicDocxButton } from '@/components/ComicDocxButton'
 import { useGatedText } from '@/lib/useGatedText'
 import { useFigure } from '@/lib/catalog'
@@ -219,6 +220,7 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
               <div className="flex flex-wrap items-center gap-3">
                 <ComicPdfButton comic={comic} />
                 <ComicPptButton comic={comic} />
+                <ComicCmykButton comic={comic} />
               </div>
             </div>
             <ComicReader comic={comic} pageCounts={pageCounts} onCommentPage={setCommentPage} />
