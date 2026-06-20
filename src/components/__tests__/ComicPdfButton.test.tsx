@@ -20,4 +20,15 @@ describe('buildComicPdf', () => {
     const parsed = await PDFDocument.load(pdf)
     expect(parsed.getPageCount()).toBe(2)
   })
+
+  // Pages are uploaded under `.jpg` keys, but a re-encode that preserved PNG
+  // bytes (or a wrong content-type from R2) would feed PNG bytes to embedJpg and
+  // throw. The format must be sniffed from the bytes, not the content-type.
+  test('embeds PNG bytes even when the content-type says JPEG', async () => {
+    const pdf = await buildComicPdf([
+      { bytes: TINY_PNG, type: 'image/jpeg' },
+    ])
+    const parsed = await PDFDocument.load(pdf)
+    expect(parsed.getPageCount()).toBe(1)
+  })
 })

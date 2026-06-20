@@ -6,13 +6,32 @@ import type { Comic } from '@/types/content'
 import { comicPageKeys } from '@/lib/comicPageKeys'
 import { resolveUrls } from '@/lib/dataApi'
 
-/** Assemble a PDF (one page per image, page sized to the image). Pure — no DOM. */
+/** True when the bytes start with the PNG 8-byte signature. */
+function isPng(bytes: Uint8Array): boolean {
+  return (
+    bytes.length >= 8 &&
+    bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 &&
+    bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a
+  )
+}
+
+/** True when the bytes start with the JPEG SOI marker. */
+function isJpg(bytes: Uint8Array): boolean {
+  return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+}
+
+/** Assemble a PDF (one page per image, page sized to the image). Pure — no DOM.
+ * The format is sniffed from the actual bytes, not the HTTP content-type or the
+ * key's extension — a page served as `.jpg` may really be PNG (and vice versa),
+ * and pdf-lib throws if embedJpg/embedPng is handed the wrong format. We fall
+ * back to the content-type only when neither signature is recognised. */
 export async function buildComicPdf(
   images: { bytes: Uint8Array; type: string }[],
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.create()
   for (const img of images) {
-    const embedded = img.type.includes('png')
+    const usePng = isPng(img.bytes) || (!isJpg(img.bytes) && img.type.includes('png'))
+    const embedded = usePng
       ? await pdf.embedPng(img.bytes)
       : await pdf.embedJpg(img.bytes)
     const page = pdf.addPage([embedded.width, embedded.height])
