@@ -4,6 +4,12 @@ import { useState } from 'react'
 import type { Figure } from '@/types/content'
 import { SectionHead } from '@/components/SectionHead'
 import { ResearchReader } from '@/components/ResearchReader'
+import { VariationGallery } from '@/components/VariationGallery'
+
+// Subject sub-part source kinds (Indic characters + future original IP): the
+// dossier, the design bible, and the characterization render as research
+// alongside (or instead of) the biographies-style books/transcripts.
+const SUBPART_KINDS = new Set(['character-dossier', 'design-bible', 'characterization'])
 import { AiConversations } from '@/components/AiConversations'
 import { PersonTabs } from '@/components/PersonTabs'
 import { useVisibleComics } from '@/lib/visibleCatalog'
@@ -98,7 +104,19 @@ export function FigurePageShell({
   initialFile?: string | null
   targetLine?: number
 }) {
-  const [selected, setSelected] = useState<string | null>(initialFile)
+  const sources = figure.sources ?? []
+  const subparts = sources.filter((s) => SUBPART_KINDS.has(s.kind))
+  const books = sources.filter((s) => s.kind === 'book')
+  const transcripts = sources.filter((s) => s.kind === 'transcript')
+  // Default the reader to the design bible (Subjects), else the first dossier
+  // sub-part, else the first book — so the panel is never blank on first load.
+  const defaultFile =
+    initialFile
+    ?? subparts.find((s) => s.kind === 'design-bible')?.files[0]?.path
+    ?? subparts[0]?.files[0]?.path
+    ?? books[0]?.files[0]?.path
+    ?? null
+  const [selected, setSelected] = useState<string | null>(defaultFile)
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const toggle = (key: string) => setCollapsed((c) => ({ ...c, [key]: !c[key] }))
 
@@ -117,10 +135,6 @@ export function FigurePageShell({
       slug: c.slug, line: c.line, title: c.title, status: c.status,
       comic_number: c.comic_number, target_length_pages: c.target_length_pages,
     }))
-
-  const sources = figure.sources ?? []
-  const books = sources.filter((s) => s.kind === 'book')
-  const transcripts = sources.filter((s) => s.kind === 'transcript')
 
   return (
     <div>
@@ -146,6 +160,13 @@ export function FigurePageShell({
 
       {/* ── Body ───────────────────────────────────────────────────── */}
       <main className="mx-auto max-w-[1100px] px-6">
+        {/* Design turnarounds (Subjects with locked variations) — the visual
+            payoff above the dossier reader. */}
+        {(figure.variations?.length ?? 0) > 0 && (
+          <div className="pt-12">
+            <VariationGallery variations={figure.variations!} />
+          </div>
+        )}
         <div className="grid gap-12 pt-12 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:items-start">
           {/* Sources index — sticky on desktop; scrolls internally if long */}
           <section className="flex flex-col gap-6 md:sticky md:top-24 md:max-h-[calc(100vh-7rem)] md:self-start md:overflow-y-auto md:pr-1">
@@ -154,6 +175,31 @@ export function FigurePageShell({
               <p className="font-serif italic text-brand-slate">No sources indexed.</p>
             ) : (
               <div className="flex flex-col gap-6">
+                {/* Design & dossier — the Subject sub-parts (dossier, design bible,
+                    characterization) as one group, listed first for Indic/IP subjects. */}
+                {subparts.length > 0 && (
+                  <CollapsibleGroup
+                    title="Design & dossier"
+                    meta={`${subparts.length} ${subparts.length === 1 ? 'document' : 'documents'}`}
+                    open={!collapsed['__subparts']}
+                    onToggle={() => toggle('__subparts')}
+                    hasActive={subparts.some((s) => s.files.some((f) => f.path === selected))}
+                  >
+                    {subparts.map((s) => {
+                      const file = s.files[0]
+                      if (!file) return null
+                      return (
+                        <FileItem
+                          key={s.slug}
+                          label={s.title}
+                          active={selected === file.path}
+                          onSelect={() => setSelected(file.path)}
+                        />
+                      )
+                    })}
+                  </CollapsibleGroup>
+                )}
+
                 {/* Books — each its own collapsible group of chapters */}
                 {books.map((book) => (
                   <CollapsibleGroup

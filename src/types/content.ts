@@ -88,7 +88,9 @@ export interface ResearchFile {
 
 export interface ResearchSource {
   slug: string
-  kind: 'book' | 'transcript'
+  // book / transcript (biographies) · topic-note (cite-driven) · the Subject
+  // sub-parts (Indic characters + future original IP).
+  kind: 'book' | 'transcript' | 'topic-note' | 'character-dossier' | 'design-bible' | 'characterization'
   title: string
   words: number
   files: ResearchFile[]
