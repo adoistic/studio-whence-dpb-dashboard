@@ -1,7 +1,7 @@
 'use client'
 
 import type { Line, Figure } from '@/types/content'
-import { useLines, usePeople } from '@/lib/catalog'
+import { useLines, usePeople, usePrograms } from '@/lib/catalog'
 import { useVisibleComics, useVisibleFigures, useOpenFigures } from '@/lib/visibleCatalog'
 import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { personDocToRow } from '@/lib/people'
@@ -51,6 +51,9 @@ export default function LinePage() {
   }
   const figures = Array.from(figuresBySlug.values())
   const { data: people } = usePeople(slug)
+  // Program tier (general): the line's programs (navigational metadata, readable
+  // by any allowlisted member). Empty for lines with a single implicit program.
+  const { data: programs } = usePrograms(slug)
 
   if (loading) return <LoadingState />
   if (error || !lines) return <ErrorState />
@@ -58,7 +61,7 @@ export default function LinePage() {
   const lineDoc = lines.find((l) => l.slug === slug)
   if (!lineDoc) return <NotFoundState title="Line not found" detail={`No line matches “${slug}”.`} />
 
-  const line: Line = { ...lineDoc, comics, figures }
+  const line: Line = { ...lineDoc, programs: programs ?? [], comics, figures }
   const peopleRows = people ? people.map(personDocToRow) : undefined
 
   // INTROS[slug] is typed non-undefined (tsconfig has no noUncheckedIndexedAccess),

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { collection, doc, getDoc, getDocs, query, where, type QueryConstraint } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { Comic, Figure, Headline, Line, ResearchSource } from '@/types/content'
+import type { Comic, Figure, Headline, Line, Program, ResearchSource } from '@/types/content'
 
 export interface Async<T> { data: T | null; loading: boolean; error?: Error }
 
@@ -54,7 +54,7 @@ export const useComic = (line: string, slug: string) =>
     if (!v) throw new Error('comic not found'); return v
   }, [line, slug])
 
-export interface ComicFilters { line?: string; series?: string; status?: string; subject_slug?: string }
+export interface ComicFilters { line?: string; series?: string; status?: string; subject_slug?: string; program_slug?: string }
 export const useComics = (f: ComicFilters = {}) =>
   useAsync<Comic[]>(async () => {
     const cs: QueryConstraint[] = []
@@ -62,8 +62,24 @@ export const useComics = (f: ComicFilters = {}) =>
     if (f.series) cs.push(where('series', '==', f.series))
     if (f.status) cs.push(where('status', '==', f.status))
     if (f.subject_slug) cs.push(where('subject_slug', '==', f.subject_slug))
+    if (f.program_slug) cs.push(where('program_slug', '==', f.program_slug))
     return listData<Comic>(await getDocs(query(collection(db, 'comics'), ...cs)))
-  }, [f.line, f.series, f.status, f.subject_slug])
+  }, [f.line, f.series, f.status, f.subject_slug, f.program_slug])
+
+// Program tier (Line → Program → Subject) — general across all lines.
+// Program docs are navigational metadata (title/blurb/emblem), readable by any
+// allowlisted member like lines; the gated content lives in the comics/dossiers
+// inside, so the Program page composes useVisibleComics/useVisibleFigures
+// filtered by program_slug rather than raw-querying gated collections here.
+export const usePrograms = (line: string) =>
+  useAsync<Program[]>(async () => {
+    const ps = listData<Program>(await getDocs(query(collection(db, 'programs'), where('line', '==', line))))
+    return ps.sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.slug.localeCompare(b.slug))
+  }, [line])
+
+export const useProgram = (line: string, slug: string) =>
+  useAsync<Program | null>(async () =>
+    docData<Program>(await getDoc(doc(db, 'programs', `${line}__${slug}`))), [line, slug])
 
 export const useFigures = (series?: string) =>
   useAsync<Figure[]>(async () => {

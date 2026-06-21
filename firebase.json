@@ -19,6 +19,7 @@
         "function": { "functionId": "dataApi", "region": "us-central1" }
       },
       { "source": "/figures/*", "destination": "/figure.html" },
+      { "source": "/programs/*/*", "destination": "/program.html" },
       { "source": "/*/*", "destination": "/comic.html" },
       { "source": "/*", "destination": "/line.html" }
     ]

@@ -109,6 +109,10 @@ service cloud.firestore {
     //    publish Action's Admin SDK, which bypasses rules) ──
     match /meta/{d}      { allow read: if isAllowlisted(); allow write: if false; }
     match /lines/{d}     { allow read: if isAllowlisted(); allow write: if false; }
+    // Program tier (Line → Program → Subject): navigational metadata (title/blurb/
+    // emblem), readable by any allowlisted member like lines/people. The gated
+    // content lives in the comics/dossiers inside, gated by their own rules.
+    match /programs/{d}  { allow read: if isAllowlisted(); allow write: if false; }
     // Figure docs DO carry a `line` field (written by the content publish
     // pipeline, tools/publish_to_firestore.py). The doc id `f` IS the
     // subject_slug, so the research gate is driven by `f` via figures_effective;

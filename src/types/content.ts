@@ -29,6 +29,8 @@ export interface Comic {
   sources_count?: number
   slug: string
   subject_slug: string | null
+  // Program tier (Line → Program → Subject): which program this comic belongs to.
+  program_slug?: string | null
   // Toddlers-specific optional fields
   subtitle?: string
   ip?: string
@@ -96,18 +98,42 @@ export interface Figure {
   series: string
   slug: string
   line?: string
+  // Program tier: which program (series / epic / category) this subject belongs to.
+  program_slug?: string | null
   // medicomics: each disease is an open-research figure any allowlisted member
   // may read (no specific allocation required).
   openResearch?: boolean
   sources_count: number
   words: number
   sources?: ResearchSource[]
+  // Subject sub-parts (Program tier, line-agnostic): the per-character production
+  // artifacts — dossier, design bible, characterization, and the design-variations
+  // gallery (locked turnarounds). R2 object keys, served gated. Populated for any
+  // Subject that has them (Indic characters today, original IP characters later).
+  dossierKey?: string
+  designKey?: string
+  characterizationKey?: string
+  variations?: { label: string; stage?: string; key: string; bytes?: number }[]
+  // Cross-work links: the same being appearing in other programs.
+  alsoIn?: { program: string; line: string; slug: string }[]
+}
+
+export interface Program {
+  slug: string
+  line: LineSlug
+  title: string
+  blurb?: string
+  order?: number
+  status?: string
+  emblem?: string
 }
 
 export interface Line {
   slug: LineSlug
   title: string
   subtitle: string
+  programs?: Program[]
+  program_count?: number
   comics: Comic[]
   figures: Figure[]
 }

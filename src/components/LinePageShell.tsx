@@ -5,6 +5,7 @@ import type { Line } from '@/types/content'
 import { ComicAnalysisTab } from '@/components/ComicAnalysisTab'
 import { ComicsTable } from '@/components/ComicsTable'
 import { PeopleTable } from '@/components/PeopleTable'
+import { ProgramCards } from '@/components/ProgramCards'
 import { SectionHead } from '@/components/SectionHead'
 import { TingalandGallery } from '@/components/TingalandGallery'
 import { LINE_VISUALS, TINGALAND_CAST } from '@/lib/images'
@@ -87,8 +88,24 @@ export function LinePageShell({ line, introMdx, people }: LinePageShellProps) {
         <div className="mt-12 flex flex-wrap gap-x-14 gap-y-8 border-t border-brand-pale-dusk pt-10">
           {hasFigures && <Stat value={line.figures.length} label="figures researched" />}
           <Stat value={line.comics.length} label="comics in production" />
+          {(line.programs?.length ?? 0) > 0 && <Stat value={line.programs!.length} label="programs" />}
           {seriesCount > 1 && <Stat value={seriesCount} label="series" />}
         </div>
+
+        {/* Program tier (Line → Program → Subject): a grid of Program cards when the
+            line has programs (biographies series, Indic epics, Awareness categories).
+            Lines with a single implicit program (toddlers/tingaland/legacy) skip it. */}
+        {(line.programs?.length ?? 0) > 0 && (
+          <section className="flex flex-col gap-8 pt-20">
+            <SectionHead kicker="Explore" title="Programs" />
+            <ProgramCards
+              programs={line.programs!}
+              comics={line.comics}
+              figures={line.figures}
+              lineSlug={line.slug}
+            />
+          </section>
+        )}
 
         {/* Tingaland production gallery — shows on the (future) tingaland line, not the
             Diamond Activity Books line that now occupies the `toddlers` slug. */}
