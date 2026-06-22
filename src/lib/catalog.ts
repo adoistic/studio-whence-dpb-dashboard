@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { collection, doc, getDoc, getDocs, query, where, type QueryConstraint } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import type { Comic, Figure, Headline, Line, Program, ResearchSource } from '@/types/content'
+import type { Comic, Coverage, Figure, Headline, Line, Program, ResearchSource } from '@/types/content'
 
 export interface Async<T> { data: T | null; loading: boolean; error?: Error }
 
@@ -29,6 +29,13 @@ export interface CatalogMeta { generated_at: string; source_sha: string; headlin
 export const useHeadline = () => useAsync<CatalogMeta>(async () => {
   const v = docData<CatalogMeta>(await getDoc(doc(db, 'meta', 'catalog')))
   if (!v) throw new Error('catalog meta missing'); return v
+}, [])
+
+// The studio-status coverage roll-up (meta/coverage), readable by any
+// allowlisted member like meta/catalog. Drives the home-page CoverageOverview.
+export const useCoverage = () => useAsync<Coverage>(async () => {
+  const v = docData<Coverage>(await getDoc(doc(db, 'meta', 'coverage')))
+  if (!v) throw new Error('coverage meta missing'); return v
 }, [])
 
 export interface MethodologyDocs { readKey: string; downloadKey: string; bytes: number; generatedAt: string }

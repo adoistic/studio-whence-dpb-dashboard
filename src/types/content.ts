@@ -152,6 +152,56 @@ export interface Headline {
   lines_active: number
 }
 
+// ── Coverage (meta/coverage) ────────────────────────────────────────────────
+// A studio-status roll-up written by the content publish pipeline alongside
+// meta/catalog, readable by any allowlisted member. It is the source for the
+// home-page coverage overview: per-line figures-researched + a program/series
+// breakdown + a comic-production pipeline by status. The shape mirrors
+// build_dashboard_data.py exactly; lines[] arrives pre-sorted (figures desc,
+// then comics desc) and each line's programs[] pre-sorted (figures desc).
+
+export interface CoverageTotals {
+  lines: number
+  figures: number
+  comics: number
+  published: number
+  approved: number
+  in_review: number
+  draft: number
+}
+
+export interface CoverageProgram {
+  slug: string
+  title: string
+  figures: number
+  comics: number
+}
+
+// The comic-production pipeline for a line, counted by status.
+export interface CoveragePipeline {
+  total: number
+  draft: number
+  in_review: number
+  approved: number
+  published: number
+}
+
+export interface CoverageLine {
+  slug: LineSlug
+  title: string
+  subtitle: string
+  figures: number
+  programs: CoverageProgram[]
+  comics: CoveragePipeline
+}
+
+export interface Coverage {
+  generated_at: string
+  source_sha: string
+  totals: CoverageTotals
+  lines: CoverageLine[]
+}
+
 export interface Content {
   generated_at: string
   source_sha: string

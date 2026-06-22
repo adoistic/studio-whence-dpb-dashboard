@@ -1,14 +1,12 @@
 'use client'
 
 import { ActivityFeed } from '@/components/ActivityFeed'
+import { CoverageOverview } from '@/components/CoverageOverview'
 import { KpiStrip } from '@/components/KpiStrip'
 import type { Kpi } from '@/components/KpiStrip'
-import { LineCard } from '@/components/LineCard'
 import { SampleStrip } from '@/components/SampleStrip'
 import { SectionHead } from '@/components/SectionHead'
-import { useHeadline, useLines } from '@/lib/catalog'
-import { useVisibleComics } from '@/lib/visibleCatalog'
-import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
+import { useCoverage, useHeadline, useLines } from '@/lib/catalog'
 import { useResolved } from '@/lib/useResolved'
 import { HERO_BACKDROP, SAMPLE_PAGES } from '@/lib/images'
 import type { ActivityEntry } from '@/types/content'
@@ -20,15 +18,9 @@ const WORDS_ON_FILE = 10_000_000
 export default function Home() {
   const { data: meta } = useHeadline()
   const { data: lines } = useLines()
-
-  // Resolve the viewer's moderation status. Moderators (admin/sub_admin) see all
-  // comics; a member sees only their allocated set, so the per-line LineCard
-  // counts and the visible line list both derive from the gated read.
-  const { user, loading: authLoading } = useUser()
-  const status = useAllowStatus(user, authLoading)
-  const canMod = canModerate(status)
-  const email = user?.email ?? null
-  const { data: comics } = useVisibleComics(canMod, email) // visible comics, for per-line LineCard counts
+  // The studio-status roll-up (meta/coverage) drives the coverage overview and
+  // supplies the corrected headline counts (figures, comics, lines).
+  const { data: coverage } = useCoverage()
 
   // Resolve the hero backdrop key to a presigned URL; render the <img> only
   // once it's present (degrades cleanly mid-load).
@@ -36,14 +28,15 @@ export default function Home() {
   const heroUrl = heroUrls[HERO_BACKDROP]
 
   // Each catalog hook returns null while its Firestore read loads; the
-  // data-dependent sections (KPIs, line cards, activity) render only when
-  // their data is present.
-  const kpis: Kpi[] | null = meta
+  // data-dependent sections (KPIs, coverage, activity) render only when their
+  // data is present. The KPI counts prefer meta/coverage's totals (the
+  // corrected figures/comics/lines) and fall back to the legacy headline.
+  const kpis: Kpi[] | null = (coverage || meta)
     ? [
-        { label: 'figures researched', value: meta.headline.figures_researched },
-        { label: 'comics in production', value: meta.headline.comics_in_production },
+        { label: 'figures researched', value: coverage?.totals.figures ?? meta!.headline.figures_researched },
+        { label: 'comics in production', value: coverage?.totals.comics ?? meta!.headline.comics_in_production },
         { label: 'words on file', value: WORDS_ON_FILE, formatter: 'million' },
-        { label: 'lines active', value: meta.headline.lines_active },
+        { label: 'lines active', value: coverage?.totals.lines ?? meta!.headline.lines_active },
       ]
     : null
 
@@ -92,26 +85,15 @@ export default function Home() {
 
       {/* ── Body ───────────────────────────────────────────────────────── */}
       <main className="mx-auto max-w-[1200px] px-6">
-        {/* The production lines */}
-        {lines && comics && (() => {
-          // Moderators see every line; a member sees only lines with ≥1 visible comic.
-          const visibleLines = canMod
-            ? lines
-            : lines.filter((line) => comics.some((c) => c.line === line.slug))
-          return (
-            <section className="flex flex-col gap-8 pt-16 md:pt-20">
-              <SectionHead kicker="The lines" title={`${visibleLines.length} lines in production`} />
-              <div className="grid grid-cols-1 gap-7 md:grid-cols-2">
-                {visibleLines.map((line) => (
-                  <LineCard
-                    key={line.slug}
-                    line={{ ...line, comics: comics.filter((c) => c.line === line.slug), figures: [] }}
-                  />
-                ))}
-              </div>
-            </section>
-          )
-        })()}
+        {/* Coverage overview — the studio-status centerpiece (meta/coverage):
+            per-line figures researched, program breakdown, and the comic
+            pipeline by status. */}
+        {coverage && (
+          <section className="flex flex-col gap-8 pt-16 md:pt-20">
+            <SectionHead kicker="Coverage" title="Where every line stands" />
+            <CoverageOverview coverage={coverage} />
+          </section>
+        )}
 
         {/* What we make — finished sample pages */}
         {SAMPLE_PAGES.length > 0 && (
