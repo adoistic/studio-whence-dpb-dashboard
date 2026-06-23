@@ -39,6 +39,8 @@ export const TINGALAND_CAST: NamedImage[] = [
   { rel: 'images/toddlers/tingaland/characters/boxy/variant-digital-art-turnaround.jpg', name: 'Boxy' },
   { rel: 'images/toddlers/tingaland/characters/keke/variant-digital-art-turnaround.jpg', name: 'Keke' },
   { rel: 'images/toddlers/tingaland/characters/mira/variant-digital-art-turnaround.jpg', name: 'Mira' },
+  { rel: 'images/toddlers/tingaland/characters/mama/variant-digital-art-turnaround.jpg', name: 'Mama' },
+  { rel: 'images/toddlers/tingaland/characters/papa/variant-digital-art-turnaround.jpg', name: 'Papa' },
   { rel: 'images/toddlers/tingaland/characters/zara/variant-digital-art-turnaround.jpg', name: 'Zara' },
   { rel: 'images/toddlers/tingaland/characters/bingo/variant-digital-art-turnaround.jpg', name: 'Bingo' },
   { rel: 'images/toddlers/tingaland/characters/moon-cow/variant-digital-art-turnaround.jpg', name: 'Moon Cow' },

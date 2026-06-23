@@ -24,8 +24,8 @@ export function TingalandGallery() {
     <div className="flex flex-col gap-14">
       {/* The cast */}
       <div className="flex flex-col gap-6">
-        <SubHead>The cast · 8 design-locked characters</SubHead>
-        <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-8">
+        <SubHead>The cast · 10 design-locked characters</SubHead>
+        <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-5">
           {TINGALAND_CAST.map((c) => (
             <figure key={c.rel} className="group flex flex-col items-center gap-2">
               <div className="aspect-square w-full overflow-hidden rounded-brand border border-brand-pale-dusk bg-brand-cream p-1.5">
