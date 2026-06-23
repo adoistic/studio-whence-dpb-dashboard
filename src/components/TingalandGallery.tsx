@@ -1,6 +1,6 @@
 'use client'
 
-import { TINGALAND_CAST, TINGALAND_SETTINGS, SAMPLE_PAGES } from '@/lib/images'
+import { TINGALAND_CAST, TINGALAND_CREATURES, TINGALAND_SETTINGS, SAMPLE_PAGES } from '@/lib/images'
 import { useResolved } from '@/lib/useResolved'
 
 function SubHead({ children }: { children: React.ReactNode }) {
@@ -17,6 +17,7 @@ function SubHead({ children }: { children: React.ReactNode }) {
 export function TingalandGallery() {
   const urls = useResolved([
     ...TINGALAND_CAST.map((c) => c.rel),
+    ...TINGALAND_CREATURES.map((c) => c.rel),
     ...TINGALAND_SETTINGS.map((s) => s.rel),
     ...SAMPLE_PAGES.map((p) => p.rel),
   ])
@@ -27,6 +28,30 @@ export function TingalandGallery() {
         <SubHead>The cast · 10 design-locked characters</SubHead>
         <div className="grid grid-cols-3 gap-4 sm:grid-cols-4 lg:grid-cols-5">
           {TINGALAND_CAST.map((c) => (
+            <figure key={c.rel} className="group flex flex-col items-center gap-2">
+              <div className="aspect-square w-full overflow-hidden rounded-brand border border-brand-pale-dusk bg-brand-cream p-1.5">
+                {urls[c.rel] && (
+                  <img
+                    src={urls[c.rel]}
+                    alt={c.name}
+                    loading="lazy"
+                    className="h-full w-full object-contain transition-transform duration-500 ease-out group-hover:scale-105"
+                  />
+                )}
+              </div>
+              <figcaption className="font-sans text-[0.62rem] uppercase tracking-label text-brand-slate text-center">
+                {c.name}
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+
+      {/* Friendly animals */}
+      <div className="flex flex-col gap-6">
+        <SubHead>Friendly animals · {TINGALAND_CREATURES.length} from the first-words books</SubHead>
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+          {TINGALAND_CREATURES.map((c) => (
             <figure key={c.rel} className="group flex flex-col items-center gap-2">
               <div className="aspect-square w-full overflow-hidden rounded-brand border border-brand-pale-dusk bg-brand-cream p-1.5">
                 {urls[c.rel] && (

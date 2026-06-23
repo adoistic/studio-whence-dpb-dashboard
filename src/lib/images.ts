@@ -47,6 +47,13 @@ export const TINGALAND_CAST: NamedImage[] = [
   { rel: 'images/toddlers/tingaland/characters/space-duck/variant-digital-art-turnaround.jpg', name: 'Space Duck' },
 ]
 
+export const TINGALAND_CREATURES: NamedImage[] = [
+  { rel: 'images/toddlers/tingaland/creatures/elephant/variant-digital-art-turnaround.jpg', name: 'Elephant' },
+  { rel: 'images/toddlers/tingaland/creatures/lion/variant-digital-art-turnaround.jpg', name: 'Lion' },
+  { rel: 'images/toddlers/tingaland/creatures/tiger/variant-digital-art-turnaround.jpg', name: 'Tiger' },
+  { rel: 'images/toddlers/tingaland/creatures/bear/variant-digital-art-turnaround.jpg', name: 'Bear' },
+]
+
 export const TINGALAND_SETTINGS: NamedImage[] = [
   { rel: 'images/toddlers/tingaland/settings/tingaland-landscape-day-digital-art-background.jpg', name: 'Tingaland, day' },
   { rel: 'images/toddlers/tingaland/settings/tingaland-landscape-night-digital-art-background.jpg', name: 'Tingaland, night' },
