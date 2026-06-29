@@ -79,6 +79,17 @@ export interface Comic {
   amazonModules?: {
     images: { key: string; label: string; bytes: number; filename: string }[]
   }
+  // Translated editions. Each entry is one target language: the translated SCRIPT
+  // (read-gated docs/comics/… markdown), an optional translated EDITABLE .pptx, and
+  // an optional BLANK-version PDF (clean, text-free pages — used when the source art
+  // is Devanagari and cannot be made into an editable translated deck). Drives the
+  // per-comic "language section" on the comic page.
+  translations?: {
+    language: string
+    script?: { key: string; bytes: number }
+    editablePpt?: { key: string; bytes: number; filename: string }
+    blank?: { key: string; bytes: number; filename: string }
+  }[]
 }
 
 export interface ResearchFile {

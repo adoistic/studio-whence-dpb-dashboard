@@ -7,6 +7,7 @@ import { StatusPill } from '@/components/StatusPill'
 import { SectionHead } from '@/components/SectionHead'
 import { VersionTimeline } from '@/components/feedback/VersionTimeline'
 import { DocumentsPanel } from '@/components/DocumentsPanel'
+import { LanguageSection } from '@/components/LanguageSection'
 import { ComicReader } from '@/components/ComicReader'
 import { ComicPdfButton } from '@/components/ComicPdfButton'
 import { ComicPptButton } from '@/components/ComicPptButton'
@@ -220,6 +221,13 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
             renders nothing unless the catalog published a docs manifest. */}
         <div className="mt-16">
           <DocumentsPanel comic={comic} />
+        </div>
+
+        {/* Translated editions (Hindi / English) — translated script + editable
+            .pptx and/or blank-version PDF. Renders nothing unless the catalog
+            published a translations[] block. */}
+        <div className="mt-16">
+          <LanguageSection comic={comic} />
         </div>
 
         {/* Read the comic — the page reader (PDF) and/or the Amazon A+ modules.

@@ -51,3 +51,6 @@ next-env.d.ts
 
 # firebase deploy cache
 .firebase/
+
+# local image/data scratch (artifacts/) — data-bearing assets, never commit; repo is public
+/artifacts/
