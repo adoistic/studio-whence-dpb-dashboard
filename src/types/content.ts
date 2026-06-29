@@ -90,6 +90,12 @@ export interface Comic {
     editablePpt?: { key: string; bytes: number; filename: string }
     blank?: { key: string; bytes: number; filename: string }
   }[]
+  // Candidate front-cover designs (gated artifacts/comics/…/cover-options/ keys)
+  // for the editorial team to review and choose. Drives the CoverOptions gallery.
+  coverOptions?: {
+    language: string
+    options: { key: string; label: string }[]
+  }
 }
 
 export interface ResearchFile {

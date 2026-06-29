@@ -8,6 +8,7 @@ import { SectionHead } from '@/components/SectionHead'
 import { VersionTimeline } from '@/components/feedback/VersionTimeline'
 import { DocumentsPanel } from '@/components/DocumentsPanel'
 import { LanguageSection } from '@/components/LanguageSection'
+import { CoverOptions } from '@/components/CoverOptions'
 import { ComicReader } from '@/components/ComicReader'
 import { ComicPdfButton } from '@/components/ComicPdfButton'
 import { ComicPptButton } from '@/components/ComicPptButton'
@@ -221,6 +222,12 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
             renders nothing unless the catalog published a docs manifest. */}
         <div className="mt-16">
           <DocumentsPanel comic={comic} />
+        </div>
+
+        {/* Cover options — candidate front covers for the team to review/choose.
+            Renders nothing unless the catalog published a coverOptions block. */}
+        <div className="mt-16">
+          <CoverOptions comic={comic} />
         </div>
 
         {/* Translated editions (Hindi / English) — translated script + editable
