@@ -104,6 +104,13 @@ export interface Comic {
     language: string
     options: { key: string; label: string }[]
   }
+  // Inside covers (inside-front + inside-back printed inner pages — e.g. Hanuman's
+  // "Meet the Characters" cast page and "The World of Hanuman" reader's companion).
+  // Gated artifacts/comics/…/inside-covers/ keys; drives the InsideCovers section.
+  insideCovers?: {
+    language: string
+    images: { key: string; label: string }[]
+  }
 }
 
 /** The official cover chosen for a comic from `coverChoices/{line}__{slug}`. */
