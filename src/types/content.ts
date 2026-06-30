@@ -77,7 +77,15 @@ export interface Comic {
   // keys. Present only for comics that ship A+ modules. Drives the "A+ Modules"
   // sub-tab on the comic page; images are resolved to presigned URLs like pages.
   amazonModules?: {
-    images: { key: string; label: string; bytes: number; filename: string }[]
+    // Legacy flat list (a single stack of modules). Still honoured.
+    images?: { key: string; label: string; bytes: number; filename: string }[]
+    // Newer layout: labelled sections (e.g. "Amazon A+ content" + "Supporting
+    // images"), each a stack of images. When present, takes precedence over
+    // `images` in the panel.
+    groups?: {
+      title: string
+      images: { key: string; label: string; bytes: number; filename: string }[]
+    }[]
   }
   // Translated editions. Each entry is one target language: the translated SCRIPT
   // (read-gated docs/comics/… markdown), an optional translated EDITABLE .pptx, and
