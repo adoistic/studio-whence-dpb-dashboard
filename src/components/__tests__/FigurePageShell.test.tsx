@@ -9,6 +9,11 @@ vi.mock('@/components/ResearchReader', () => ({
   ),
 }))
 
+// VariationGallery resolves gated images; shell tests do not exercise that path.
+vi.mock('@/components/VariationGallery', () => ({
+  VariationGallery: () => <div data-testid="variation-gallery" />,
+}))
+
 // AiConversations is exercised in its own tests + the aiConversations lib tests;
 // here it is stubbed (it transitively loads @/lib/firebase) so the shell renders
 // in isolation. It still shows the figureSlug it was handed.
@@ -90,7 +95,7 @@ describe('FigurePageShell', () => {
     expect(screen.getByRole('heading', { name: /dhirubhai ambani/i })).toBeInTheDocument()
     expect(screen.getByText('The Polyester Prince')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /intro/i })).toBeInTheDocument()
-    expect(screen.getByText('reader:none')).toBeInTheDocument()  // nothing selected yet
+    expect(screen.getByText(/^reader:research\/biographies\/.*01-intro\.md$/)).toBeInTheDocument()
   })
   test('selecting a file passes its research key to the reader', () => {
     render(<FigurePageShell figure={figure} />)

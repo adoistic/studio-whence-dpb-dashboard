@@ -156,3 +156,26 @@ export async function uploadIdeaImage(ideaId: string, file: File): Promise<strin
   await uploadToR2(url, file)
   return key
 }
+
+/** Ask the Function for a presigned PUT URL for an official-cover reference image. */
+export async function requestCoverRefUploadUrl(
+  line: string, slug: string, filename: string, contentType: string,
+): Promise<{ url: string; key: string }> {
+  const res = await authedFetch('/upload-url', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ coverRef: { line, slug }, filename, contentType }),
+  })
+  if (!res.ok) throw new Error(`upload-url failed: ${res.status}`)
+  return (await res.json()) as { url: string; key: string }
+}
+
+/** Convenience: presign + upload an official-cover reference, returning the stored key. */
+export async function uploadCoverRef(line: string, slug: string, file: File): Promise<string> {
+  const filename = (file.name.split(/[\\/]/).pop() ?? 'cover').replace(/[^a-zA-Z0-9._-]/g, '_')
+  const { url, key } = await requestCoverRefUploadUrl(
+    line, slug, filename, file.type || 'application/octet-stream',
+  )
+  await uploadToR2(url, file)
+  return key
+}

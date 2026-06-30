@@ -16,6 +16,8 @@
  *   - `secrets/` and the bucket root are likewise not allowed prefixes.
  */
 
+import { randomUUID } from "crypto";
+
 /** Prefixes presignable through `/resolve`. `content.json` is deliberately absent. */
 export const RESOLVE_PREFIXES = [
   'research/',
@@ -36,8 +38,10 @@ export const READ_PREFIXES = [
   'sites/',
 ] as const;
 
-/** Prefixes writable through the presigned-PUT /upload-url route. Idea images only. */
-export const WRITE_PREFIXES = ['images/ideas/'] as const;
+/** Prefixes writable through the presigned-PUT /upload-url route. */
+export const WRITE_PREFIXES = ['images/ideas/', 'artifacts/comics/'] as const;
+
+const SLUG_RE = /^[a-z0-9-]+$/;
 
 /**
  * Normalize and validate an R2 object key against an allowlist of prefixes.
@@ -68,4 +72,27 @@ export function safeKey(
 
   // 4. Safe — return the decoded key.
   return decoded;
+}
+
+/**
+ * Build the confined R2 key for an official-cover reference upload. The key is
+ * server-constructed and restricted to the comic's `cover-refs/` subpath.
+ */
+export function buildCoverRefKey(
+  line: string,
+  slug: string,
+  filename: string,
+  uniquePart = randomUUID()
+): string | null {
+  if (!SLUG_RE.test(line) || !SLUG_RE.test(slug)) return null;
+  const safeName = (filename.split(/[\\/]/).pop() ?? "").replace(/[^a-zA-Z0-9._-]/g, "_");
+  if (!safeName || safeName === "." || safeName === "..") return null;
+  const dot = safeName.lastIndexOf(".");
+  const stem = dot > 0 ? safeName.slice(0, dot) : safeName;
+  const ext = dot > 0 ? safeName.slice(dot) : "";
+  const versionedName = `${stem}-${uniquePart.replace(/[^a-zA-Z0-9_-]/g, "_")}${ext}`;
+  return safeKey(
+    `artifacts/comics/${line}/${slug}/cover-refs/${versionedName}`,
+    WRITE_PREFIXES
+  );
 }

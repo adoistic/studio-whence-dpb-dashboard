@@ -1,5 +1,5 @@
 import { describe, expect, it, test } from 'vitest'
-import { safeKey, RESOLVE_PREFIXES, READ_PREFIXES, WRITE_PREFIXES } from '../keys'
+import { buildCoverRefKey, safeKey, RESOLVE_PREFIXES, READ_PREFIXES, WRITE_PREFIXES } from '../keys'
 
 describe('WRITE_PREFIXES', () => {
   it('accepts an idea image key', () => {
@@ -10,6 +10,24 @@ describe('WRITE_PREFIXES', () => {
   })
   it('rejects traversal', () => {
     expect(safeKey('images/ideas/../secrets/x', WRITE_PREFIXES)).toBeNull()
+  })
+  it('accepts a cover-ref artifacts key', () => {
+    expect(safeKey('artifacts/comics/legacy/x/cover-refs/p.png', WRITE_PREFIXES))
+      .toBe('artifacts/comics/legacy/x/cover-refs/p.png')
+  })
+})
+
+describe('buildCoverRefKey', () => {
+  it('builds a confined cover-ref key and sanitizes the filename', () => {
+    expect(buildCoverRefKey('legacy', 'hanuman-celestial-superpower', 'My Cover.png', 'u1'))
+      .toBe('artifacts/comics/legacy/hanuman-celestial-superpower/cover-refs/My_Cover-u1.png')
+  })
+  it('rejects a bad line or slug', () => {
+    expect(buildCoverRefKey('legacy', 'has space', 'a.png')).toBeNull()
+    expect(buildCoverRefKey('../x', 'y', 'a.png')).toBeNull()
+  })
+  it('rejects an empty filename', () => {
+    expect(buildCoverRefKey('legacy', 'x', '')).toBeNull()
   })
 })
 

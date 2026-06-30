@@ -153,6 +153,14 @@ describe('scopeOfKey', () => {
         comicId: 'biographies__01-the-comic',
       },
     },
+    {
+      name: 'artifacts/comics cover-ref → { line, comicId }',
+      key: 'artifacts/comics/legacy/hanuman-celestial-superpower/cover-refs/ref.png',
+      expected: {
+        line: 'legacy',
+        comicId: 'legacy__hanuman-celestial-superpower',
+      },
+    },
   ]
 
   for (const c of cases) {

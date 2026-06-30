@@ -227,7 +227,11 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
         {/* Cover options — candidate front covers for the team to review/choose.
             Renders nothing unless the catalog published a coverOptions block. */}
         <div className="mt-16">
-          <CoverOptions comic={comic} />
+          <CoverOptions
+            comic={comic}
+            canModerate={canMod}
+            author={{ email: user?.email ?? '', name: user?.displayName ?? user?.email ?? '' }}
+          />
         </div>
 
         {/* Translated editions (Hindi / English) — translated script + editable

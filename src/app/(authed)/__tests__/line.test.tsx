@@ -27,10 +27,12 @@ import LinePage from '../line/page'
 let mockUseLines: () => Async<Line[]>
 let mockUseFigures: () => Async<Figure[]>
 let mockUsePeople: () => Async<PersonDoc[]>
+let mockUsePrograms: () => Async<Line['programs']>
 
 vi.mock('@/lib/catalog', () => ({
   useLines: () => mockUseLines(),
   usePeople: () => mockUsePeople(),
+  usePrograms: () => mockUsePrograms(),
 }))
 
 // The page now reads the gated catalog (useVisibleComics/useVisibleFigures) and
@@ -103,6 +105,7 @@ beforeEach(() => {
   mockUseVisibleComics = () => loaded<Comic[]>([])
   mockUseFigures = () => loaded<Figure[]>([])
   mockUsePeople = () => loaded<PersonDoc[]>(peopleDocs)
+  mockUsePrograms = () => loaded([])
   mockUseUser = () => ({ user: { email: 'mod@x.com' }, loading: false })
   mockStatus = 'admin'
 })

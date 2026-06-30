@@ -50,4 +50,40 @@ describe('POST /upload-url', () => {
     expect(r.status).toHaveBeenCalledWith(200)
     expect(r.json).toHaveBeenCalledWith({ url: 'https://signed.put/x', key: 'images/ideas/i1/p.png' })
   })
+  it('200 with a cover-ref key for a moderator', async () => {
+    h.authorize.mockResolvedValue({ email: 'a@thothica.com', moderator: true })
+    const r = res()
+    await (dataApi as any)(req({
+      coverRef: { line: 'legacy', slug: 'hanuman-celestial-superpower' },
+      filename: 'ref.png',
+      contentType: 'image/png',
+    }), r)
+    expect(r.status).toHaveBeenCalledWith(200)
+    expect(r.json).toHaveBeenCalledWith({
+      url: 'https://signed.put/x',
+      key: expect.stringMatching(
+        /^artifacts\/comics\/legacy\/hanuman-celestial-superpower\/cover-refs\/ref-[a-zA-Z0-9_-]+\.png$/,
+      ),
+    })
+  })
+  it('403 for a cover-ref with a bad slug', async () => {
+    h.authorize.mockResolvedValue({ email: 'a@thothica.com', moderator: true })
+    const r = res()
+    await (dataApi as any)(req({
+      coverRef: { line: 'legacy', slug: 'bad slug' },
+      filename: 'ref.png',
+      contentType: 'image/png',
+    }), r)
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
+  it('403 for a non-moderator cover-ref upload', async () => {
+    h.authorize.mockResolvedValue({ email: 'm@dpb.in', moderator: false })
+    const r = res()
+    await (dataApi as any)(req({
+      coverRef: { line: 'legacy', slug: 'x' },
+      filename: 'ref.png',
+      contentType: 'image/png',
+    }), r)
+    expect(r.status).toHaveBeenCalledWith(403)
+  })
 })

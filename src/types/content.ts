@@ -106,6 +106,16 @@ export interface Comic {
   }
 }
 
+/** The official cover chosen for a comic from `coverChoices/{line}__{slug}`. */
+export interface CoverChoice {
+  source: 'option' | 'upload'
+  key: string
+  label: string
+  setByEmail: string
+  setByName: string
+  setAt: unknown
+}
+
 export interface ResearchFile {
   path: string
   title: string

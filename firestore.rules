@@ -77,6 +77,37 @@ service cloud.firestore {
             && allocDoc().get('figures', []).hasAny([get(/databases/$(database)/documents/comics/$(cid)).data.get('subject_slug','')]))
       ));
     }
+    function coverChoiceLineOf(id) {
+      return id.split('__')[0];
+    }
+    function coverChoiceSlugOf(id) {
+      return id.split('__')[1];
+    }
+    function coverChoiceKeyAllowed(id, source, key) {
+      return source == 'option'
+        ? key.matches('^artifacts/comics/' + coverChoiceLineOf(id) + '/' + coverChoiceSlugOf(id) + '/cover-options/[^/]+$')
+        : key.matches('^artifacts/comics/' + coverChoiceLineOf(id) + '/' + coverChoiceSlugOf(id) + '/cover-refs/[^/]+$');
+    }
+    function validCoverChoiceWrite(id) {
+      return id.matches('^[a-z0-9-]+__[a-z0-9-]+$')
+        && request.resource.data.keys().hasOnly([
+          'source', 'key', 'label', 'setByEmail', 'setByName', 'setAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'source', 'key', 'label', 'setByEmail', 'setByName', 'setAt'
+        ])
+        && request.resource.data.source in ['option', 'upload']
+        && request.resource.data.key is string
+        && request.resource.data.label is string
+        && request.resource.data.setByEmail is string
+        && request.resource.data.setByName is string
+        && request.resource.data.setAt == request.time
+        && coverChoiceKeyAllowed(
+          id,
+          request.resource.data.source,
+          request.resource.data.key
+        );
+    }
 
     match /allowlist/{email} {
       allow read: if isAllowlisted();
@@ -218,6 +249,17 @@ service cloud.firestore {
             // may not mutate category, but a category-less doc still edits fine.
             && request.resource.data.get('category', null) == resource.data.get('category', null));
       allow delete: if isSubAdmin() || (isAllowlisted() && resource.data.authorEmail == userEmail());
+    }
+
+    // ── Cover choice (official cover per comic; client-written by moderators) ──
+    // Doc id is the comicId `{line}__{slug}`. Members can read the choice only
+    // for allocated comics; moderators can write and must stamp their own email.
+    match /coverChoices/{id} {
+      allow read: if isAllowlisted() && feedbackAllocAllowed(id);
+      allow create, update: if isSubAdmin()
+        && request.resource.data.setByEmail == userEmail()
+        && validCoverChoiceWrite(id);
+      allow delete: if false;
     }
 
     // ── Idea Drop (moderator-authored idea cards routed to recipients) ──

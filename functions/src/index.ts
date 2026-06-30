@@ -3,7 +3,13 @@ import type { Request } from "firebase-functions/v2/https";
 import type { Response } from "express";
 
 import { authorize } from "./auth";
-import { safeKey, RESOLVE_PREFIXES, READ_PREFIXES, WRITE_PREFIXES } from "./keys";
+import {
+  buildCoverRefKey,
+  safeKey,
+  RESOLVE_PREFIXES,
+  READ_PREFIXES,
+  WRITE_PREFIXES,
+} from "./keys";
 import { getObject, presignGet, presignPut } from "./r2";
 import {
   getAllocation,
@@ -242,14 +248,33 @@ export const dataApi = onRequest(
 
     let parsed: unknown = req.body;
     if (typeof parsed === "string") { try { parsed = JSON.parse(parsed); } catch { parsed = undefined; } }
-    const b = parsed as { ideaId?: unknown; filename?: unknown; contentType?: unknown } | undefined;
-    const ideaId = String(b?.ideaId ?? "");
-    const filename = String(b?.filename ?? "").split(/[\\/]/).pop()?.replace(/[^a-zA-Z0-9._-]/g, "_") ?? "";
+    const b = parsed as {
+      ideaId?: unknown;
+      coverRef?: { line?: unknown; slug?: unknown };
+      filename?: unknown;
+      contentType?: unknown;
+    } | undefined;
     const contentType = String(b?.contentType ?? "");
-    if (!ideaId || !filename || !contentType.startsWith("image/")) {
+    if (!contentType.startsWith("image/")) {
       res.status(400).json({ error: "bad request" }); return;
     }
-    const key = safeKey(`images/ideas/${ideaId}/${filename}`, WRITE_PREFIXES);
+    const rawName = String(b?.filename ?? "");
+
+    let key: string | null = null;
+    if (b?.coverRef) {
+      key = buildCoverRefKey(
+        String(b.coverRef.line ?? ""),
+        String(b.coverRef.slug ?? ""),
+        rawName
+      );
+    } else {
+      const ideaId = String(b?.ideaId ?? "");
+      const filename = rawName.split(/[\\/]/).pop()?.replace(/[^a-zA-Z0-9._-]/g, "_") ?? "";
+      if (!ideaId || !filename) {
+        res.status(400).json({ error: "bad request" }); return;
+      }
+      key = safeKey(`images/ideas/${ideaId}/${filename}`, WRITE_PREFIXES);
+    }
     if (key === null) { res.status(403).json({ error: "forbidden" }); return; }
     try {
       const url = await presignPut(key, contentType);

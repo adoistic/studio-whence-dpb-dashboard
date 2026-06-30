@@ -36,6 +36,14 @@ vi.mock('@/lib/auth', () => ({
 // hover, which this test doesn't trigger.
 vi.mock('@/lib/dataApi', () => ({ readMarkdown: async () => '' }))
 
+// CoverOptions has its own tests. Mock it here so this shell test does not
+// initialize the cover-choice Firestore hook.
+vi.mock('@/components/CoverOptions', () => ({
+  CoverOptions: ({ comic }: { comic: Comic }) => (
+    <div data-testid="cover-options" data-comic-slug={comic.slug} />
+  ),
+}))
+
 vi.mock('@/components/feedback/CommentGutter', () => ({
   CommentGutter: (props: { comicId: string; comicVersion: number; line: string }) => (
     <div data-testid="comment-gutter" data-comic-id={props.comicId} data-version={props.comicVersion} data-line={props.line} />
