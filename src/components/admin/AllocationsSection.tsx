@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { useMembers, type Member } from '@/lib/admin'
 import {
   useAllocation, setGrants, addGrant, removeGrant,
-  type Allocation, type Grants,
+  type Allocation, type Grants, type GrantKind,
 } from '@/lib/allocation'
 import { useLines, useFigures, useComics } from '@/lib/catalog'
 import type { Comic, Figure, Line } from '@/types/content'
@@ -100,6 +100,20 @@ export function AllocationsSection({ adminEmail }: { adminEmail: string }) {
     return (id: string) => m.get(id) ?? id
   }, [comics.data])
 
+  // Grantable programs (series), derived from comics: program_slug → series title.
+  // A program grant unlocks every comic + figure in that series, present and future.
+  const programs = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const c of comics.data ?? []) {
+      if (c.program_slug) m.set(c.program_slug, c.series || titleCaseSlug(c.program_slug))
+    }
+    return Array.from(m, ([slug, title]) => ({ slug, title })).sort((a, b) => a.title.localeCompare(b.title))
+  }, [comics.data])
+  const programTitle = useMemo(() => {
+    const m = new Map(programs.map((p) => [p.slug, p.title]))
+    return (slug: string) => m.get(slug) ?? slug
+  }, [programs])
+
   // A write runs the mutation, then bumps the alloc refresh key so the chips reload.
   const write = async (grants: Grants) => {
     setErrMsg(null)
@@ -160,8 +174,10 @@ export function AllocationsSection({ adminEmail }: { adminEmail: string }) {
           lines={lines.data ?? []}
           figures={figures.data ?? []}
           comics={comics.data ?? []}
+          programs={programs}
           lineTitle={lineTitle}
           comicTitle={comicTitle}
+          programTitle={programTitle}
           onWrite={write}
         />
       )}
@@ -172,21 +188,23 @@ export function AllocationsSection({ adminEmail }: { adminEmail: string }) {
 // ── Current grants + add controls (rendered once a member is chosen) ───────────────
 
 function CurrentAndAdd({
-  alloc, lines, figures, comics, lineTitle, comicTitle, onWrite,
+  alloc, lines, figures, comics, programs, lineTitle, comicTitle, programTitle, onWrite,
 }: {
   alloc: Allocation
   lines: Line[]
   figures: Figure[]
   comics: Comic[]
+  programs: { slug: string; title: string }[]
   lineTitle: (slug: string) => string
   comicTitle: (id: string) => string
+  programTitle: (slug: string) => string
   onWrite: (grants: Grants) => void
 }) {
-  const hasAny = alloc.lines.length + alloc.figures.length + alloc.comics.length > 0
+  const hasAny = alloc.lines.length + alloc.figures.length + alloc.comics.length + alloc.programs.length > 0
 
-  const remove = (kind: 'line' | 'figure' | 'comic', value: string) =>
+  const remove = (kind: GrantKind, value: string) =>
     onWrite(removeGrant(alloc, kind, value))
-  const add = (kind: 'line' | 'figure' | 'comic', value: string) =>
+  const add = (kind: GrantKind, value: string) =>
     onWrite(addGrant(alloc, kind, value))
 
   return (
@@ -212,6 +230,24 @@ function CurrentAndAdd({
                       label={lineTitle(slug)}
                       removeLabel={`Remove line ${lineTitle(slug)}`}
                       onRemove={() => remove('line', slug)}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <SubHeading title="Programs (whole series)" count={alloc.programs.length} />
+              {alloc.programs.length === 0 ? (
+                <p className="font-sans text-xs text-brand-slate/70">None.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {alloc.programs.map((slug) => (
+                    <GrantChip
+                      key={slug}
+                      label={programTitle(slug)}
+                      removeLabel={`Remove program ${programTitle(slug)}`}
+                      onRemove={() => remove('program', slug)}
                     />
                   ))}
                 </div>
@@ -259,6 +295,7 @@ function CurrentAndAdd({
 
       {/* ── Add controls ────────────────────────────────────────────── */}
       <div className="flex flex-col gap-6 border-t border-brand-pale-dusk pt-6">
+        <AddProgram programs={programs} granted={alloc.programs} onAdd={(slug) => add('program', slug)} />
         <AddLine lines={lines} granted={alloc.lines} onAdd={(slug) => add('line', slug)} />
         <AddFigure
           figures={figures}
@@ -274,6 +311,42 @@ function CurrentAndAdd({
           granted={alloc.comics}
           onAdd={(id) => add('comic', id)}
         />
+      </div>
+    </div>
+  )
+}
+
+// ── Add a program (whole series) ─────────────────────────────────────────────────
+
+function AddProgram({
+  programs, granted, onAdd,
+}: { programs: { slug: string; title: string }[]; granted: string[]; onAdd: (slug: string) => void }) {
+  const [sel, setSel] = useState('')
+  const already = sel !== '' && granted.includes(sel)
+  return (
+    <div>
+      <label htmlFor="alloc-add-program" className="mb-1 block font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
+        Add a program (grants the whole series — current &amp; future)
+      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          id="alloc-add-program"
+          aria-label="Program to add"
+          value={sel}
+          onChange={(e) => setSel(e.target.value)}
+          className={SELECT_CLS}
+        >
+          <option value="">Select a program…</option>
+          {programs.map((p) => (
+            <option key={p.slug} value={p.slug}>{p.title}</option>
+          ))}
+        </select>
+        <AddButton
+          label="Add program grant"
+          disabled={sel === '' || already}
+          onClick={() => { onAdd(sel); setSel('') }}
+        />
+        {already && <span className="font-sans text-xs text-brand-slate">Already granted.</span>}
       </div>
     </div>
   )

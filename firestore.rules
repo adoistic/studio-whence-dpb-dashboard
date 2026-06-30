@@ -43,16 +43,22 @@ service cloud.firestore {
     // that figure's comics; an explicit comic grant unlocks just that comic). A
     // comic grant must NOT cascade to the figure's sibling comics via
     // figures_effective — that set is for RESEARCH access only (figureResearchAllowed).
-    function comicAllowed(cid, line, subject) {
+    // A `programs` grant (e.g. 'cricket-legends') unlocks EVERY comic + figure
+    // whose `program_slug` matches — current AND future — so a whole series can be
+    // granted once. The program slug is read from the doc (`program_slug`), passed
+    // in by each call site; an empty program ('') never matches a real grant.
+    function comicAllowed(cid, line, subject, program) {
       return isSubAdmin() || (hasAlloc() && (
            allocDoc().get('comics', []).hasAny([cid])
         || allocDoc().get('lines', []).hasAny([line])
-        || allocDoc().get('figures', []).hasAny([subject]) ));
+        || allocDoc().get('figures', []).hasAny([subject])
+        || allocDoc().get('programs', []).hasAny([program]) ));
     }
-    function figureResearchAllowed(fline, fslug) {
+    function figureResearchAllowed(fline, fslug, fprogram) {
       return isSubAdmin() || (hasAlloc() && (
            allocDoc().get('lines', []).hasAny([fline])
-        || allocDoc().get('figures_effective', []).hasAny([fslug]) ));
+        || allocDoc().get('figures_effective', []).hasAny([fslug])
+        || allocDoc().get('programs', []).hasAny([fprogram]) ));
     }
     // FEEDBACK gate. A feedback doc carries `comicId` (`{line}__{slug}`); the
     // `line` is DERIVED from comicId (its prefix), never read from the separate
@@ -74,7 +80,8 @@ service cloud.firestore {
            allocDoc().get('comics', []).hasAny([cid])
         || allocDoc().get('lines', []).hasAny([feedbackLineOf(cid)])
         || (exists(/databases/$(database)/documents/comics/$(cid))
-            && allocDoc().get('figures', []).hasAny([get(/databases/$(database)/documents/comics/$(cid)).data.get('subject_slug','')]))
+            && (allocDoc().get('figures', []).hasAny([get(/databases/$(database)/documents/comics/$(cid)).data.get('subject_slug','')])
+                || allocDoc().get('programs', []).hasAny([get(/databases/$(database)/documents/comics/$(cid)).data.get('program_slug','')])))
       ));
     }
     function coverChoiceLineOf(id) {
@@ -155,7 +162,7 @@ service cloud.firestore {
     // allowlisted member may read. Specific comics stay allocation-gated.
     match /figures/{f}   {
       allow read: if isAllowlisted()
-        && (figureResearchAllowed(resource.data.get('line', ''), f)
+        && (figureResearchAllowed(resource.data.get('line', ''), f, resource.data.get('program_slug', ''))
             || resource.data.get('openResearch', false) == true);
       allow write: if false;
       match /sources/{s} {
@@ -165,14 +172,15 @@ service cloud.firestore {
         allow read: if isAllowlisted()
           && exists(/databases/$(database)/documents/figures/$(f))
           && (figureResearchAllowed(
-                get(/databases/$(database)/documents/figures/$(f)).data.get('line', ''), f)
+                get(/databases/$(database)/documents/figures/$(f)).data.get('line', ''), f,
+                get(/databases/$(database)/documents/figures/$(f)).data.get('program_slug', ''))
               || get(/databases/$(database)/documents/figures/$(f)).data.get('openResearch', false) == true);
         allow write: if false;
       }
     }
     match /comics/{c} {
       allow read: if isAllowlisted()
-        && comicAllowed(c, resource.data.line, resource.data.get('subject_slug', ''));
+        && comicAllowed(c, resource.data.line, resource.data.get('subject_slug', ''), resource.data.get('program_slug', ''));
       allow write: if false;
       // Versions gate on the PARENT comic doc (re-read it; the wildcard `c` is in
       // scope inside this nested match).
@@ -181,7 +189,8 @@ service cloud.firestore {
           && exists(/databases/$(database)/documents/comics/$(c))
           && comicAllowed(c,
                get(/databases/$(database)/documents/comics/$(c)).data.line,
-               get(/databases/$(database)/documents/comics/$(c)).data.get('subject_slug', ''));
+               get(/databases/$(database)/documents/comics/$(c)).data.get('subject_slug', ''),
+               get(/databases/$(database)/documents/comics/$(c)).data.get('program_slug', ''));
         allow write: if false;
       }
     }
@@ -201,7 +210,7 @@ service cloud.firestore {
             && comicAllowed(
                  resource.data.attachTo.line + '__' + resource.data.attachTo.comicSlug,
                  resource.data.attachTo.line,
-                 ''))
+                 '', ''))
         || (resource.data.attachTo.kind == 'figure'
             && (resource.data.attachTo.get('open', false) == true
                 || (hasAlloc() && allocDoc().get('lines', []).hasAny([resource.data.attachTo.line]))

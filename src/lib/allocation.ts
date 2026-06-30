@@ -31,11 +31,13 @@ export interface Allocation {
   lines: string[]
   figures: string[]
   comics: string[]
+  programs: string[]
   figures_effective: string[]
 }
 
-/** The raw, admin-facing grant triple (no derived field). */
-export interface Grants { lines: string[]; figures: string[]; comics: string[] }
+/** The raw, admin-facing grant set (no derived field). A `programs` grant unlocks
+ * every comic + figure whose `program_slug` matches — current and future. */
+export interface Grants { lines: string[]; figures: string[]; comics: string[]; programs: string[] }
 
 // ─── Derivation ──────────────────────────────────────────────────────────────────
 
@@ -59,7 +61,7 @@ export function deriveEffectiveFigures(
 // ─── Read hook (one-shot; component bumps refreshKey to reload after a write) ─────
 
 const EMPTY_GRANT = (email: string): Allocation =>
-  ({ email, lines: [], figures: [], comics: [], figures_effective: [] })
+  ({ email, lines: [], figures: [], comics: [], programs: [], figures_effective: [] })
 
 /**
  * Read a member's allocation. A missing doc maps to an empty-grant object (NOT
@@ -77,6 +79,7 @@ export function useAllocation(email: string | null, refreshKey = 0): Async<Alloc
       lines: d.lines ?? [],
       figures: d.figures ?? [],
       comics: d.comics ?? [],
+      programs: d.programs ?? [],
       figures_effective: d.figures_effective ?? [],
     }
   }, [email, refreshKey])
@@ -94,12 +97,13 @@ export async function setGrants(
   grants: Grants,
   opts: { adminEmail: string; subjectByComic: Record<string, string | undefined> },
 ): Promise<void> {
-  const { lines, figures, comics } = grants
+  const { lines, figures, comics, programs } = grants
   const figures_effective = deriveEffectiveFigures(figures, comics, opts.subjectByComic)
   await setDoc(doc(db, 'allocations', normalizeEmail(email)), {
     lines,
     figures,
     comics,
+    programs,
     figures_effective,
     updatedBy: opts.adminEmail,
     updatedAt: serverTimestamp(),
@@ -108,28 +112,26 @@ export async function setGrants(
 
 // ─── Pure grant-list helpers (so the UI doesn't duplicate set logic) ──────────────
 
-const listFor = (kind: 'line' | 'figure' | 'comic'): keyof Grants =>
-  kind === 'line' ? 'lines' : kind === 'figure' ? 'figures' : 'comics'
+export type GrantKind = 'line' | 'figure' | 'comic' | 'program'
 
-/** Add a grant to the right raw list if absent; returns the new grant triple. */
-export function addGrant(
-  alloc: Allocation,
-  kind: 'line' | 'figure' | 'comic',
-  value: string,
-): Grants {
-  const base: Grants = { lines: [...alloc.lines], figures: [...alloc.figures], comics: [...alloc.comics] }
+const listFor = (kind: GrantKind): keyof Grants =>
+  kind === 'line' ? 'lines' : kind === 'figure' ? 'figures'
+    : kind === 'comic' ? 'comics' : 'programs'
+
+const grantsOf = (a: Allocation): Grants =>
+  ({ lines: [...a.lines], figures: [...a.figures], comics: [...a.comics], programs: [...a.programs] })
+
+/** Add a grant to the right raw list if absent; returns the new grant set. */
+export function addGrant(alloc: Allocation, kind: GrantKind, value: string): Grants {
+  const base = grantsOf(alloc)
   const key = listFor(kind)
   if (!base[key].includes(value)) base[key] = [...base[key], value]
   return base
 }
 
-/** Remove a grant from the right raw list; returns the new grant triple. */
-export function removeGrant(
-  alloc: Allocation,
-  kind: 'line' | 'figure' | 'comic',
-  value: string,
-): Grants {
-  const base: Grants = { lines: [...alloc.lines], figures: [...alloc.figures], comics: [...alloc.comics] }
+/** Remove a grant from the right raw list; returns the new grant set. */
+export function removeGrant(alloc: Allocation, kind: GrantKind, value: string): Grants {
+  const base = grantsOf(alloc)
   const key = listFor(kind)
   base[key] = base[key].filter((v) => v !== value)
   return base

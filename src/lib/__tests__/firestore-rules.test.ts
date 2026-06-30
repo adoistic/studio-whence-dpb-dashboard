@@ -103,6 +103,16 @@ beforeAll(async () => {
     // The granted comic + a SIBLING comic with the same subject (NOT granted by id).
     await setDoc(doc(db, 'comics/biographies__c1'), { line: 'biographies', subject_slug: 'sachin-tendulkar', status: 'draft' })
     await setDoc(doc(db, 'comics/biographies__c2'), { line: 'biographies', subject_slug: 'sachin-tendulkar', status: 'draft' })
+    // A member granted a whole PROGRAM (series) by program_slug — unlocks every
+    // comic + figure with program_slug 'cricket-legends' (current & future) and
+    // nothing else. No line/figure/comic grants.
+    await setDoc(doc(db, 'allowlist/progmember@dpb.in'), { role: 'allow' })
+    await setDoc(doc(db, 'allocations/progmember@dpb.in'), {
+      lines: [], figures: [], comics: [], programs: ['cricket-legends'],
+      figures_effective: [], updatedBy: 'adnan@thothica.com', updatedAt: '2026-06-30',
+    })
+    await setDoc(doc(db, 'comics/biographies__cricketc'), { line: 'biographies', subject_slug: 'kapil-dev', program_slug: 'cricket-legends', status: 'draft' })
+    await setDoc(doc(db, 'figures/kapil-dev'), { slug: 'kapil-dev', line: 'biographies', program_slug: 'cricket-legends' })
     // A member with NO allocation doc (allowlisted only) → must see no IP.
     await setDoc(doc(db, 'allowlist/noalloc@dpb.in'), { role: 'allow' })
     // Catalog seed docs for allocation assertions.
@@ -476,6 +486,7 @@ describe('firestore.rules — work allocation', () => {
   const member   = () => env.authenticatedContext('al-m', { email: 'member@dpb.in' }).firestore()
   const comicMember = () => env.authenticatedContext('al-cm', { email: 'comicmember@dpb.in' }).firestore()
   const noAlloc  = () => env.authenticatedContext('al-n', { email: 'noalloc@dpb.in' }).firestore()
+  const progMember = () => env.authenticatedContext('al-pm', { email: 'progmember@dpb.in' }).firestore()
   const subAdmin = () => env.authenticatedContext('al-sa', { email: 'sub@dpb.in' }).firestore()
   const admin    = () => env.authenticatedContext('al-ad', { email: 'adnan@thothica.com' }).firestore()
 
@@ -509,6 +520,16 @@ describe('firestore.rules — work allocation', () => {
   it('comic grant DOES unlock the figure’s research (figures_effective)', async () => {
     await assertSucceeds(getDoc(doc(comicMember(), 'figures/sachin-tendulkar')))
     await assertSucceeds(getDoc(doc(comicMember(), 'figures/sachin-tendulkar/sources/book-a')))
+  })
+
+  // ── A PROGRAM (series) grant unlocks every comic + figure in that program ──
+  it('a program grant unlocks the program’s comics and figures', async () => {
+    await assertSucceeds(getDoc(doc(progMember(), 'comics/biographies__cricketc')))
+    await assertSucceeds(getDoc(doc(progMember(), 'figures/kapil-dev')))
+  })
+  it('a program grant does NOT unlock content outside that program', async () => {
+    await assertFails(getDoc(doc(progMember(), 'comics/awareness__y')))       // no program_slug match
+    await assertFails(getDoc(doc(progMember(), 'figures/dhirubhai-ambani')))  // business series, not cricket-legends
   })
 
   // ── Version subcollection inherits the parent comic's gate ──

@@ -49,7 +49,7 @@ export function chunk<T>(arr: T[], size = 30): T[][] {
 async function readAllocation(email: string): Promise<Allocation> {
   const norm = normalizeEmail(email)
   const snap = await getDoc(doc(db, 'allocations', norm))
-  const empty: Allocation = { email: norm, lines: [], figures: [], comics: [], figures_effective: [] }
+  const empty: Allocation = { email: norm, lines: [], figures: [], comics: [], programs: [], figures_effective: [] }
   if (!snap.exists()) return empty
   const d = snap.data() as Partial<Allocation>
   return {
@@ -57,6 +57,7 @@ async function readAllocation(email: string): Promise<Allocation> {
     lines: d.lines ?? [],
     figures: d.figures ?? [],
     comics: d.comics ?? [],
+    programs: d.programs ?? [],
     figures_effective: d.figures_effective ?? [],
   }
 }
@@ -86,7 +87,8 @@ export function useVisibleComics(
     if (!email) return []
 
     const alloc = await readAllocation(email)
-    if (alloc.lines.length === 0 && alloc.figures.length === 0 && alloc.comics.length === 0) {
+    if (alloc.lines.length === 0 && alloc.figures.length === 0
+        && alloc.comics.length === 0 && alloc.programs.length === 0) {
       return []
     }
 
@@ -100,6 +102,9 @@ export function useVisibleComics(
     }
     for (const c of chunk(alloc.comics)) {
       runs.push(getDocs(query(comicsCol, where(documentId(), 'in', c))).then(listData<Comic>))
+    }
+    for (const c of chunk(alloc.programs)) {
+      runs.push(getDocs(query(comicsCol, where('program_slug', 'in', c))).then(listData<Comic>))
     }
 
     const byId = new Map<string, Comic>()
@@ -139,7 +144,8 @@ export function useVisibleFigures(
     if (!email) return []
 
     const alloc = await readAllocation(email)
-    if (alloc.figures_effective.length === 0 && alloc.lines.length === 0) {
+    if (alloc.figures_effective.length === 0 && alloc.lines.length === 0
+        && alloc.programs.length === 0) {
       return []
     }
 
@@ -150,6 +156,9 @@ export function useVisibleFigures(
     }
     for (const c of chunk(alloc.lines)) {
       runs.push(getDocs(query(figuresCol, where('line', 'in', c))).then(listData<Figure>))
+    }
+    for (const c of chunk(alloc.programs)) {
+      runs.push(getDocs(query(figuresCol, where('program_slug', 'in', c))).then(listData<Figure>))
     }
 
     const bySlug = new Map<string, Figure>()

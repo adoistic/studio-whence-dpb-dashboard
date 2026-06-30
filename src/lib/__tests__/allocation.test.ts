@@ -34,7 +34,7 @@ beforeEach(() => {
 const ADMIN = 'adnan@thothica.com'
 
 const alloc = (over: Partial<Allocation> = {}): Allocation => ({
-  email: 'm@x.com', lines: [], figures: [], comics: [], figures_effective: [], ...over,
+  email: 'm@x.com', lines: [], figures: [], comics: [], programs: [], figures_effective: [], ...over,
 })
 
 // ── deriveEffectiveFigures ──────────────────────────────────────────────────────────
@@ -96,6 +96,7 @@ describe('setGrants', () => {
         lines: ['biographies'],
         figures: ['sachin-tendulkar'],
         comics: ['biographies__01-the-wall'],
+        programs: ['cricket-legends'],
       },
       { adminEmail: ADMIN, subjectByComic: { 'biographies__01-the-wall': 'rahul-dravid' } },
     )
@@ -106,6 +107,7 @@ describe('setGrants', () => {
         lines: ['biographies'],
         figures: ['sachin-tendulkar'],
         comics: ['biographies__01-the-wall'],
+        programs: ['cricket-legends'],
         figures_effective: ['sachin-tendulkar', 'rahul-dravid'],
         updatedBy: ADMIN,
         updatedAt: '__ts__',
@@ -116,12 +118,12 @@ describe('setGrants', () => {
   it('writes empty figures_effective when there are no figures/comics', async () => {
     await setGrants(
       'a@b.com',
-      { lines: ['indic'], figures: [], comics: [] },
+      { lines: ['indic'], figures: [], comics: [], programs: [] },
       { adminEmail: ADMIN, subjectByComic: {} },
     )
     expect(mockSetDoc).toHaveBeenCalledWith(
       { __path: 'allocations/a@b.com' },
-      expect.objectContaining({ lines: ['indic'], figures: [], comics: [], figures_effective: [] }),
+      expect.objectContaining({ lines: ['indic'], figures: [], comics: [], programs: [], figures_effective: [] }),
     )
   })
 })
@@ -131,20 +133,23 @@ describe('setGrants', () => {
 describe('addGrant', () => {
   it('adds to the right raw list', () => {
     expect(addGrant(alloc(), 'line', 'biographies')).toEqual(
-      { lines: ['biographies'], figures: [], comics: [] },
+      { lines: ['biographies'], figures: [], comics: [], programs: [] },
     )
     expect(addGrant(alloc(), 'figure', 'sachin-tendulkar')).toEqual(
-      { lines: [], figures: ['sachin-tendulkar'], comics: [] },
+      { lines: [], figures: ['sachin-tendulkar'], comics: [], programs: [] },
     )
     expect(addGrant(alloc(), 'comic', 'biographies__01')).toEqual(
-      { lines: [], figures: [], comics: ['biographies__01'] },
+      { lines: [], figures: [], comics: ['biographies__01'], programs: [] },
+    )
+    expect(addGrant(alloc(), 'program', 'cricket-legends')).toEqual(
+      { lines: [], figures: [], comics: [], programs: ['cricket-legends'] },
     )
   })
 
   it('is idempotent when the value is already present', () => {
     const a = alloc({ figures: ['sachin-tendulkar'] })
     expect(addGrant(a, 'figure', 'sachin-tendulkar')).toEqual(
-      { lines: [], figures: ['sachin-tendulkar'], comics: [] },
+      { lines: [], figures: ['sachin-tendulkar'], comics: [], programs: [] },
     )
   })
 
@@ -159,14 +164,21 @@ describe('removeGrant', () => {
   it('removes from the right raw list', () => {
     const a = alloc({ figures: ['sachin-tendulkar', 'virat-kohli'] })
     expect(removeGrant(a, 'figure', 'sachin-tendulkar')).toEqual(
-      { lines: [], figures: ['virat-kohli'], comics: [] },
+      { lines: [], figures: ['virat-kohli'], comics: [], programs: [] },
+    )
+  })
+
+  it('removes a program grant', () => {
+    const a = alloc({ programs: ['cricket-legends', 'tech-legends'] })
+    expect(removeGrant(a, 'program', 'cricket-legends')).toEqual(
+      { lines: [], figures: [], comics: [], programs: ['tech-legends'] },
     )
   })
 
   it('is a no-op when removing an absent value', () => {
     const a = alloc({ lines: ['biographies'] })
     expect(removeGrant(a, 'line', 'indic')).toEqual(
-      { lines: ['biographies'], figures: [], comics: [] },
+      { lines: ['biographies'], figures: [], comics: [], programs: [] },
     )
   })
 
@@ -192,7 +204,7 @@ describe('useAllocation', () => {
     const { result } = renderHook(() => useAllocation('  Member@DPB.IN '))
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.data).toEqual({
-      email: 'member@dpb.in', lines: [], figures: [], comics: [], figures_effective: [],
+      email: 'member@dpb.in', lines: [], figures: [], comics: [], programs: [], figures_effective: [],
     })
   })
 
@@ -203,6 +215,7 @@ describe('useAllocation', () => {
         lines: ['biographies'],
         figures: ['sachin-tendulkar'],
         comics: ['biographies__01'],
+        programs: ['cricket-legends'],
         figures_effective: ['sachin-tendulkar', 'rahul-dravid'],
       }),
     })
@@ -213,6 +226,7 @@ describe('useAllocation', () => {
       lines: ['biographies'],
       figures: ['sachin-tendulkar'],
       comics: ['biographies__01'],
+      programs: ['cricket-legends'],
       figures_effective: ['sachin-tendulkar', 'rahul-dravid'],
     })
   })
@@ -222,7 +236,7 @@ describe('useAllocation', () => {
     const { result } = renderHook(() => useAllocation('m@x.com'))
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.data).toEqual({
-      email: 'm@x.com', lines: ['indic'], figures: [], comics: [], figures_effective: [],
+      email: 'm@x.com', lines: ['indic'], figures: [], comics: [], programs: [], figures_effective: [],
     })
   })
 })

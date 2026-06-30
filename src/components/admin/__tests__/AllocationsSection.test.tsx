@@ -38,28 +38,32 @@ let allocData: {
   lines: string[]
   figures: string[]
   comics: string[]
+  programs: string[]
   figures_effective: string[]
 } | null = null
 
 // The real allocation module imports @/lib/firebase (auth init blows up under
 // jsdom), so we reimplement the small, pure add/remove helpers here to test the
 // real add/remove semantics without dragging in Firebase.
-type Grants = { lines: string[]; figures: string[]; comics: string[] }
+type Grants = { lines: string[]; figures: string[]; comics: string[]; programs: string[] }
 type Alloc = Grants & { email: string; figures_effective: string[] }
-const listKey = (k: 'line' | 'figure' | 'comic') =>
-  (k === 'line' ? 'lines' : k === 'figure' ? 'figures' : 'comics') as keyof Grants
+const listKey = (k: 'line' | 'figure' | 'comic' | 'program') =>
+  (k === 'line' ? 'lines' : k === 'figure' ? 'figures'
+    : k === 'comic' ? 'comics' : 'programs') as keyof Grants
+const grantsOf = (a: Alloc): Grants =>
+  ({ lines: [...a.lines], figures: [...a.figures], comics: [...a.comics], programs: [...a.programs] })
 
 vi.mock('@/lib/allocation', () => ({
   useAllocation: () => ({ data: allocData, loading: false }),
   setGrants,
-  addGrant: (a: Alloc, kind: 'line' | 'figure' | 'comic', value: string): Grants => {
-    const base: Grants = { lines: [...a.lines], figures: [...a.figures], comics: [...a.comics] }
+  addGrant: (a: Alloc, kind: 'line' | 'figure' | 'comic' | 'program', value: string): Grants => {
+    const base = grantsOf(a)
     const key = listKey(kind)
     if (!base[key].includes(value)) base[key] = [...base[key], value]
     return base
   },
-  removeGrant: (a: Alloc, kind: 'line' | 'figure' | 'comic', value: string): Grants => {
-    const base: Grants = { lines: [...a.lines], figures: [...a.figures], comics: [...a.comics] }
+  removeGrant: (a: Alloc, kind: 'line' | 'figure' | 'comic' | 'program', value: string): Grants => {
+    const base = grantsOf(a)
     const key = listKey(kind)
     base[key] = base[key].filter((v) => v !== value)
     return base
@@ -109,6 +113,7 @@ describe('AllocationsSection', () => {
       lines: ['awareness'],
       figures: ['steve-jobs'],
       comics: ['biographies__01-master'],
+      programs: [],
       figures_effective: ['steve-jobs', 'sachin-tendulkar'],
     }
     render(<AllocationsSection adminEmail={ADMIN} />)
@@ -129,7 +134,7 @@ describe('AllocationsSection', () => {
 
   it('adding a comic calls setGrants with the comic id appended + subjectByComic map', () => {
     allocData = {
-      email: 'ankit@dpb.in', lines: [], figures: [], comics: [], figures_effective: [],
+      email: 'ankit@dpb.in', lines: [], figures: [], comics: [], programs: [], figures_effective: [],
     }
     render(<AllocationsSection adminEmail={ADMIN} />)
     selectMember()
@@ -157,6 +162,7 @@ describe('AllocationsSection', () => {
       lines: ['biographies', 'awareness'],
       figures: [],
       comics: [],
+      programs: [],
       figures_effective: [],
     }
     render(<AllocationsSection adminEmail={ADMIN} />)
@@ -170,7 +176,7 @@ describe('AllocationsSection', () => {
 
   it('a member with an empty allocation shows the "No works allocated" message', () => {
     allocData = {
-      email: 'ankit@dpb.in', lines: [], figures: [], comics: [], figures_effective: [],
+      email: 'ankit@dpb.in', lines: [], figures: [], comics: [], programs: [], figures_effective: [],
     }
     render(<AllocationsSection adminEmail={ADMIN} />)
     selectMember()
@@ -183,6 +189,7 @@ describe('AllocationsSection', () => {
       lines: ['biographies'],
       figures: [],
       comics: [],
+      programs: [],
       figures_effective: [],
     }
     render(<AllocationsSection adminEmail={ADMIN} />)
