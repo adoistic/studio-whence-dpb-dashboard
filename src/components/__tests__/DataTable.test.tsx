@@ -84,3 +84,41 @@ describe('DataTable', () => {
     expect(screen.getByRole('button', { name: /Name/i })).toBeInTheDocument()
   })
 })
+
+describe('DataTable search + filters (opt-in)', () => {
+  const filters = [
+    { key: 'band', label: 'Band', get: (r: Item) => (r.score >= 20 ? 'high' : 'low') },
+  ]
+
+  test('no toolbar renders unless opted in', () => {
+    render(<DataTable rows={rows} columns={cols} filename="t.csv" rowKey={r => r.id} />)
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+  })
+
+  test('search narrows rows and the count shows n of m', () => {
+    render(<DataTable rows={rows} columns={cols} filename="t.csv" rowKey={r => r.id} searchable />)
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'ban' } })
+    expect(screen.getByText('Banana')).toBeVisible()
+    expect(screen.queryByText('Apple')).not.toBeInTheDocument()
+    expect(screen.getByText('1 of 3 entries')).toBeVisible()
+  })
+
+  test('a facet filter narrows rows; Reset restores everything', () => {
+    render(<DataTable rows={rows} columns={cols} filename="t.csv" rowKey={r => r.id} filters={filters} />)
+    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'low' } })
+    expect(screen.getByText('Apple')).toBeVisible()
+    expect(screen.queryByText('Banana')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }))
+    expect(screen.getByText('Banana')).toBeVisible()
+    expect(screen.getByText('3 entries')).toBeVisible()
+  })
+
+  test('narrowing to zero shows the no-matches reset affordance', () => {
+    render(<DataTable rows={rows} columns={cols} filename="t.csv" rowKey={r => r.id} searchable />)
+    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'zzz' } })
+    expect(screen.getByText(/no matches/i)).toBeVisible()
+    fireEvent.click(screen.getByRole('button', { name: /reset the filters/i }))
+    expect(screen.getByText('Banana')).toBeVisible()
+  })
+})
