@@ -223,10 +223,18 @@ service cloud.firestore {
 
     // ── Feedback (live source of truth; client-written under these rules) ──
     match /feedback/{id} {
+      // An author may always read their OWN comment — draft included, and with
+      // no allocation re-check (it is their own words). Without this branch a
+      // member's just-posted comment (published:false, awaiting approval)
+      // vanished from their own view the moment they posted it. Moderator-hidden
+      // docs stay invisible to everyone but moderators. Both fields in the
+      // author branch (authorEmail, hidden) are equality-filtered by the
+      // client's own-comments list query, so the rule stays list-safe.
       allow read: if isAllowlisted() && (
         isSubAdmin()
         || (resource.data.published == true && resource.data.hidden == false
             && feedbackAllocAllowed(resource.data.comicId))
+        || (resource.data.authorEmail == userEmail() && resource.data.hidden == false)
       );
       allow create: if isAllowlisted()
         && request.resource.data.authorEmail == userEmail()

@@ -111,6 +111,29 @@ export interface Comic {
     language: string
     images: { key: string; label: string }[]
   }
+  // Activity pages (the 4-page activity supplement generated per comic — quiz,
+  // vocabulary, themed activity, draw & color). Gated
+  // artifacts/comics/…/activities/ keys; drives the Activities section.
+  activities?: {
+    language: string
+    pages: { key: string; label: string }[]
+  }
+  // "About the Book" sell copy: printed back-cover pointers (book's language)
+  // plus buyer-segment pitches (kid / parent / school / retailer / wholesaler /
+  // book fair / library). Text-only — rides the gated catalog like the rest of
+  // this object. Drives the AboutTheBook section.
+  aboutTheBook?: {
+    language: string
+    backCover: string[]
+    segments: { audience: string; label: string; pointers: string[] }[]
+  }
+  // Printed back cover — the About-the-Book blurb composited over the clean
+  // cover artwork. Single gated artifacts/comics/…/back-cover/ key; drives the
+  // BackCover section. (Front cover stays blank pending a design rethink.)
+  backCover?: {
+    language: string
+    image: { key: string; label: string }
+  }
 }
 
 /** The official cover chosen for a comic from `coverChoices/{line}__{slug}`. */

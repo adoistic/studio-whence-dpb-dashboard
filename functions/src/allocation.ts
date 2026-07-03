@@ -13,13 +13,15 @@
  * Two responsibilities:
  *   1. `scopeOfKey` — a PURE parser mapping an R2 object key → the work scope it
  *      belongs to (`{ line?, subject?, comicId? }`). No I/O.
- *   2. `getAllocation` / `comicSubject` / `isKeyAllowedForMember` — the Firestore
- *      reads + the allow decision. Fail-closed: an unattributable scope, a
- *      missing allocation doc, or an empty scope all DENY.
+ *   2. `getAllocation` / `comicMeta` / `figureProgram` / `isKeyAllowedForMember`
+ *      — the Firestore reads + the allow decision. Fail-closed: an
+ *      unattributable scope, a missing allocation doc, or an empty scope all DENY.
  *
  * Read budget: the allocation doc is read ONCE per request (in `index.ts`) and
- * passed in here. Only a DRAFT key triggers a second read (the comic doc, to
- * learn its subject for the figure-grant test). So ≤2 Firestore reads per key.
+ * passed in here. Only a comic key triggers a second read (the comic doc, to
+ * learn its subject/program for the figure/program-grant tests) and only a
+ * research key with a program grant triggers a figure-doc read. So ≤2
+ * Firestore reads per key.
  */
 
 import { getFirestore } from 'firebase-admin/firestore'
@@ -39,18 +41,23 @@ export interface KeyScope {
  * `figures` is the RAW explicit figure grants; `figures_effective` is
  * `figures ∪ subjects-of-granted-comics`. COMIC access (draft/comic/image-comic
  * keys) tests RAW `figures`; RESEARCH access tests `figures_effective`. A single
- * comic grant must unlock the figure's research library but NOT its sibling comics. */
+ * comic grant must unlock the figure's research library but NOT its sibling comics.
+ *
+ * `programs` mirrors the Firestore rules' program grant: it unlocks every
+ * comic + figure whose `program_slug` matches — current AND future. */
 export interface Allocation {
   lines: string[]
   figures: string[]
   figures_effective: string[]
   comics: string[]
+  programs: string[]
 }
 
 /** Injectable Firestore readers so the allow logic is unit-testable without a
  * live Admin SDK. Both default to the real Firestore in `isKeyAllowedForMember`. */
 export interface AllocationDeps {
-  comicSubject: (comicId: string) => Promise<string | null>
+  comicMeta: (comicId: string) => Promise<{ subject: string | null; program: string | null }>
+  figureProgram: (slug: string) => Promise<string | null>
 }
 
 /**
@@ -198,6 +205,7 @@ export async function getAllocation(email: string): Promise<Allocation | null> {
     figures?: unknown
     figures_effective?: unknown
     comics?: unknown
+    programs?: unknown
   }
   const arr = (v: unknown): string[] =>
     Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
@@ -206,19 +214,38 @@ export async function getAllocation(email: string): Promise<Allocation | null> {
     figures: arr(data.figures),
     figures_effective: arr(data.figures_effective),
     comics: arr(data.comics),
+    programs: arr(data.programs),
   }
 }
 
 /**
- * Read `comics/{comicId}` → its `subject_slug`, or `null` if the doc is absent
- * or the field is missing. Used to resolve a DRAFT key's subject (the path
- * carries the comicId + line but not the subject).
+ * Read `comics/{comicId}` → its `subject_slug` + `program_slug` in ONE read
+ * (either may be `null` when the doc/field is absent). Used to resolve a comic
+ * key's subject/program for the figure/program grant tests (the path carries
+ * the comicId + line but not the subject or program).
  */
-export async function comicSubject(comicId: string): Promise<string | null> {
+export async function comicMeta(
+  comicId: string
+): Promise<{ subject: string | null; program: string | null }> {
   const snap = await getFirestore().collection('comics').doc(comicId).get()
+  if (!snap.exists) return { subject: null, program: null }
+  const data = (snap.data?.() ?? {}) as { subject_slug?: unknown; program_slug?: unknown }
+  return {
+    subject: typeof data.subject_slug === 'string' ? data.subject_slug : null,
+    program: typeof data.program_slug === 'string' ? data.program_slug : null,
+  }
+}
+
+/**
+ * Read `figures/{slug}` → its `program_slug`, or `null` when the doc/field is
+ * absent. Used by the RESEARCH branch so a program grant unlocks its figures'
+ * research libraries (mirrors the rules' `figureResearchAllowed`).
+ */
+export async function figureProgram(slug: string): Promise<string | null> {
+  const snap = await getFirestore().collection('figures').doc(slug).get()
   if (!snap.exists) return null
-  const data = (snap.data?.() ?? {}) as { subject_slug?: unknown }
-  return typeof data.subject_slug === 'string' ? data.subject_slug : null
+  const data = (snap.data?.() ?? {}) as { program_slug?: unknown }
+  return typeof data.program_slug === 'string' ? data.program_slug : null
 }
 
 /**
@@ -230,22 +257,26 @@ export async function comicSubject(comicId: string): Promise<string | null> {
  *       `alloc.comics` includes `scope.comicId`, OR
  *       `alloc.lines`  includes `scope.line`,    OR
  *       RAW `alloc.figures` includes the comic's subject (looked up from the
- *       comic doc when not in the path). A comic grant unlocks that comic only —
- *       it must NOT cascade to the figure's sibling comics via figures_effective.
+ *       comic doc when not in the path), OR
+ *       `alloc.programs` includes the comic's `program_slug` (same comic-doc
+ *       lookup). A comic grant unlocks that comic only — it must NOT cascade
+ *       to the figure's sibling comics via figures_effective.
  *
  *   - RESEARCH scope (carries `subject`, no `comicId`): allow if
  *       `alloc.lines` includes `scope.line`, OR
  *       `alloc.figures_effective` includes `scope.subject` (so a comic grant
- *       unlocks the figure's research library).
+ *       unlocks the figure's research library), OR
+ *       `alloc.programs` includes the figure's `program_slug` (figure-doc
+ *       lookup; mirrors the rules' figureResearchAllowed).
  *
  * Fail-closed: empty scope `{}` → deny; missing `alloc` → deny.
- * Read budget: 0 extra reads for non-comic keys; ≤1 extra (the comic doc) for
- * comic keys, and only when line/comic grants didn't already allow.
+ * Read budget: ≤1 extra read (the comic doc for comic keys, the figure doc for
+ * research keys), and only when the cheap list grants didn't already allow.
  */
 export async function isKeyAllowedForMember(
   key: string,
   alloc: Allocation | null,
-  deps: AllocationDeps = { comicSubject }
+  deps: AllocationDeps = { comicMeta, figureProgram }
 ): Promise<boolean> {
   if (!alloc) return false
   const scope = scopeOfKey(key)
@@ -264,12 +295,15 @@ export async function isKeyAllowedForMember(
     // Firestore read. (Draft keys, where the subject is NOT in the path, still
     // fall through to the comic-doc lookup below.)
     if (scope.subject && alloc.figures.includes(scope.subject)) return true
-    // Comic key with no subject in the path: resolve the comic's subject and
-    // test it against the RAW figure grants (an explicit figure grant unlocks
-    // all of that figure's comics; a sibling comic grant does NOT).
-    if (alloc.figures.length > 0) {
-      const subject = await deps.comicSubject(scope.comicId)
-      if (subject && alloc.figures.includes(subject)) return true
+    // Comic key with subject not (or not conclusively) in the path: ONE
+    // comic-doc read resolves both the subject (tested against RAW figures —
+    // an explicit figure grant unlocks all of that figure's comics; a sibling
+    // comic grant does NOT) and the program_slug (tested against `programs` —
+    // a program grant unlocks the whole series, current & future).
+    if (alloc.figures.length > 0 || alloc.programs.length > 0) {
+      const meta = await deps.comicMeta(scope.comicId)
+      if (meta.subject && alloc.figures.includes(meta.subject)) return true
+      if (meta.program && alloc.programs.includes(meta.program)) return true
     }
     return false
   }
@@ -278,6 +312,12 @@ export async function isKeyAllowedForMember(
   if (scope.line && alloc.lines.includes(scope.line)) return true
   if (scope.subject && alloc.figures_effective.includes(scope.subject)) {
     return true
+  }
+  // Program grant → the figure's research library (figure-doc lookup, only
+  // when the cheap grants above didn't already allow).
+  if (scope.subject && alloc.programs.length > 0) {
+    const program = await deps.figureProgram(scope.subject)
+    if (program && alloc.programs.includes(program)) return true
   }
 
   return false

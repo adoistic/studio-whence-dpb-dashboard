@@ -3,17 +3,18 @@ import { beforeEach, describe, expect, test, vi } from 'vitest'
 // ─── Mocks for firebase-admin/firestore ────────────────────────────────────
 //
 // `getFirestore().collection(name).doc(id).get()` is routed per collection:
-//   `allocations` → allocGet, `comics` → comicGet.
+//   `allocations` → allocGet, `figures` → figureGet, everything else → comicGet.
 // Each defaults to {exists:false} so absent docs are the baseline.
 
 const allocGet = vi.fn()
 const comicGet = vi.fn()
+const figureGet = vi.fn()
 
 vi.mock('firebase-admin/firestore', () => ({
   getFirestore: vi.fn(() => ({
     collection: vi.fn((name: string) => ({
       doc: vi.fn(() => ({
-        get: name === 'allocations' ? allocGet : comicGet,
+        get: name === 'allocations' ? allocGet : name === 'figures' ? figureGet : comicGet,
       })),
     })),
   })),
@@ -22,16 +23,20 @@ vi.mock('firebase-admin/firestore', () => ({
 import {
   scopeOfKey,
   getAllocation,
-  comicSubject,
+  comicMeta,
+  figureProgram,
   isKeyAllowedForMember,
   type Allocation,
+  type AllocationDeps,
 } from '../allocation'
 
 beforeEach(() => {
   allocGet.mockReset()
   comicGet.mockReset()
+  figureGet.mockReset()
   allocGet.mockResolvedValue({ exists: false, data: () => ({}) })
   comicGet.mockResolvedValue({ exists: false, data: () => ({}) })
+  figureGet.mockResolvedValue({ exists: false, data: () => ({}) })
 })
 
 // ─── scopeOfKey — pure parser (table test) ───────────────────────────────────
@@ -186,6 +191,7 @@ describe('getAllocation', () => {
         figures: ['sachin-tendulkar'],
         figures_effective: ['sachin-tendulkar', 'dhirubhai-ambani'],
         comics: ['biographies__a'],
+        programs: ['cricket-legends'],
       }),
     })
     expect(await getAllocation('m@x.com')).toEqual({
@@ -193,10 +199,11 @@ describe('getAllocation', () => {
       figures: ['sachin-tendulkar'],
       figures_effective: ['sachin-tendulkar', 'dhirubhai-ambani'],
       comics: ['biographies__a'],
+      programs: ['cricket-legends'],
     })
   })
 
-  test('missing figures / figures_effective default to []', async () => {
+  test('missing figures / figures_effective / programs default to []', async () => {
     allocGet.mockResolvedValue({
       exists: true,
       data: () => ({ lines: ['biographies'], comics: ['biographies__a'] }),
@@ -206,37 +213,69 @@ describe('getAllocation', () => {
       figures: [],
       figures_effective: [],
       comics: ['biographies__a'],
+      programs: [],
     })
   })
 
   test('non-array fields are coerced to []', async () => {
     allocGet.mockResolvedValue({
       exists: true,
-      data: () => ({ lines: 'oops', figures: {}, figures_effective: null, comics: 5 }),
+      data: () => ({ lines: 'oops', figures: {}, figures_effective: null, comics: 5, programs: 'nope' }),
     })
     expect(await getAllocation('m@x.com')).toEqual({
       lines: [],
       figures: [],
       figures_effective: [],
       comics: [],
+      programs: [],
     })
   })
 })
 
-// ─── comicSubject ────────────────────────────────────────────────────────────
+// ─── comicMeta ───────────────────────────────────────────────────────────────
 
-describe('comicSubject', () => {
-  test('present → subject_slug', async () => {
+describe('comicMeta', () => {
+  test('present → subject_slug + program_slug in one read', async () => {
     comicGet.mockResolvedValue({
       exists: true,
-      data: () => ({ subject_slug: 'dhirubhai-ambani' }),
+      data: () => ({ subject_slug: 'dhirubhai-ambani', program_slug: 'business-legends' }),
     })
-    expect(await comicSubject('biographies__01')).toBe('dhirubhai-ambani')
+    expect(await comicMeta('biographies__01')).toEqual({
+      subject: 'dhirubhai-ambani',
+      program: 'business-legends',
+    })
   })
 
-  test('absent → null', async () => {
+  test('null / missing fields → null (the publish pipeline writes explicit nulls)', async () => {
+    comicGet.mockResolvedValue({
+      exists: true,
+      data: () => ({ subject_slug: 'tingaland', program_slug: null }),
+    })
+    expect(await comicMeta('tingaland__01')).toEqual({ subject: 'tingaland', program: null })
+  })
+
+  test('absent doc → both null', async () => {
     comicGet.mockResolvedValue({ exists: false })
-    expect(await comicSubject('biographies__01')).toBeNull()
+    expect(await comicMeta('biographies__01')).toEqual({ subject: null, program: null })
+  })
+})
+
+// ─── figureProgram ───────────────────────────────────────────────────────────
+
+describe('figureProgram', () => {
+  test('present → program_slug', async () => {
+    figureGet.mockResolvedValue({
+      exists: true,
+      data: () => ({ program_slug: 'cricket-legends' }),
+    })
+    expect(await figureProgram('kapil-dev')).toBe('cricket-legends')
+  })
+
+  test('absent doc / missing field → null', async () => {
+    figureGet.mockResolvedValue({ exists: false })
+    expect(await figureProgram('kapil-dev')).toBeNull()
+    figureGet.mockResolvedValue({ exists: true, data: () => ({}) })
+    expect(await figureProgram('kapil-dev')).toBeNull()
   })
 })
 
@@ -248,6 +287,13 @@ describe('isKeyAllowedForMember', () => {
     figures: [],
     figures_effective: [],
     comics: [],
+    programs: [],
+    ...over,
+  })
+  // Injectable deps with fail-closed defaults; override per test.
+  const mkDeps = (over: Partial<AllocationDeps> = {}): AllocationDeps => ({
+    comicMeta: vi.fn(async () => ({ subject: null, program: null })),
+    figureProgram: vi.fn(async () => null),
     ...over,
   })
 
@@ -300,16 +346,16 @@ describe('isKeyAllowedForMember', () => {
   })
 
   test('draft key: RAW figure grant matched via comic-doc subject lookup', async () => {
-    const deps = {
-      comicSubject: vi.fn(async () => 'sachin-tendulkar'),
-    }
+    const deps = mkDeps({
+      comicMeta: vi.fn(async () => ({ subject: 'sachin-tendulkar', program: null })),
+    })
     const ok = await isKeyAllowedForMember(
       'drafts/biographies/01-the-debut.html',
       alloc({ figures: ['sachin-tendulkar'] }),
       deps
     )
     expect(ok).toBe(true)
-    expect(deps.comicSubject).toHaveBeenCalledWith('biographies__01-the-debut')
+    expect(deps.comicMeta).toHaveBeenCalledWith('biographies__01-the-debut')
   })
 
   test('draft key: figures_effective does NOT grant the comic (sibling-comic leak)', async () => {
@@ -317,7 +363,9 @@ describe('isKeyAllowedForMember', () => {
     // unlock the figure's OTHER (sibling) comics — only the comic-id grant or a
     // RAW figure grant may. Here the member was granted a sibling comic (so the
     // subject is in figures_effective) but NOT this comic and NOT the raw figure.
-    const deps = { comicSubject: vi.fn(async () => 'sachin-tendulkar') }
+    const deps = mkDeps({
+      comicMeta: vi.fn(async () => ({ subject: 'sachin-tendulkar', program: null })),
+    })
     const ok = await isKeyAllowedForMember(
       'drafts/biographies/02-the-sibling.html',
       alloc({ comics: ['biographies__01-the-debut'], figures_effective: ['sachin-tendulkar'] }),
@@ -327,37 +375,110 @@ describe('isKeyAllowedForMember', () => {
   })
 
   test('draft key: no comic-doc lookup when a line grant already allows', async () => {
-    const deps = { comicSubject: vi.fn() }
+    const deps = mkDeps()
     const ok = await isKeyAllowedForMember(
       'drafts/biographies/01-the-debut.html',
       alloc({ lines: ['biographies'] }),
       deps
     )
     expect(ok).toBe(true)
-    expect(deps.comicSubject).not.toHaveBeenCalled()
+    expect(deps.comicMeta).not.toHaveBeenCalled()
   })
 
-  test('draft key: no comic-doc lookup when RAW figures is empty', async () => {
-    // figures_effective is non-empty but figures is empty → the comic branch
-    // never looks up the subject (it would only test RAW figures).
-    const deps = { comicSubject: vi.fn() }
+  test('draft key: no comic-doc lookup when RAW figures AND programs are empty', async () => {
+    // figures_effective is non-empty but figures + programs are empty → the
+    // comic branch never reads the comic doc (it would only test those grants).
+    const deps = mkDeps()
     const ok = await isKeyAllowedForMember(
       'drafts/biographies/02-the-sibling.html',
       alloc({ figures_effective: ['sachin-tendulkar'] }),
       deps
     )
     expect(ok).toBe(false)
-    expect(deps.comicSubject).not.toHaveBeenCalled()
+    expect(deps.comicMeta).not.toHaveBeenCalled()
   })
 
   test('draft key: subject lookup misses → deny', async () => {
-    const deps = { comicSubject: vi.fn(async () => 'someone-else') }
+    const deps = mkDeps({
+      comicMeta: vi.fn(async () => ({ subject: 'someone-else', program: null })),
+    })
     const ok = await isKeyAllowedForMember(
       'drafts/biographies/01-the-debut.html',
       alloc({ figures: ['sachin-tendulkar'] }),
       deps
     )
     expect(ok).toBe(false)
+  })
+
+  // ── Program (whole-series) grants — the gap that broke program members ──
+
+  test('draft key: PROGRAM grant matched via comic-doc program lookup', async () => {
+    const deps = mkDeps({
+      comicMeta: vi.fn(async () => ({ subject: 'virat-kohli', program: 'cricket-legends' })),
+    })
+    const ok = await isKeyAllowedForMember(
+      'drafts/biographies/01-the-delhi-boy-who-became-king.html',
+      alloc({ programs: ['cricket-legends'] }),
+      deps
+    )
+    expect(ok).toBe(true)
+    expect(deps.comicMeta).toHaveBeenCalledWith('biographies__01-the-delhi-boy-who-became-king')
+  })
+
+  test('draft key: program mismatch (or null program_slug) → deny', async () => {
+    const deps = mkDeps({
+      comicMeta: vi.fn(async () => ({ subject: 'tingaland', program: null })),
+    })
+    const ok = await isKeyAllowedForMember(
+      'drafts/tingaland/01-tingaland-rhymes.html',
+      alloc({ programs: ['cricket-legends'] }),
+      deps
+    )
+    expect(ok).toBe(false)
+  })
+
+  test('page-image key: PROGRAM grant allows via the same comic-doc lookup', async () => {
+    const deps = mkDeps({
+      comicMeta: vi.fn(async () => ({ subject: 'virat-kohli', program: 'cricket-legends' })),
+    })
+    const ok = await isKeyAllowedForMember(
+      'images/comics/biographies/01-the-delhi-boy-who-became-king/pages/page-01.jpg',
+      alloc({ programs: ['cricket-legends'] }),
+      deps
+    )
+    expect(ok).toBe(true)
+  })
+
+  test('research key: PROGRAM grant unlocks the figure’s research (figure-doc lookup)', async () => {
+    const deps = mkDeps({ figureProgram: vi.fn(async () => 'cricket-legends') })
+    const ok = await isKeyAllowedForMember(
+      'research/biographies/03-Cricket-Legends/_books/virat-kohli/notes.md',
+      alloc({ programs: ['cricket-legends'] }),
+      deps
+    )
+    expect(ok).toBe(true)
+    expect(deps.figureProgram).toHaveBeenCalledWith('virat-kohli')
+  })
+
+  test('research key: figure outside the granted program → deny', async () => {
+    const deps = mkDeps({ figureProgram: vi.fn(async () => 'business-legends') })
+    const ok = await isKeyAllowedForMember(
+      'research/biographies/01-Business-Legends/_books/ratan-tata/notes.md',
+      alloc({ programs: ['cricket-legends'] }),
+      deps
+    )
+    expect(ok).toBe(false)
+  })
+
+  test('research key: no figure-doc lookup when programs is empty', async () => {
+    const deps = mkDeps()
+    const ok = await isKeyAllowedForMember(
+      'research/biographies/03-Cricket-Legends/_books/virat-kohli/notes.md',
+      alloc({ figures_effective: ['someone-else'] }),
+      deps
+    )
+    expect(ok).toBe(false)
+    expect(deps.figureProgram).not.toHaveBeenCalled()
   })
 
   test('research key: figures_effective grants (a comic grant unlocks research)', async () => {
@@ -416,14 +537,14 @@ describe('isKeyAllowedForMember', () => {
   })
 
   test('docs/comics: RAW figure grant allows WITHOUT a comic-doc lookup (subject in-path)', async () => {
-    const deps = { comicSubject: vi.fn() }
+    const deps = mkDeps()
     const ok = await isKeyAllowedForMember(
       'docs/comics/biographies/sam-altman/01-the-optimist/bundle.md',
       alloc({ figures: ['sam-altman'] }),
       deps
     )
     expect(ok).toBe(true)
-    expect(deps.comicSubject).not.toHaveBeenCalled()
+    expect(deps.comicMeta).not.toHaveBeenCalled()
   })
 
   test('docs/comics: empty allocation → deny', async () => {
@@ -435,28 +556,28 @@ describe('isKeyAllowedForMember', () => {
   })
 
   test('member with the comic grant may read its page images', async () => {
-    const a: Allocation = { lines: [], figures: [], figures_effective: [], comics: ['biographies__01-the-comic'] }
     const ok = await isKeyAllowedForMember(
-      'images/comics/biographies/01-the-comic/pages/page-01.jpg', a,
-      { comicSubject: async () => null },
+      'images/comics/biographies/01-the-comic/pages/page-01.jpg',
+      alloc({ comics: ['biographies__01-the-comic'] }),
+      mkDeps(),
     )
     expect(ok).toBe(true)
   })
 
   test('member without the grant is denied the page images', async () => {
-    const a: Allocation = { lines: ['toddlers'], figures: [], figures_effective: [], comics: [] }
     const ok = await isKeyAllowedForMember(
-      'images/comics/biographies/01-the-comic/pages/page-01.jpg', a,
-      { comicSubject: async () => null },
+      'images/comics/biographies/01-the-comic/pages/page-01.jpg',
+      alloc({ lines: ['toddlers'] }),
+      mkDeps(),
     )
     expect(ok).toBe(false)
   })
 
   test('member with a line grant may read the line\'s comic page images', async () => {
-    const a: Allocation = { lines: ['biographies'], figures: [], figures_effective: [], comics: [] }
     const ok = await isKeyAllowedForMember(
-      'images/comics/biographies/01-the-comic/cover.jpg', a,
-      { comicSubject: async () => null },
+      'images/comics/biographies/01-the-comic/cover.jpg',
+      alloc({ lines: ['biographies'] }),
+      mkDeps(),
     )
     expect(ok).toBe(true)
   })

@@ -10,6 +10,9 @@ import { DocumentsPanel } from '@/components/DocumentsPanel'
 import { LanguageSection } from '@/components/LanguageSection'
 import { CoverOptions } from '@/components/CoverOptions'
 import { InsideCovers } from '@/components/InsideCovers'
+import { BackCover } from '@/components/BackCover'
+import { Activities } from '@/components/Activities'
+import { AboutTheBook } from '@/components/AboutTheBook'
 import { ComicReader } from '@/components/ComicReader'
 import { ComicPdfButton } from '@/components/ComicPdfButton'
 import { ComicPptButton } from '@/components/ComicPptButton'
@@ -116,7 +119,7 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
   // to the same `pN` refs the draft view uses. The drawer is scoped to one page.
   const comicId = `${comic.line}__${comic.slug}`
   const [commentPage, setCommentPage] = useState<number | null>(null)
-  const { data: fbThreads } = useComicFeedback(comicId, canMod)
+  const { data: fbThreads } = useComicFeedback(comicId, canMod, email ?? '')
   const pageCounts = useMemo(
     () => countThreadsByPage(fbThreads.filter((t) => visibleTo(t.root, canMod))),
     [fbThreads, canMod],
@@ -234,6 +237,9 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
             author={{ email: user?.email ?? '', name: user?.displayName ?? user?.email ?? '' }}
           />
           <InsideCovers comic={comic} />
+          <BackCover comic={comic} />
+          <Activities comic={comic} />
+          <AboutTheBook comic={comic} />
         </div>
 
         {/* Translated editions (Hindi / English) — translated script + editable

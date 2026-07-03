@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import type { PersonRow } from '@/lib/people'
 import { PeopleTable } from '../PeopleTable'
 
@@ -17,11 +17,29 @@ describe('PeopleTable', () => {
     render(<PeopleTable people={rows} filename="x.csv" />)
     const link = screen.getByRole('link', { name: /jrd tata/i })
     expect(link).toHaveAttribute('href', '/figures/jrd-tata')
-    expect(screen.getByText(/published/i)).toBeInTheDocument()
-    expect(screen.getByText(/researched/i)).toBeInTheDocument()
+    const table = screen.getByRole('table')
+    expect(within(table).getByText(/published/i)).toBeInTheDocument()
+    expect(within(table).getByText(/researched/i)).toBeInTheDocument()
   })
   test('a multi-comic person shows the comic count', () => {
     render(<PeopleTable people={rows} filename="x.csv" />)
     expect(screen.getByText(/2 comics/i)).toBeInTheDocument()
+  })
+})
+
+describe('PeopleTable search + filters', () => {
+  test('search narrows the cast by name', () => {
+    render(<PeopleTable people={rows} filename="x.csv" />)
+    fireEvent.change(screen.getByPlaceholderText('Search characters…'), { target: { value: 'birla' } })
+    expect(screen.getByRole('link', { name: /gd birla/i })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /jrd tata/i })).not.toBeInTheDocument()
+  })
+
+  test('stage filter narrows the cast in pipeline order', () => {
+    render(<PeopleTable people={rows} filename="x.csv" />)
+    const stage = screen.getByLabelText(/stage/i)
+    fireEvent.change(stage, { target: { value: 'published' } })
+    expect(screen.getByRole('link', { name: /jrd tata/i })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /gd birla/i })).not.toBeInTheDocument()
   })
 })

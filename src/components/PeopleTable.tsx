@@ -1,8 +1,10 @@
 'use client'
 
 import type { PersonRow } from '@/lib/people'
+import { STAGE_RANK } from '@/lib/people'
+import type { Stage } from '@/lib/people'
 import { DataTable } from '@/components/DataTable'
-import type { Column } from '@/components/DataTable'
+import type { Column, TableFilter } from '@/components/DataTable'
 import { StatusPill } from '@/components/StatusPill'
 
 function StagePill({ row }: { row: PersonRow }) {
@@ -31,6 +33,30 @@ const PEOPLE_COLUMNS: Column<PersonRow>[] = [
   { key: 'words', header: 'Words', get: (p) => p.words ?? -1, cell: (p) => <span className="tabular-nums text-brand-slate">{p.words != null ? p.words.toLocaleString() : '—'}</span> },
 ]
 
+function stageLabel(stage: Stage): string {
+  return stage === 'in-review' ? 'In review' : stage[0].toUpperCase() + stage.slice(1)
+}
+
+// Facet filters for the cast table. Stage options follow pipeline order (not
+// alphabetical); Series only appears when the cast spans more than one series.
+function peopleFilters(people: PersonRow[]): TableFilter<PersonRow>[] {
+  const filters: TableFilter<PersonRow>[] = []
+  const stages = [...new Set(people.map((p) => p.stage))].sort((a, b) => STAGE_RANK[a] - STAGE_RANK[b])
+  if (stages.length > 1) {
+    filters.push({
+      key: 'stage',
+      label: 'Stage',
+      get: (p) => p.stage,
+      options: stages.map((s) => ({ value: s, label: stageLabel(s) })),
+    })
+  }
+  const series = [...new Set(people.map((p) => p.series).filter(Boolean))]
+  if (series.length > 1) {
+    filters.push({ key: 'series', label: 'Series', get: (p) => p.series })
+  }
+  return filters
+}
+
 export function PeopleTable({ people, filename }: { people: PersonRow[]; filename: string }) {
   return (
     <DataTable<PersonRow>
@@ -39,6 +65,9 @@ export function PeopleTable({ people, filename }: { people: PersonRow[]; filenam
       filename={filename}
       rowKey={(p) => p.slug}
       rowHref={(p) => p.href}
+      searchable
+      searchPlaceholder="Search characters…"
+      filters={peopleFilters(people)}
     />
   )
 }
