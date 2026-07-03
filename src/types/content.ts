@@ -127,6 +127,13 @@ export interface Comic {
     backCover: string[]
     segments: { audience: string; label: string; pointers: string[] }[]
   }
+  // Printed back cover — the About-the-Book blurb composited over the clean
+  // cover artwork. Single gated artifacts/comics/…/back-cover/ key; drives the
+  // BackCover section. (Front cover stays blank pending a design rethink.)
+  backCover?: {
+    language: string
+    image: { key: string; label: string }
+  }
 }
 
 /** The official cover chosen for a comic from `coverChoices/{line}__{slug}`. */

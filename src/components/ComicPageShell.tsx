@@ -10,6 +10,7 @@ import { DocumentsPanel } from '@/components/DocumentsPanel'
 import { LanguageSection } from '@/components/LanguageSection'
 import { CoverOptions } from '@/components/CoverOptions'
 import { InsideCovers } from '@/components/InsideCovers'
+import { BackCover } from '@/components/BackCover'
 import { Activities } from '@/components/Activities'
 import { AboutTheBook } from '@/components/AboutTheBook'
 import { ComicReader } from '@/components/ComicReader'
@@ -236,6 +237,7 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
             author={{ email: user?.email ?? '', name: user?.displayName ?? user?.email ?? '' }}
           />
           <InsideCovers comic={comic} />
+          <BackCover comic={comic} />
           <Activities comic={comic} />
           <AboutTheBook comic={comic} />
         </div>
