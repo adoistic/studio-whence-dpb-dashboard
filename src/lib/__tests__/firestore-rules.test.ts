@@ -164,6 +164,22 @@ beforeAll(async () => {
       body: 'c2 comment', status: 'open', comicVersion: 1, hidden: false, published: true,
       createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
     })
+    // A DRAFT root authored by member@dpb.in — the author-visibility branch must
+    // let the author read their OWN pending comment while other members cannot.
+    await setDoc(doc(db, 'feedback/fb-own-draft'), {
+      comicId: 'biographies__x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'member@dpb.in', authorName: 'M', authorRole: 'allow',
+      body: 'my pending comment', status: 'open', comicVersion: 1, hidden: false, published: false,
+      createdAt: '2026-07-01', updatedAt: '2026-07-01', editedAt: null,
+    })
+    // A moderator-HIDDEN doc authored by member@dpb.in — the author branch must
+    // NOT reveal hidden docs, even to their author.
+    await setDoc(doc(db, 'feedback/fb-own-hidden'), {
+      comicId: 'biographies__x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'member@dpb.in', authorName: 'M', authorRole: 'allow',
+      body: 'pruned', status: 'open', comicVersion: 1, hidden: true, published: true,
+      createdAt: '2026-07-01', updatedAt: '2026-07-01', editedAt: null,
+    })
 
     // ── Line-grant → figure research seed (#5) ──
     // A figure doc that DOES carry a `line` field (figures now carry line), and a
@@ -643,6 +659,7 @@ describe('firestore.rules — feedback allocation gate', () => {
   // comicmember@dpb.in: comics ['biographies__c1'] only (no line/figure grant).
   const member      = () => env.authenticatedContext('fb-m', { email: 'member@dpb.in' }).firestore()
   const comicMember = () => env.authenticatedContext('fb-cm', { email: 'comicmember@dpb.in' }).firestore()
+  const progMember  = () => env.authenticatedContext('fb-pm', { email: 'progmember@dpb.in' }).firestore()
   const subAdmin    = () => env.authenticatedContext('fb-sa', { email: 'sub@dpb.in' }).firestore()
 
   const fbDoc = (over = {}) => ({
@@ -687,6 +704,31 @@ describe('firestore.rules — feedback allocation gate', () => {
   it('moderator can create feedback on any comic (bypass)', async () => {
     await assertSucceeds(setDoc(doc(subAdmin(), 'feedback/fb-create-mod'),
       fbDoc({ comicId: 'awareness__y', line: 'awareness', authorEmail: 'sub@dpb.in', published: true })))
+  })
+  it('a PROGRAM-granted member can create feedback on a program comic; denied outside it', async () => {
+    // progmember@dpb.in holds only programs:['cricket-legends'];
+    // biographies__cricketc carries that program_slug, awareness__y does not.
+    await assertSucceeds(setDoc(doc(progMember(), 'feedback/fb-create-prog'),
+      fbDoc({ comicId: 'biographies__cricketc', authorEmail: 'progmember@dpb.in' })))
+    await assertFails(setDoc(doc(progMember(), 'feedback/fb-create-prog-bad'),
+      fbDoc({ comicId: 'awareness__y', line: 'awareness', authorEmail: 'progmember@dpb.in' })))
+  })
+
+  // ── Author visibility (own drafts) ──
+  it('an author reads their OWN draft; another member cannot', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'feedback/fb-own-draft')))
+    await assertFails(getDoc(doc(comicMember(), 'feedback/fb-own-draft')))
+  })
+  it('an author cannot read their own moderator-hidden comment', async () => {
+    await assertFails(getDoc(doc(member(), 'feedback/fb-own-hidden')))
+  })
+  it('the member own-comments list query (comicId + authorEmail + !hidden) is accepted', async () => {
+    await assertSucceeds(getDocs(query(
+      collection(member(), 'feedback'),
+      where('comicId', '==', 'biographies__x'),
+      where('authorEmail', '==', 'member@dpb.in'),
+      where('hidden', '==', false),
+    )))
   })
 })
 

@@ -52,7 +52,7 @@ export function CommentGutter({
   }
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const { data: threads } = useComicFeedback(comicId, canMod)
+  const { data: threads } = useComicFeedback(comicId, canMod, currentEmail)
   const { data: versions } = useComicVersions(comicId)
 
   // ── Visibility filter ─────────────────────────────────────────────────────

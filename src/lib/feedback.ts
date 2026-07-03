@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import {
   collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, deleteDoc,
-  doc, serverTimestamp, type QueryConstraint,
+  doc, serverTimestamp, type QueryConstraint, type QuerySnapshot,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { groupThreads, type FeedbackNode, type Thread, type Status, type Anchor, type Category } from '@/lib/feedbackTypes'
@@ -22,20 +22,66 @@ function useFeedbackQuery(constraints: QueryConstraint[], deps: unknown[]): Live
   return s
 }
 
-export function useComicFeedback(comicId: string, viewerCanModerate: boolean): Live<Thread[]> {
+export function useComicFeedback(
+  comicId: string,
+  viewerCanModerate: boolean,
+  viewerEmail = '',
+): Live<Thread[]> {
   // Moderators (admin/sub_admin) read every doc — drafts + hidden included.
   // Members may only read published, non-hidden docs (the deployed rules reject
-  // an unfiltered member query), so the constraints add those `where`s.
-  const constraints = viewerCanModerate
-    ? [where('comicId', '==', comicId), orderBy('createdAt', 'desc')]
-    : [
-        where('comicId', '==', comicId),
-        where('published', '==', true),
-        where('hidden', '==', false),
-        orderBy('createdAt', 'desc'),
-      ]
-  const { data, loading, error } = useFeedbackQuery(constraints, [comicId, viewerCanModerate])
-  return { data: groupThreads(data), loading, error }
+  // an unfiltered member query) PLUS their OWN comments (drafts included — the
+  // rules' author branch), so a member's just-posted comment doesn't vanish
+  // from their view while it awaits approval. The two member queries are merged
+  // by doc id; groupThreads re-sorts, so merge order is irrelevant.
+  const [s, setS] = useState<Live<FeedbackNode[]>>({ data: [], loading: true })
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setS({ data: [], loading: true })
+    const col = collection(db, 'feedback')
+    const toNodes = (snap: QuerySnapshot) =>
+      snap.docs.map((d) => ({ id: d.id, ...(d.data() as object) }) as FeedbackNode)
+
+    if (viewerCanModerate) {
+      return onSnapshot(
+        query(col, where('comicId', '==', comicId), orderBy('createdAt', 'desc')),
+        (snap) => setS({ data: toNodes(snap), loading: false }),
+        (err) => setS({ data: [], loading: false, error: err as Error }),
+      )
+    }
+
+    const parts: { published?: FeedbackNode[]; own?: FeedbackNode[] } = {}
+    const emit = () => {
+      if (!parts.published) return // published stream drives loading state
+      const byId = new Map<string, FeedbackNode>()
+      for (const n of [...parts.published, ...(parts.own ?? [])]) byId.set(n.id, n)
+      setS({ data: Array.from(byId.values()), loading: false })
+    }
+    const unsubs = [
+      onSnapshot(
+        query(col,
+          where('comicId', '==', comicId),
+          where('published', '==', true),
+          where('hidden', '==', false),
+          orderBy('createdAt', 'desc')),
+        (snap) => { parts.published = toNodes(snap); emit() },
+        (err) => setS({ data: [], loading: false, error: err as Error }),
+      ),
+    ]
+    if (viewerEmail) {
+      unsubs.push(onSnapshot(
+        query(col,
+          where('comicId', '==', comicId),
+          where('authorEmail', '==', viewerEmail),
+          where('hidden', '==', false),
+          orderBy('createdAt', 'desc')),
+        (snap) => { parts.own = toNodes(snap); emit() },
+        // Fail-soft: an own-comments error must not blank the published list.
+        () => { parts.own = []; emit() },
+      ))
+    }
+    return () => { for (const u of unsubs) u() }
+  }, [comicId, viewerCanModerate, viewerEmail])
+  return { data: groupThreads(s.data), loading: s.loading, error: s.error }
 }
 
 export function useAllRoots(viewerCanModerate: boolean): Live<FeedbackNode[]> {

@@ -119,7 +119,7 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
   // to the same `pN` refs the draft view uses. The drawer is scoped to one page.
   const comicId = `${comic.line}__${comic.slug}`
   const [commentPage, setCommentPage] = useState<number | null>(null)
-  const { data: fbThreads } = useComicFeedback(comicId, canMod)
+  const { data: fbThreads } = useComicFeedback(comicId, canMod, email ?? '')
   const pageCounts = useMemo(
     () => countThreadsByPage(fbThreads.filter((t) => visibleTo(t.root, canMod))),
     [fbThreads, canMod],

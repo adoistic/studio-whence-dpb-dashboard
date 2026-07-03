@@ -173,8 +173,9 @@ export function CommentThread({
           {/* Status pill */}
           {root.status && <StatusPillFeedback status={root.status} />}
 
-          {/* Draft pill — only moderators ever receive draft docs, so this
-              simply follows the data (no extra gating). */}
+          {/* Draft pill — moderators receive every draft; a member receives
+              only their OWN drafts (awaiting approval). Either way it simply
+              follows the data (no extra gating). */}
           {rootIsDraft && (
             <span className="inline-flex items-center rounded-full border border-brand-gold/50 bg-brand-gold/10 px-2 py-0.5 font-sans text-[0.6rem] uppercase tracking-label text-brand-gold">
               Draft

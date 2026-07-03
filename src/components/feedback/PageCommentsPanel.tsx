@@ -69,7 +69,7 @@ export function PageCommentsPanel({
   }
 
   // ── Data ─────────────────────────────────────────────────────────────────
-  const { data: threads } = useComicFeedback(comicId, canMod)
+  const { data: threads } = useComicFeedback(comicId, canMod, currentEmail)
   const { data: versions } = useComicVersions(comicId)
 
   const visible = threads.filter((t) => visibleTo(t.root, canMod))
