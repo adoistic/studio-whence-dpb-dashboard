@@ -17,7 +17,7 @@
  * tests and for cold-start ordering where secrets are injected at runtime.
  */
 
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import { DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 
 /** The default presign TTL, in seconds (10 minutes). */
@@ -137,6 +137,34 @@ export async function putObject(
       ContentType: contentType,
     })
   )
+}
+
+/**
+ * List every object key under `prefix` (paginated, all pages drained).
+ *
+ * Used by the `healComicPages` scheduler to read the set of published comic
+ * page images (`images/comics/…`) and reconcile Firestore's `pages` blocks
+ * against R2 reality. Uses the same lazy `client()` + env guard as the rest of
+ * this module. Returns keys in R2's listing order.
+ */
+export async function listKeysUnderPrefix(prefix: string): Promise<string[]> {
+  const s3 = client()
+  const keys: string[] = []
+  let token: string | undefined
+  do {
+    const res = await s3.send(
+      new ListObjectsV2Command({
+        Bucket: process.env.R2_BUCKET!,
+        Prefix: prefix,
+        ContinuationToken: token,
+      })
+    )
+    for (const obj of res.Contents ?? []) {
+      if (obj.Key) keys.push(obj.Key)
+    }
+    token = res.IsTruncated ? res.NextContinuationToken : undefined
+  } while (token)
+  return keys
 }
 
 /** Delete one object (idea-delete cleanup of capture transcripts). */

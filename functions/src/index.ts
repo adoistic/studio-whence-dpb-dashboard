@@ -454,3 +454,4 @@ export const dataApi = onRequest(
 );
 
 export { onIdeaWritten } from "./ideasTrigger";
+export { healComicPages } from "./healPages";
