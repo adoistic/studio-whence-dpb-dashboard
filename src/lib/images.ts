@@ -31,6 +31,7 @@ export const LINE_VISUALS: Record<string, LineVisual> = {
   indic: { note: 'The epics and the sacred texts' },
   toddlers: { image: 'images/comics/toddlers/numbers/cover.jpg', note: 'Diamond Books · early-learning workbooks' },
   tingaland: { image: 'images/toddlers/tingaland/settings/tingaland-landscape-night-digital-art-background.jpg', note: 'Diamond Junior · Tinga Dojo & friends' },
+  'did-you-know': { note: 'Little Chanakya · true, surprising facts' },
 }
 
 export type NamedImage = { rel: string; name: string }

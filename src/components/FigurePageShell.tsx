@@ -152,6 +152,25 @@ export function FigurePageShell({
               {figure.sources_count} sources · {figure.words.toLocaleString()} words
             </span>
           </div>
+          {/* Cross-listing: the same being held by more than one program. The
+              figure's design lives in the primary program; each other program
+              carries its own text-faithful dossier of them. */}
+          {(figure.also_programs?.length ?? 0) > 0 && figure.line && (
+            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <span className="font-sans text-[0.7rem] uppercase tracking-label text-brand-pale-dusk/70">
+                Also appears in
+              </span>
+              {figure.also_programs!.map((p) => (
+                <a
+                  key={p}
+                  href={`/programs/${figure.line}/${p}`}
+                  className="font-sans text-[0.7rem] uppercase tracking-label text-brand-gold underline underline-offset-4 hover:text-brand-cream"
+                >
+                  {titleCaseSlug(p)}
+                </a>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 

@@ -20,7 +20,11 @@ export function ProgramCards({
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
       {programs.map((p) => {
         const nComics = comics.filter((c) => c.program_slug === p.slug).length
-        const nChars = figures.filter((f) => f.program_slug === p.slug).length
+        // Count cross-listed figures too, so a card's character count matches
+        // what the program page actually shows.
+        const nChars = figures.filter(
+          (f) => f.program_slug === p.slug || (f.also_programs ?? []).includes(p.slug),
+        ).length
         const meta = [
           nComics ? `${nComics} comic${nComics === 1 ? '' : 's'}` : null,
           nChars ? `${nChars} character${nChars === 1 ? '' : 's'}` : null,

@@ -166,7 +166,14 @@ export interface Figure {
   slug: string
   line?: string
   // Program tier: which program (series / epic / category) this subject belongs to.
+  // This is the PRIMARY program and is a single value on purpose — it is the
+  // allocation/gating key matched by the Firestore rules.
   program_slug?: string | null
+  // Cross-listing: other programs this same figure also belongs to. Presentation
+  // only — never used for access decisions. A figure held by two texts (Krishna in
+  // the Mahabharata and in the Shiva Purana) keeps one design bible in its primary
+  // program and gains a separate dossier in each of these.
+  also_programs?: string[]
   // medicomics: each disease is an open-research figure any allowlisted member
   // may read (no specific allocation required).
   openResearch?: boolean

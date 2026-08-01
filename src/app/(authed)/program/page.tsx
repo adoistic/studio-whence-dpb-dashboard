@@ -30,7 +30,13 @@ export default function ProgramPage() {
   const { data: allComics } = useVisibleComics(canMod, email)
   const { data: allFigures } = useVisibleFigures(canMod, email)
   const comics = (allComics ?? []).filter((c) => c.program_slug === slug && c.line === lineSlug)
-  const figures = (allFigures ?? []).filter((f) => f.program_slug === slug && f.line === lineSlug)
+  // A figure belongs to this program if it is their primary one OR they are
+  // cross-listed into it (the same being held by two texts). `allFigures` is
+  // already gated, so a figure the viewer cannot read is simply absent here —
+  // cross-listing never widens access.
+  const figures = (allFigures ?? []).filter(
+    (f) => f.line === lineSlug && (f.program_slug === slug || (f.also_programs ?? []).includes(slug)),
+  )
 
   if (loading) return <LoadingState />
   if (error) return <ErrorState />
