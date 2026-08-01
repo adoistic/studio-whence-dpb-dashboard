@@ -84,6 +84,16 @@ export const usePrograms = (line: string) =>
     return ps.sort((a, b) => (a.order ?? 99) - (b.order ?? 99) || a.slug.localeCompare(b.slug))
   }, [line])
 
+// Every program across every line, in one read. Program docs are navigational
+// metadata readable by any allowlisted member (the rule above), so a whole-
+// collection list is allowed here where a gated collection would not be.
+export const useAllPrograms = () =>
+  useAsync<Program[]>(async () => {
+    const ps = listData<Program>(await getDocs(collection(db, 'programs')))
+    return ps.sort((a, b) =>
+      a.line.localeCompare(b.line) || (a.order ?? 99) - (b.order ?? 99) || a.slug.localeCompare(b.slug))
+  }, [])
+
 export const useProgram = (line: string, slug: string) =>
   useAsync<Program | null>(async () =>
     docData<Program>(await getDoc(doc(db, 'programs', `${line}__${slug}`))), [line, slug])

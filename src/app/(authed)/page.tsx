@@ -6,6 +6,7 @@ import { KpiStrip } from '@/components/KpiStrip'
 import type { Kpi } from '@/components/KpiStrip'
 import { SampleStrip } from '@/components/SampleStrip'
 import { SectionHead } from '@/components/SectionHead'
+import { StatusWorkbookButton } from '@/components/StatusWorkbookButton'
 import { useCoverage, useHeadline, useLines } from '@/lib/catalog'
 import { useResolved } from '@/lib/useResolved'
 import { HERO_BACKDROP, SAMPLE_PAGES } from '@/lib/images'
@@ -90,7 +91,12 @@ export default function Home() {
             pipeline by status. */}
         {coverage && (
           <section className="flex flex-col gap-8 pt-16 md:pt-20">
-            <SectionHead kicker="Coverage" title="Where every line stands" />
+            <div className="flex flex-wrap items-end justify-between gap-4">
+              <SectionHead kicker="Coverage" title="Where every line stands" />
+              {/* The whole status as a workbook, built live in the browser from
+                  the same gated reads the rest of the app uses. */}
+              <StatusWorkbookButton />
+            </div>
             <CoverageOverview coverage={coverage} />
           </section>
         )}

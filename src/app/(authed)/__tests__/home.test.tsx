@@ -43,6 +43,11 @@ vi.mock('@/components/KpiStrip', () => ({
 vi.mock('@/components/ActivityFeed', () => ({ ActivityFeed: () => null }))
 vi.mock('@/components/SampleStrip', () => ({ SampleStrip: () => null }))
 vi.mock('@/components/SectionHead', () => ({ SectionHead: () => null }))
+// The Excel export button reads the gated catalog through the auth stack; stub
+// it like the other heavy children so Home stays testable without Firebase.
+vi.mock('@/components/StatusWorkbookButton', () => ({
+  StatusWorkbookButton: () => <div>status-workbook-button</div>,
+}))
 
 // ─── Fixtures ───────────────────────────────────────────────────────────────
 
@@ -93,5 +98,16 @@ describe('Home — coverage overview', () => {
     mockUseCoverage = () => ({ data: null, loading: false })
     render(<Home />)
     expect(screen.queryByText(/^coverage:/)).not.toBeInTheDocument()
+  })
+
+  test('the Excel export sits with the coverage section', () => {
+    render(<Home />)
+    expect(screen.getByText('status-workbook-button')).toBeInTheDocument()
+  })
+
+  test('and is absent with the section it belongs to', () => {
+    mockUseCoverage = () => ({ data: null, loading: false })
+    render(<Home />)
+    expect(screen.queryByText('status-workbook-button')).not.toBeInTheDocument()
   })
 })
