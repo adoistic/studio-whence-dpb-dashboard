@@ -106,4 +106,35 @@ describe('ComicReader', () => {
     expect(onCommentPage).toHaveBeenCalledWith(1)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
+
+  // ── Web-size images + failure recovery ───────────────────────────────────
+  test('displays the web variant, keeping the 2000px master off the reader', async () => {
+    render(<ComicReader comic={comic} />)
+    const img = await screen.findByAltText('X — frame 1')
+    expect(img).toHaveAttribute(
+      'src',
+      'https://fake/images/comics/biographies/01-the-comic/web/cover.jpg',
+    )
+  })
+
+  test('one load error refreshes the presign; a second falls back to the master', async () => {
+    render(<ComicReader comic={comic} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Next page' }))
+    const webSrc = 'https://fake/images/comics/biographies/01-the-comic/pages/web/page-01.jpg'
+    const img = await screen.findByAltText('X — frame 2')
+    expect(img).toHaveAttribute('src', webSrc)
+
+    // First error: treated as an expired presign — re-resolved, still the web key.
+    fireEvent.error(img)
+    const retried = await screen.findByAltText('X — frame 2')
+    expect(retried).toHaveAttribute('src', webSrc)
+
+    // Second error: the web object is missing — the reader swaps to the master.
+    fireEvent.error(retried)
+    const master = await screen.findByAltText('X — frame 2')
+    expect(master).toHaveAttribute(
+      'src',
+      'https://fake/images/comics/biographies/01-the-comic/pages/page-01.jpg',
+    )
+  })
 })

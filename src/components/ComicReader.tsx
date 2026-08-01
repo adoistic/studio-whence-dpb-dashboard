@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Comic } from '@/types/content'
-import { comicPageKeys } from '@/lib/comicPageKeys'
+import { comicPageKeys, webVariantKey } from '@/lib/comicPageKeys'
 import { readerPageNumber } from '@/lib/readerPages'
-import { useResolved } from '@/lib/useResolved'
+import { refreshResolved, useResolved } from '@/lib/useResolved'
 
 export interface ComicReaderProps {
   comic: Comic
@@ -16,11 +16,49 @@ export interface ComicReaderProps {
 }
 
 export function ComicReader({ comic, pageCounts, onCommentPage }: ComicReaderProps) {
-  const keys = comicPageKeys(comic)
+  // The reader displays the 1200px web variants — the 2000px masters stay on
+  // the PDF/print paths. An index whose web variant errors on a fresh presign
+  // (not yet published) falls back to its master.
+  const masterKeys = comicPageKeys(comic)
+  const [masterFallback, setMasterFallback] = useState<ReadonlySet<number>>(
+    () => new Set<number>(),
+  )
+  const keys = masterKeys.map((k, idx) =>
+    masterFallback.has(idx) ? k : webVariantKey(k),
+  )
   const urls = useResolved(keys)
   const total = keys.length
   const [i, setI] = useState(0)
   const [fs, setFs] = useState(false)
+
+  // Warm the pages around the current one so paging is instant. The browser
+  // dedupes repeat loads; the ref set just avoids re-kicking known URLs.
+  const prefetched = useRef<Set<string>>(new Set())
+  const currentUrl = urls[keys[i]]
+  useEffect(() => {
+    for (const j of [i + 1, i + 2, i + 3, i - 1]) {
+      if (j < 0 || j >= keys.length) continue
+      const url = urls[keys[j]]
+      if (!url || prefetched.current.has(url)) continue
+      prefetched.current.add(url)
+      new Image().src = url
+    }
+  })
+
+  // First error on a key → assume an expired presign and re-resolve it; a
+  // second error on the fresh URL means the object is missing → master.
+  const erroredOnce = useRef<Set<string>>(new Set())
+  const onImgError = useCallback(() => {
+    const key = keys[i]
+    if (!key) return
+    if (!erroredOnce.current.has(key)) {
+      erroredOnce.current.add(key)
+      refreshResolved(key)
+    } else if (key !== masterKeys[i]) {
+      setMasterFallback((prev) => new Set(prev).add(i))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [i, keys.join('|')])
   // Which script page the current frame shows (null on the cover frame).
   const page = readerPageNumber(!!comic.pages?.coverKey, i)
   const pageCommentCount = page != null ? (pageCounts?.get(page) ?? 0) : 0
@@ -87,7 +125,6 @@ export function ComicReader({ comic, pageCounts, onCommentPage }: ComicReaderPro
   }
 
   if (total === 0) return null
-  const currentUrl = urls[keys[i]]
   const atStart = i === 0
   const atEnd = i === total - 1
 
@@ -105,6 +142,7 @@ export function ComicReader({ comic, pageCounts, onCommentPage }: ComicReaderPro
           <img
             src={currentUrl}
             alt={`${comic.title} — frame ${i + 1}`}
+            onError={onImgError}
             className="w-full rounded-md shadow-md"
           />
         ) : (
@@ -234,6 +272,7 @@ export function ComicReader({ comic, pageCounts, onCommentPage }: ComicReaderPro
                   src={currentUrl}
                   alt={`${comic.title} — frame ${i + 1}`}
                   draggable={false}
+                  onError={onImgError}
                   className="max-h-full max-w-full select-none object-contain"
                 />
               ) : (
