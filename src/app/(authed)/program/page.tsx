@@ -2,6 +2,7 @@
 
 import { useProgram } from '@/lib/catalog'
 import { useVisibleComics, useVisibleFigures } from '@/lib/visibleCatalog'
+import { programComics, programFigures } from '@/lib/programMembership'
 import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { ProgramPageShell } from '@/components/ProgramPageShell'
 import { LoadingState, ErrorState, NotFoundState } from '@/components/QuietStates'
@@ -29,14 +30,12 @@ export default function ProgramPage() {
   const email = user?.email ?? null
   const { data: allComics } = useVisibleComics(canMod, email)
   const { data: allFigures } = useVisibleFigures(canMod, email)
-  const comics = (allComics ?? []).filter((c) => c.program_slug === slug && c.line === lineSlug)
   // A figure belongs to this program if it is their primary one OR they are
-  // cross-listed into it (the same being held by two texts). `allFigures` is
-  // already gated, so a figure the viewer cannot read is simply absent here —
-  // cross-listing never widens access.
-  const figures = (allFigures ?? []).filter(
-    (f) => f.line === lineSlug && (f.program_slug === slug || (f.also_programs ?? []).includes(slug)),
-  )
+  // cross-listed into it (the same being held by two texts), and their comics
+  // come with them — cross-listing is first class, not a footnote. Both lists
+  // are already gated, so cross-listing never widens access.
+  const figures = programFigures(allFigures ?? [], lineSlug, slug)
+  const comics = programComics(allComics ?? [], allFigures ?? [], lineSlug, slug)
 
   if (loading) return <LoadingState />
   if (error) return <ErrorState />

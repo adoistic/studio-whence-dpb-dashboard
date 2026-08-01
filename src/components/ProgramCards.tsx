@@ -1,6 +1,7 @@
 'use client'
 
 import type { Comic, Figure, Program } from '@/types/content'
+import { programComics, programFigures } from '@/lib/programMembership'
 
 // A grid of Program cards for a line page (Line → Program → Subject). General
 // across every line — biographies' Legends series, Indic's epics, Awareness's
@@ -19,12 +20,10 @@ export function ProgramCards({
   return (
     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
       {programs.map((p) => {
-        const nComics = comics.filter((c) => c.program_slug === p.slug).length
-        // Count cross-listed figures too, so a card's character count matches
-        // what the program page actually shows.
-        const nChars = figures.filter(
-          (f) => f.program_slug === p.slug || (f.also_programs ?? []).includes(p.slug),
-        ).length
+        // Both counts use the same membership rule as the program page itself,
+        // so a card can never disagree with the page it links to.
+        const nComics = programComics(comics, figures, lineSlug, p.slug).length
+        const nChars = programFigures(figures, lineSlug, p.slug).length
         const meta = [
           nComics ? `${nComics} comic${nComics === 1 ? '' : 's'}` : null,
           nChars ? `${nChars} character${nChars === 1 ? '' : 's'}` : null,
