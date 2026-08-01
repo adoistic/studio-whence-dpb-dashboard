@@ -63,11 +63,14 @@ export async function buildStatusWorkbook(input: WorkbookInput): Promise<Blob> {
       return ws
     }
     const cols = Object.keys(rows[0]).filter((k) => !k.startsWith('_'))
-    ws.columns = cols.map((c) => ({
-      header: c,
-      key: c,
-      width: widths[c] ?? (['Comic', 'Logline', 'Narrator'].includes(c) ? 42 : Math.max(11, Math.min(28, c.length + 4))),
-    }))
+    // Size each column to what is actually in it. Hand-picked widths truncated
+    // the very cells that matter — "Diamond Activity Books" rendered as
+    // "Diamond Act" in the column that carries the link.
+    ws.columns = cols.map((c) => {
+      const longest = rows.slice(0, 400)
+        .reduce((n, r) => Math.max(n, String(r[c] ?? '').length), 0)
+      return { header: c, key: c, width: widths[c] ?? Math.max(11, Math.min(46, Math.max(c.length, longest) + 3)) }
+    })
     const head = ws.getRow(1)
     head.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 }
     head.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: HEAD_FILL } }
@@ -85,6 +88,11 @@ export async function buildStatusWorkbook(input: WorkbookInput): Promise<Blob> {
       }
       for (const pct of ['Pages %', 'Component %']) {
         if (cols.includes(pct)) r.getCell(cols.indexOf(pct) + 1).numFmt = '0%'
+      }
+      // Thousands separators on the counts that actually get large — an
+      // eight-digit word total is unreadable as a bare run of digits.
+      for (const n of ['Words', 'Sources', 'Total pages made', 'Files']) {
+        if (cols.includes(n)) r.getCell(cols.indexOf(n) + 1).numFmt = '#,##0'
       }
     }
     ws.views = [{ state: 'frozen', ySplit: 1 }]
@@ -119,7 +127,8 @@ export async function buildStatusWorkbook(input: WorkbookInput): Promise<Blob> {
       line.forEach((v, i) => {
         const c = ws.getCell(r, i + 1)
         c.value = v
-        if (i === 2 && typeof v === 'number' && v <= 1) c.numFmt = '0%'
+        if (typeof v === 'number' && !Number.isInteger(v) && v >= 0 && v <= 1) c.numFmt = '0%'
+        else if (typeof v === 'number' && Math.abs(v) >= 10_000) c.numFmt = '#,##0'
       })
       r += 1
     }
@@ -207,7 +216,10 @@ export async function buildStatusWorkbook(input: WorkbookInput): Promise<Blob> {
     ['Script', 'A comic exists in the catalog only because a validated script does, so every comic '
       + 'row counts as having a script. For subjects, "Has script" means at least one comic exists.'],
     ['Page state', '0 · No pages — script only. 2 · Some pages — art started. 3 · All pages — the '
-      + 'made page count has reached the script target, so the interior is potentially complete.'],
+      + 'made page count has reached the script target, so the interior is potentially complete. A '
+      + 'PUBLISHED book counts as complete whatever the arithmetic says: it has shipped. That '
+      + 'matters for the activity books, whose script target counts covers while the published page '
+      + 'set is the interior alone, so the two are not measuring the same thing.'],
     ['Potentially complete', 'That the interior is fully drawn. It does not assert editorial '
       + 'approval — read it alongside Status.'],
     ['Components', 'The parts a finished book needs beyond its interior: cover, cover options, '
@@ -218,6 +230,11 @@ export async function buildStatusWorkbook(input: WorkbookInput): Promise<Blob> {
     ['Research band', 'Subjects classified by words of source material held. Bands come from the '
       + 'real distribution: the median subject holds about 31,000 words while the top tenth clear '
       + 'half a million, so equal-width bands would be useless.'],
+    ['Not started', 'A subject scaffolded in the index but never researched still carries a stub of '
+      + 'about a hundred words. It counts as research only once it holds a source, or more than a '
+      + 'thousand words. Both tests are needed: a few real dossiers are built from reference '
+      + 'collections that register no source entry, and they run to hundreds of thousands of words '
+      + '— three orders of magnitude clear of any stub.'],
     ['Words', 'One book can be research for many subjects — a single history of the Sikhs is cited '
       + 'under 69 different figures. Each subject’s Words column correctly counts everything '
       + 'backing that subject, so summing the column counts shared books once per subject. Treat it '

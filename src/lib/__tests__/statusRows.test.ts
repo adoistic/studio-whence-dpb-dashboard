@@ -1,8 +1,11 @@
 import { describe, test, expect } from 'vitest'
 import {
   COMPONENTS,
+  NOT_STARTED,
   comicRows,
   componentRows,
+  hasResearch,
+  isComplete,
   lineRows,
   normStatus,
   programRows,
@@ -26,14 +29,32 @@ describe('normStatus', () => {
 })
 
 describe('researchBand', () => {
+  // A subject with sources is banded by the words backing it.
   test.each([
-    [0, '0 · None'],
     [9_999, '1 · Seed (under 10k)'],
     [30_813, '2 · Working (10k–50k)'],
     [200_000, '3 · Substantial (50k–250k)'],
     [702_194, '4 · Deep (250k–1M)'],
     [3_096_590, '5 · Exhaustive (1M+ words)'],
-  ])('%i words → %s', (w, band) => expect(researchBand(w)).toBe(band))
+  ])('%i words with sources → %s', (w, band) => expect(researchBand(w, 3)).toBe(band))
+
+  test('an empty subject is Not started', () => expect(researchBand(0, 0)).toBe(NOT_STARTED))
+
+  test('a scaffolded index stub is Not started, not Seed', () => {
+    // The eleven Bollywood Legends figures: ~104 words of index stub, no sources.
+    expect(researchBand(104, 0)).toBe(NOT_STARTED)
+    expect(hasResearch(0, 104)).toBe(false)
+  })
+
+  test('a real dossier with no registered sources still counts as research', () => {
+    // J.C. Bose: 244k words built from a reference collection, zero `sources`.
+    expect(hasResearch(0, 244_451)).toBe(true)
+    expect(researchBand(244_451, 0)).toBe('3 · Substantial (50k–250k)')
+  })
+
+  test('one source is enough, however thin the text', () => {
+    expect(hasResearch(1, 0)).toBe(true)
+  })
 })
 
 describe('comicRows — page state', () => {
@@ -58,6 +79,28 @@ describe('comicRows — page state', () => {
     const r = comicRows([comic('a', { pages: { hasPages: true, count: 12, coverKey: null } })])[0]
     expect(r['Page state']).toBe('2 · Some pages')
     expect(r['Pages %']).toBeNull()
+  })
+  test('a PUBLISHED book is complete even a page under target', () => {
+    // The Diamond Activity Books: target 50 counts covers, published pages are
+    // the 49-page interior. A shipped book is not half-made.
+    const c = comic('capital-letters', {
+      status: 'published', target_length_pages: 50,
+      pages: { hasPages: true, count: 49, coverKey: 'k' },
+    })
+    expect(isComplete(c)).toBe(true)
+    expect(comicRows([c])[0]['Page state']).toBe('3 · All pages (potentially complete)')
+  })
+  test('but a published book with no art at all is still No pages', () => {
+    const c = comic('a', { status: 'published', target_length_pages: 50 })
+    expect(isComplete(c)).toBe(false)
+    expect(comicRows([c])[0]['Page state']).toBe('0 · No pages')
+  })
+  test('an unpublished book under target is NOT quietly promoted', () => {
+    const c = comic('a', {
+      status: 'approved', target_length_pages: 48,
+      pages: { hasPages: true, count: 12, coverKey: null },
+    })
+    expect(isComplete(c)).toBe(false)
   })
   test('a comic with no subject is a standalone title', () => {
     expect(comicRows([comic('capital-letters', { subject_slug: '' })])[0].Subject).toBe('(standalone title)')
@@ -95,6 +138,12 @@ describe('subjectRows — the production pipeline', () => {
     expect(r['Has script']).toBe('No')
     expect(r['Furthest comic status']).toBe('researched')
   })
+  test('a scaffolded stub is Not started, not Researched', () => {
+    const r = subjectRows([fig('amitabh-bachchan', { sources_count: 0, words: 104 })], [])[0]
+    expect(r['Production stage']).toBe('0 · Scaffolded, not started')
+    expect(r['Has research']).toBe('No')
+    expect(r['Research band']).toBe(NOT_STARTED)
+  })
   test('a comic with no art → Script written', () => {
     const r = subjectRows([fig('ganesha')], [comic('c', { subject_slug: 'ganesha', target_length_pages: 64 })])[0]
     expect(r['Production stage']).toBe('2 · Script written')
@@ -119,7 +168,7 @@ describe('subjectRows — the production pipeline', () => {
     const r = subjectRows([fig('shiva')], [
       comic('a', { subject_slug: 'shiva', status: 'draft' }),
       comic('b', { subject_slug: 'shiva', status: 'published' }),
-      comic('c', { subject_slug: 'shiva', status: 'in_review' }),
+      comic('c', { subject_slug: 'shiva', status: 'in_review' as Comic['status'] }),
     ])[0]
     expect(r['Furthest comic status']).toBe('published')
     expect(r.Comics).toBe(3)

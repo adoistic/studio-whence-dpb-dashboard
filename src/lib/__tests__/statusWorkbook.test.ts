@@ -11,7 +11,7 @@ const comics: Comic[] = [
   } as Comic,
   {
     title: 'The One They All Love', slug: '01-krishna', line: 'indic', subject_slug: 'krishna',
-    program_slug: 'mahabharata', status: 'in_review', target_length_pages: 64,
+    program_slug: 'mahabharata', status: 'in_review' as Comic['status'], target_length_pages: 64,
   } as Comic,
 ]
 const figures: Figure[] = [

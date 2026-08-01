@@ -54,10 +54,26 @@ const RESEARCH_BANDS: [number, string][] = [
   [10_000, '2 · Working (10k–50k)'],
   [1, '1 · Seed (under 10k)'],
 ]
+export const NOT_STARTED = '0 · Not started (index entry only)'
 
-export function researchBand(words: number): string {
+// A scaffolded-but-unstarted subject still carries its index stub — the eleven
+// Bollywood Legends figures each hold about 104 words and no sources. Counting
+// those as "has research" overstates the library by eleven subjects, so a
+// subject counts as researched once it holds a source OR more than a stub of
+// text. Both conditions are needed: some real dossiers are built from reference
+// collections that register no `sources` entry (J.C. Bose, 244k words, zero
+// sources), and the stubs sit three orders of magnitude below them, so the split
+// is unambiguous rather than a tuned threshold.
+export const STUB_WORDS = 1_000
+
+export function hasResearch(sources: number, words: number): boolean {
+  return sources > 0 || words >= STUB_WORDS
+}
+
+export function researchBand(words: number, sources = 0): string {
+  if (!hasResearch(sources, words)) return NOT_STARTED
   for (const [floor, label] of RESEARCH_BANDS) if (words >= floor) return label
-  return '0 · None'
+  return NOT_STARTED
 }
 
 export const STATUS_ORDER = ['draft', 'in-review', 'approved', 'published']
@@ -79,6 +95,22 @@ export function titleCaseSlug(slug: string): string {
 /** `_`-prefixed keys are metadata (the row's link) and are never written as columns. */
 export type Row = { [column: string]: string | number | null | undefined; _href?: string }
 
+/**
+ * Whether a comic's interior is fully drawn — the ONE rule, used by the Comics,
+ * Subjects, Programs and Lines sheets so no two of them can disagree.
+ *
+ * A published book has shipped, so its interior is complete by definition. That
+ * clause is what keeps the published Diamond Activity Books from reading as
+ * half-made: their script target counts covers (50) while the published page set
+ * is interior-only (48–49).
+ */
+export function isComplete(c: Comic): boolean {
+  const made = c.pages?.count ?? 0
+  const target = c.target_length_pages ?? 0
+  if (made === 0) return false
+  return (target > 0 && made >= target) || normStatus(c.status) === 'published'
+}
+
 export function comicRows(comics: Comic[]): Row[] {
   return comics
     .slice()
@@ -89,7 +121,7 @@ export function comicRows(comics: Comic[]): Row[] {
       const pageState =
         made === 0
           ? '0 · No pages'
-          : target && made >= target
+          : isComplete(c)
             ? '3 · All pages (potentially complete)'
             : '2 · Some pages'
 
@@ -159,19 +191,18 @@ export function subjectRows(figures: Figure[], comics: Comic[]): Row[] {
       const furthest = ranked.at(-1) ?? (mine.length ? normStatus(mine[0].status) : 'researched')
 
       const pagesMade = mine.reduce((n, c) => n + (c.pages?.count ?? 0), 0)
-      const complete = mine.filter(
-        (c) => (c.pages?.count ?? 0) > 0 && (c.target_length_pages ?? 0) > 0
-          && (c.pages?.count ?? 0) >= (c.target_length_pages ?? 0),
-      ).length
+      const complete = mine.filter(isComplete).length
       const some = mine.filter((c) => (c.pages?.count ?? 0) > 0).length
 
-      const stage = !mine.length
-        ? '1 · Researched only'
-        : pagesMade === 0
-          ? '2 · Script written'
-          : complete
-            ? '4 · All pages made'
-            : '3 · Some pages made'
+      const stage = !mine.length && !hasResearch(f.sources_count ?? 0, words)
+        ? '0 · Scaffolded, not started'
+        : !mine.length
+          ? '1 · Researched only'
+          : pagesMade === 0
+            ? '2 · Script written'
+            : complete
+              ? '4 · All pages made'
+              : '3 · Some pages made'
 
       return {
         Line: f.line ?? '',
@@ -182,8 +213,8 @@ export function subjectRows(figures: Figure[], comics: Comic[]): Row[] {
         Slug: f.slug,
         Sources: f.sources_count ?? 0,
         Words: words,
-        'Research band': researchBand(words),
-        'Has research': words ? 'Yes' : 'No',
+        'Research band': researchBand(words, f.sources_count ?? 0),
+        'Has research': hasResearch(f.sources_count ?? 0, words) ? 'Yes' : 'No',
         Dossier: f.dossierKey ? 'Yes' : 'No',
         'Design bible': f.designKey ? 'Yes' : 'No',
         Characterization: f.characterizationKey ? 'Yes' : 'No',
@@ -210,9 +241,7 @@ export function programRows(programs: Program[], comics: Comic[], figures: Figur
       const subs = programFigures(figures, p.line, p.slug)
       const cs = programComics(comics, figures, p.line, p.slug)
       const withPages = cs.filter((c) => (c.pages?.count ?? 0) > 0)
-      const allPages = cs.filter(
-        (c) => (c.target_length_pages ?? 0) > 0 && (c.pages?.count ?? 0) >= (c.target_length_pages ?? 0),
-      )
+      const allPages = cs.filter(isComplete)
       const byStatus = Object.fromEntries(
         STATUS_ORDER.map((s) => [`Comics ${s}`, cs.filter((c) => normStatus(c.status) === s).length]),
       )
@@ -242,9 +271,7 @@ export function lineRows(lines: Line[], comics: Comic[], figures: Figure[], prog
     .map((l) => {
       const cs = comics.filter((c) => c.line === l.slug)
       const subs = figures.filter((f) => f.line === l.slug)
-      const allPages = cs.filter(
-        (c) => (c.target_length_pages ?? 0) > 0 && (c.pages?.count ?? 0) >= (c.target_length_pages ?? 0),
-      )
+      const allPages = cs.filter(isComplete)
       const some = cs.filter((c) => (c.pages?.count ?? 0) > 0)
       const byStatus = Object.fromEntries(
         STATUS_ORDER.map((s) => [`Comics ${s}`, cs.filter((c) => normStatus(c.status) === s).length]),
@@ -254,7 +281,7 @@ export function lineRows(lines: Line[], comics: Comic[], figures: Figure[], prog
         Slug: l.slug,
         Programs: programs.filter((p) => p.line === l.slug).length,
         Subjects: subs.length,
-        'Subjects with research': subs.filter((f) => (f.words ?? 0) > 0).length,
+        'Subjects with research': subs.filter((f) => hasResearch(f.sources_count ?? 0, f.words ?? 0)).length,
         Comics: cs.length,
         'Comics with all pages': allPages.length,
         'Comics with some pages': some.length - allPages.length,
