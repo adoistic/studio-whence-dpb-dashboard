@@ -22,6 +22,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { pageBreakdown } from '@/lib/statusRows'
 import type { Comic } from '@/types/content'
 
 /** Studio default until someone sets otherwise. */
@@ -90,24 +91,25 @@ export function lineRate(line: string, cfg: PricingConfig | null): ResolvedRate 
 export interface ComicValue {
   rate: number
   source: RateSource
-  /** rate × target pages — what the finished book is worth. */
+  /** rate × target interior pages — what the script commits to. */
   contracted: number
-  /** rate × pages actually drawn — what has been earned so far. */
+  /** rate × billable pages drawn (interior + cover + IFC/IBC + back + activities). */
   delivered: number
 }
 
 /**
  * Two numbers per comic, never one.
  *
- * `delivered` counts pages that exist; `contracted` counts pages the script
- * commits to. Reporting a single "value" would have to pick one and would read
- * as the other to half the people looking at it.
+ * `delivered` counts every billable page that exists — interior art plus the
+ * cover (options collapse to one), inside covers, back cover and activity
+ * pages, per statusRows.pageBreakdown. `contracted` counts the interior pages
+ * the script commits to. Reporting a single "value" would have to pick one and
+ * would read as the other to half the people looking at it.
  */
 export function valueOf(comic: Comic, cfg: PricingConfig | null): ComicValue {
   const { rate, source } = rateFor(comic, cfg)
   const target = comic.target_length_pages ?? 0
-  const made = comic.pages?.count ?? 0
-  return { rate, source, contracted: rate * target, delivered: rate * made }
+  return { rate, source, contracted: rate * target, delivered: rate * pageBreakdown(comic).billable }
 }
 
 const FMT = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 })
@@ -118,12 +120,13 @@ export function formatMoney(n: number, currency = 'INR'): string {
   return `${symbol}${FMT.format(Math.round(n))}`
 }
 
-/** Compact for headline tiles: ₹1.2 Cr, ₹34.5 L, ₹12,000. */
+/** Compact for headline tiles: ₹1.2 Cr, ₹34.5 L, ₹12,000 — never a trailing .0. */
 export function formatMoneyShort(n: number, currency = 'INR'): string {
   const symbol = currency === 'INR' ? '₹' : `${currency} `
   const abs = Math.abs(n)
-  if (abs >= 1e7) return `${symbol}${(n / 1e7).toFixed(abs >= 1e8 ? 0 : 1)} Cr`
-  if (abs >= 1e5) return `${symbol}${(n / 1e5).toFixed(abs >= 1e6 ? 0 : 1)} L`
+  // parseFloat drops a trailing .0 so a round lakh reads ₹1 L, not ₹1.0 L.
+  if (abs >= 1e7) return `${symbol}${parseFloat((n / 1e7).toFixed(abs >= 1e8 ? 0 : 1))} Cr`
+  if (abs >= 1e5) return `${symbol}${parseFloat((n / 1e5).toFixed(abs >= 1e6 ? 0 : 1))} L`
   return `${symbol}${FMT.format(Math.round(n))}`
 }
 

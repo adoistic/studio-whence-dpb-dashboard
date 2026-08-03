@@ -1,41 +1,62 @@
 'use client'
 
+/**
+ * Access — who sees what, in one table.
+ *
+ * The old version hid every member's grants behind a dropdown: to find out who
+ * could see a comic you had to select members one at a time. This one leads
+ * with the answer — a table of every member and a plain-English summary of what
+ * they can see — and puts the editor behind an Edit toggle on each row.
+ *
+ * Editing is one composer, not four stacked forms: pick WHAT you are granting
+ * (whole line / series / figure / single comic), pick the thing, press Grant.
+ * Removal is the × on a chip. Every write is the full grant set (setGrants),
+ * exactly as before — only the surface changed.
+ */
+
 import { useMemo, useState } from 'react'
 import { useMembers, type Member } from '@/lib/admin'
 import {
-  useAllocation, setGrants, addGrant, removeGrant,
-  type Allocation, type Grants, type GrantKind,
+  addGrant,
+  removeGrant,
+  setGrants,
+  useAllAllocations,
+  type Allocation,
+  type GrantKind,
+  type Grants,
 } from '@/lib/allocation'
 import { useLines, useFigures, useComics } from '@/lib/catalog'
-import type { Comic, Figure, Line } from '@/types/content'
+import type { Comic } from '@/types/content'
 
-// ── Helpers ──────────────────────────────────────────────────────────────────────
+// ── Small helpers ─────────────────────────────────────────────────────────────
 
-/** "sachin-tendulkar" → "Sachin Tendulkar" (display only; raw slug is stored). */
 function titleCaseSlug(slug: string): string {
   return slug.split('-').map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(' ')
 }
 
-/** A comic's stable id, matching the Firestore doc id `{line}__{slug}`. */
 function comicId(c: Comic): string {
   return `${c.line}__${c.slug}`
 }
 
-// ── Section heading + chip atoms (mirror AdminPanel's brand styling) ───────────────
+const EMPTY = (email: string): Allocation => ({
+  email, lines: [], figures: [], comics: [], programs: [], figures_effective: [],
+})
 
-function SubHeading({ title, count }: { title: string; count: number }) {
-  return (
-    <div className="mb-2 flex items-baseline gap-2">
-      <h3 className="font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">{title}</h3>
-      <span className="font-sans text-[0.65rem] text-brand-slate/70">{count}</span>
-    </div>
-  )
-}
+const grantCount = (a: Allocation) =>
+  a.lines.length + a.programs.length + a.figures.length + a.comics.length
 
-function GrantChip({ label, onRemove, removeLabel }: { label: string; onRemove: () => void; removeLabel: string }) {
+const SELECT_CLS =
+  'rounded-md border border-brand-pale-dusk bg-brand-cream px-3 py-2 font-sans text-[0.8rem] text-brand-umber focus:border-brand-indigo focus:outline-none'
+
+// ── Chips ─────────────────────────────────────────────────────────────────────
+
+function GrantChip({
+  label, kindLabel, onRemove, removeLabel,
+}: { label: string; kindLabel: string; onRemove: () => void; removeLabel: string }) {
   return (
     <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-pale-dusk bg-brand-pale-dusk/30 py-1 pl-3 pr-1 font-sans text-[0.75rem] text-brand-umber">
       {label}
+      <span className="font-sans text-[0.58rem] uppercase tracking-label text-brand-slate">{kindLabel}</span>
       <button
         type="button"
         aria-label={removeLabel}
@@ -48,61 +69,183 @@ function GrantChip({ label, onRemove, removeLabel }: { label: string; onRemove: 
   )
 }
 
-const SELECT_CLS =
-  'min-w-[12rem] rounded-md border border-brand-pale-dusk bg-brand-cream px-3 py-2 font-sans text-sm text-brand-umber focus:border-brand-indigo focus:outline-none'
+// ── The grant composer: what → which → Grant ──────────────────────────────────
 
-function AddButton({ label, disabled, onClick }: { label: string; disabled: boolean; onClick: () => void }) {
+const KIND_LABEL: Record<GrantKind, string> = {
+  line: 'Whole line',
+  program: 'Series (current & future books)',
+  figure: 'Figure (all their books + research)',
+  comic: 'Single comic',
+}
+
+function GrantComposer({
+  alloc, lineOptions, programOptions, figureOptions, comicOptions, onGrant,
+}: {
+  alloc: Allocation
+  lineOptions: { slug: string; title: string }[]
+  programOptions: { slug: string; title: string }[]
+  figureOptions: { slug: string; line: string }[]
+  comicOptions: Comic[]
+  onGrant: (kind: GrantKind, value: string) => void
+}) {
+  const [kind, setKind] = useState<GrantKind>('line')
+  const [lineFilter, setLineFilter] = useState('')
+  const [sel, setSel] = useState('')
+
+  const granted: Record<GrantKind, string[]> = {
+    line: alloc.lines, program: alloc.programs, figure: alloc.figures, comic: alloc.comics,
+  }
+
+  // The options for the current kind, narrowed by the optional line filter.
+  const options: { value: string; label: string }[] = useMemo(() => {
+    switch (kind) {
+      case 'line':
+        return lineOptions.map((l) => ({ value: l.slug, label: l.title }))
+      case 'program':
+        return programOptions.map((p) => ({ value: p.slug, label: p.title }))
+      case 'figure':
+        return figureOptions
+          .filter((f) => !lineFilter || f.line === lineFilter)
+          .map((f) => ({ value: f.slug, label: titleCaseSlug(f.slug) }))
+      case 'comic':
+        return comicOptions
+          .filter((c) => !lineFilter || c.line === lineFilter)
+          .map((c) => ({ value: comicId(c), label: c.title || c.slug }))
+    }
+  }, [kind, lineFilter, lineOptions, programOptions, figureOptions, comicOptions])
+
+  const already = sel !== '' && granted[kind].includes(sel)
+  const showLineFilter = kind === 'figure' || kind === 'comic'
+
   return (
-    <button
-      type="button"
-      aria-label={label}
-      disabled={disabled}
-      onClick={onClick}
-      className="inline-flex items-center rounded-full border border-brand-indigo bg-brand-indigo px-3 py-1.5 font-sans text-[0.7rem] uppercase tracking-label text-brand-cream transition-colors hover:bg-brand-indigo/90 disabled:cursor-not-allowed disabled:border-brand-pale-dusk disabled:bg-brand-pale-dusk/40 disabled:text-brand-slate"
-    >
-      Add
-    </button>
+    <div className="rounded-lg border border-brand-pale-dusk bg-brand-pale-dusk/20 p-4">
+      <div className="mb-2 font-sans text-[0.62rem] uppercase tracking-label text-brand-slate">
+        Give access
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          aria-label="What to grant"
+          value={kind}
+          onChange={(e) => { setKind(e.target.value as GrantKind); setSel(''); setLineFilter('') }}
+          className={SELECT_CLS}
+        >
+          {(Object.keys(KIND_LABEL) as GrantKind[]).map((k) => (
+            <option key={k} value={k}>{KIND_LABEL[k]}</option>
+          ))}
+        </select>
+
+        {showLineFilter ? (
+          <select
+            aria-label="Narrow by line"
+            value={lineFilter}
+            onChange={(e) => { setLineFilter(e.target.value); setSel('') }}
+            className={SELECT_CLS}
+          >
+            <option value="">Any line</option>
+            {lineOptions.map((l) => (
+              <option key={l.slug} value={l.slug}>{l.title}</option>
+            ))}
+          </select>
+        ) : null}
+
+        <select
+          aria-label="Which one"
+          value={sel}
+          onChange={(e) => setSel(e.target.value)}
+          className={`${SELECT_CLS} min-w-[14rem]`}
+        >
+          <option value="">Choose…</option>
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+
+        <button
+          type="button"
+          aria-label="Grant access"
+          disabled={sel === '' || already}
+          onClick={() => { onGrant(kind, sel); setSel('') }}
+          className="inline-flex items-center rounded-full border border-brand-indigo bg-brand-indigo px-4 py-1.5 font-sans text-[0.7rem] uppercase tracking-label text-brand-cream transition-colors hover:bg-brand-indigo/90 disabled:cursor-not-allowed disabled:border-brand-pale-dusk disabled:bg-brand-pale-dusk/40 disabled:text-brand-slate"
+        >
+          Grant
+        </button>
+        {already && <span className="font-sans text-xs text-brand-slate">Already granted.</span>}
+      </div>
+    </div>
   )
 }
 
-// ── Main section ───────────────────────────────────────────────────────────────────
+// ── One member's row + expandable editor ──────────────────────────────────────
+
+function MemberRow({
+  email, role, alloc, expanded, onToggle, summary, children,
+}: {
+  email: string
+  role: string
+  alloc: Allocation
+  expanded: boolean
+  onToggle: () => void
+  summary: React.ReactNode
+  children: React.ReactNode
+}) {
+  const everything = role === 'sub_admin'
+  return (
+    <li className="rounded-lg border border-brand-pale-dusk bg-white">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
+        <span className="min-w-0 flex-1">
+          <span className="block truncate font-serif text-[0.95rem] text-brand-umber">{email}</span>
+          <span className="mt-0.5 block font-sans text-[0.7rem] text-brand-slate">{summary}</span>
+        </span>
+        {everything ? (
+          <span className="rounded-full bg-brand-indigo/10 px-2.5 py-0.5 font-sans text-[0.62rem] uppercase tracking-label text-brand-indigo">
+            sub-admin · sees everything
+          </span>
+        ) : (
+          <>
+            <span className="font-sans text-[0.7rem] tabular-nums text-brand-slate">
+              {grantCount(alloc)} {grantCount(alloc) === 1 ? 'grant' : 'grants'}
+            </span>
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-label={`Edit access for ${email}`}
+              onClick={onToggle}
+              className="rounded-full border border-brand-pale-dusk px-3.5 py-1 font-sans text-[0.7rem] text-brand-slate transition hover:border-brand-indigo hover:text-brand-indigo"
+            >
+              {expanded ? 'Close' : 'Edit access'}
+            </button>
+          </>
+        )}
+      </div>
+      {expanded ? <div className="border-t border-brand-pale-dusk/70 px-4 py-4">{children}</div> : null}
+    </li>
+  )
+}
+
+// ── Main section ──────────────────────────────────────────────────────────────
 
 export function AllocationsSection({ adminEmail }: { adminEmail: string }) {
-  // The members list shares the admin panel's refresh cadence loosely; we read
-  // it once on mount (refreshKey 0) — members rarely change mid-allocation.
+  const [refreshKey, setRefreshKey] = useState(0)
   const members = useMembers(0)
+  const allocations = useAllAllocations(refreshKey)
   const lines = useLines()
   const figures = useFigures()
   const comics = useComics()
 
-  const [selectedEmail, setSelectedEmail] = useState('')
-  const [allocRefreshKey, setAllocRefreshKey] = useState(0)
+  const [expanded, setExpanded] = useState<string | null>(null)
   const [errMsg, setErrMsg] = useState<string | null>(null)
 
-  const alloc = useAllocation(selectedEmail || null, allocRefreshKey)
-
-  // comicId → subject_slug, so setGrants can derive figures_effective.
-  const subjectByComic = useMemo<Record<string, string | undefined>>(() => {
-    const cs = comics.data ?? []
-    return Object.fromEntries(cs.map((c) => [comicId(c), c.subject_slug ?? undefined]))
-  }, [comics.data])
-
-  // Lookup tables for friendly chip / option labels.
+  // ── Lookup tables ──
+  const lineOptions = useMemo(
+    () => (lines.data ?? []).map((l) => ({ slug: l.slug, title: l.title })),
+    [lines.data],
+  )
   const lineTitle = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const l of lines.data ?? []) m.set(l.slug, l.title)
-    return (slug: string) => m.get(slug) ?? slug
-  }, [lines.data])
+    const m = new Map(lineOptions.map((l) => [l.slug, l.title]))
+    return (slug: string) => m.get(slug) ?? titleCaseSlug(slug)
+  }, [lineOptions])
 
-  const comicTitle = useMemo(() => {
-    const m = new Map<string, string>()
-    for (const c of comics.data ?? []) m.set(comicId(c), c.title)
-    return (id: string) => m.get(id) ?? id
-  }, [comics.data])
-
-  // Grantable programs (series), derived from comics: program_slug → series title.
-  // A program grant unlocks every comic + figure in that series, present and future.
-  const programs = useMemo(() => {
+  const programOptions = useMemo(() => {
     const m = new Map<string, string>()
     for (const c of comics.data ?? []) {
       if (c.program_slug) m.set(c.program_slug, c.series || titleCaseSlug(c.program_slug))
@@ -110,36 +253,82 @@ export function AllocationsSection({ adminEmail }: { adminEmail: string }) {
     return Array.from(m, ([slug, title]) => ({ slug, title })).sort((a, b) => a.title.localeCompare(b.title))
   }, [comics.data])
   const programTitle = useMemo(() => {
-    const m = new Map(programs.map((p) => [p.slug, p.title]))
-    return (slug: string) => m.get(slug) ?? slug
-  }, [programs])
+    const m = new Map(programOptions.map((p) => [p.slug, p.title]))
+    return (slug: string) => m.get(slug) ?? titleCaseSlug(slug)
+  }, [programOptions])
 
-  // A write runs the mutation, then bumps the alloc refresh key so the chips reload.
-  const write = async (grants: Grants) => {
+  const figureOptions = useMemo(() => {
+    // figure → line, inferred from comics (figure docs carry no line field here).
+    const lineOf = new Map<string, string>()
+    for (const c of comics.data ?? []) if (c.subject_slug) lineOf.set(c.subject_slug, c.line)
+    return (figures.data ?? []).map((f) => ({ slug: f.slug, line: lineOf.get(f.slug) ?? '' }))
+  }, [figures.data, comics.data])
+
+  const comicTitle = useMemo(() => {
+    const m = new Map((comics.data ?? []).map((c) => [comicId(c), c.title || c.slug]))
+    return (id: string) => m.get(id) ?? id
+  }, [comics.data])
+
+  const subjectByComic = useMemo<Record<string, string | undefined>>(
+    () => Object.fromEntries((comics.data ?? []).map((c) => [comicId(c), c.subject_slug ?? undefined])),
+    [comics.data],
+  )
+
+  // ── Rows: every allowlist member, plus any allocation doc for an email that
+  //    is not on the allowlist (a domain user who signed in directly). ──
+  const allocByEmail = useMemo(() => {
+    const m = new Map<string, Allocation>()
+    for (const a of allocations.data ?? []) m.set(a.email, a)
+    return m
+  }, [allocations.data])
+
+  const rows = useMemo(() => {
+    const memberList: Member[] = members.data ?? []
+    const seen = new Set(memberList.map((m) => m.email))
+    const extra = (allocations.data ?? []).filter((a) => !seen.has(a.email))
+    return [
+      ...memberList.map((m) => ({ email: m.email, role: m.role as string })),
+      ...extra.map((a) => ({ email: a.email, role: 'domain' })),
+    ].sort((a, b) => a.email.localeCompare(b.email))
+  }, [members.data, allocations.data])
+
+  // ── Writes ──
+  const write = async (email: string, grants: Grants) => {
     setErrMsg(null)
     try {
-      await setGrants(selectedEmail, grants, { adminEmail, subjectByComic })
-      setAllocRefreshKey((k) => k + 1)
+      await setGrants(email, grants, { adminEmail, subjectByComic })
+      setRefreshKey((k) => k + 1)
     } catch {
-      setErrMsg('Couldn’t save allocation.')
+      setErrMsg('Couldn’t save the change — try again.')
     }
   }
 
-  const memberList: Member[] = members.data ?? []
-  const current = alloc.data
+  // Plain-English access summary for a row.
+  const summarize = (role: string, a: Allocation): React.ReactNode => {
+    if (role === 'sub_admin') return 'Everything, without needing grants'
+    const bits: string[] = [
+      ...a.lines.map((l) => `${lineTitle(l)} (line)`),
+      ...a.programs.map((p) => `${programTitle(p)} (series)`),
+      ...a.figures.map((f) => titleCaseSlug(f)),
+      ...a.comics.map((c) => comicTitle(c)),
+    ]
+    if (bits.length === 0)
+      return <span className="text-brand-gold">Nothing yet — this person sees no work</span>
+    const shown = bits.slice(0, 4)
+    return shown.join(' · ') + (bits.length > 4 ? ` · +${bits.length - 4} more` : '')
+  }
+
+  const loading = members.loading || allocations.loading
 
   return (
     <section>
-      <div className="mb-4 flex items-baseline gap-3">
-        <h2 className="font-serif font-light text-brand-umber text-[1.4rem]">Allocations</h2>
-        <span className="font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
-          Assign works to a member
-        </span>
+      <div className="mb-2 flex items-baseline gap-3">
+        <h2 className="font-serif font-light text-brand-umber text-[1.4rem]">Who sees what</h2>
       </div>
-
-      <p className="mb-5 max-w-xl font-serif text-sm text-brand-umber/70 leading-relaxed">
-        Pick a member, then grant them whole lines, figures, or individual comics.
-        A member sees only what they’re assigned; admins and sub-admins see everything.
+      <p className="mb-5 max-w-2xl font-serif text-sm leading-relaxed text-brand-umber/70">
+        Members see only the work you grant them, listed here in plain terms. You and the
+        sub-admins see everything without grants. To change someone’s access, open{' '}
+        <em>Edit access</em> on their row.
       </p>
 
       {errMsg && (
@@ -148,396 +337,87 @@ export function AllocationsSection({ adminEmail }: { adminEmail: string }) {
         </p>
       )}
 
-      {/* ── Member picker ──────────────────────────────────────────────── */}
-      <div className="mb-6">
-        <label htmlFor="alloc-member" className="mb-1 block font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
-          Member
-        </label>
-        <select
-          id="alloc-member"
-          value={selectedEmail}
-          onChange={(e) => { setSelectedEmail(e.target.value); setErrMsg(null) }}
-          className={SELECT_CLS}
-        >
-          <option value="">Select a member…</option>
-          {memberList.map((m) => (
-            <option key={m.email} value={m.email}>
-              {m.email}{m.role === 'sub_admin' ? ' (sub-admin)' : ''}
-            </option>
-          ))}
-        </select>
-      </div>
+      {loading ? (
+        <p className="font-sans text-sm text-brand-slate">Loading…</p>
+      ) : rows.length === 0 ? (
+        <p className="rounded-lg border border-dashed border-brand-pale-dusk px-4 py-6 text-center font-sans text-sm text-brand-slate">
+          No members yet — add one under People, then grant them work here.
+        </p>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {rows.map(({ email, role }) => {
+            const alloc = allocByEmail.get(email) ?? EMPTY(email)
+            const isOpen = expanded === email
+            return (
+              <MemberRow
+                key={email}
+                email={email}
+                role={role}
+                alloc={alloc}
+                expanded={isOpen}
+                onToggle={() => setExpanded(isOpen ? null : email)}
+                summary={summarize(role, alloc)}
+              >
+                <div className="flex flex-col gap-4">
+                  {grantCount(alloc) > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {alloc.lines.map((slug) => (
+                        <GrantChip
+                          key={`l-${slug}`}
+                          label={lineTitle(slug)}
+                          kindLabel="line"
+                          removeLabel={`Remove line ${lineTitle(slug)}`}
+                          onRemove={() => write(email, removeGrant(alloc, 'line', slug))}
+                        />
+                      ))}
+                      {alloc.programs.map((slug) => (
+                        <GrantChip
+                          key={`p-${slug}`}
+                          label={programTitle(slug)}
+                          kindLabel="series"
+                          removeLabel={`Remove series ${programTitle(slug)}`}
+                          onRemove={() => write(email, removeGrant(alloc, 'program', slug))}
+                        />
+                      ))}
+                      {alloc.figures.map((slug) => (
+                        <GrantChip
+                          key={`f-${slug}`}
+                          label={titleCaseSlug(slug)}
+                          kindLabel="figure"
+                          removeLabel={`Remove figure ${titleCaseSlug(slug)}`}
+                          onRemove={() => write(email, removeGrant(alloc, 'figure', slug))}
+                        />
+                      ))}
+                      {alloc.comics.map((id) => (
+                        <GrantChip
+                          key={`c-${id}`}
+                          label={comicTitle(id)}
+                          kindLabel="comic"
+                          removeLabel={`Remove comic ${comicTitle(id)}`}
+                          onRemove={() => write(email, removeGrant(alloc, 'comic', id))}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="font-sans text-[0.78rem] text-brand-slate">
+                      No grants yet — this member sees nothing until you give access below.
+                    </p>
+                  )}
 
-      {selectedEmail && current && (
-        <CurrentAndAdd
-          alloc={current}
-          lines={lines.data ?? []}
-          figures={figures.data ?? []}
-          comics={comics.data ?? []}
-          programs={programs}
-          lineTitle={lineTitle}
-          comicTitle={comicTitle}
-          programTitle={programTitle}
-          onWrite={write}
-        />
+                  <GrantComposer
+                    alloc={alloc}
+                    lineOptions={lineOptions}
+                    programOptions={programOptions}
+                    figureOptions={figureOptions}
+                    comicOptions={comics.data ?? []}
+                    onGrant={(kind, value) => write(email, addGrant(alloc, kind, value))}
+                  />
+                </div>
+              </MemberRow>
+            )
+          })}
+        </ul>
       )}
     </section>
-  )
-}
-
-// ── Current grants + add controls (rendered once a member is chosen) ───────────────
-
-function CurrentAndAdd({
-  alloc, lines, figures, comics, programs, lineTitle, comicTitle, programTitle, onWrite,
-}: {
-  alloc: Allocation
-  lines: Line[]
-  figures: Figure[]
-  comics: Comic[]
-  programs: { slug: string; title: string }[]
-  lineTitle: (slug: string) => string
-  comicTitle: (id: string) => string
-  programTitle: (slug: string) => string
-  onWrite: (grants: Grants) => void
-}) {
-  const hasAny = alloc.lines.length + alloc.figures.length + alloc.comics.length + alloc.programs.length > 0
-
-  const remove = (kind: GrantKind, value: string) =>
-    onWrite(removeGrant(alloc, kind, value))
-  const add = (kind: GrantKind, value: string) =>
-    onWrite(addGrant(alloc, kind, value))
-
-  return (
-    <div className="flex flex-col gap-8">
-      {/* ── Current grants, grouped ─────────────────────────────────── */}
-      <div>
-        <h3 className="mb-3 font-serif text-brand-umber text-[1.05rem]">Current grants</h3>
-        {!hasAny ? (
-          <p className="rounded-lg border border-dashed border-brand-pale-dusk px-4 py-5 text-center font-sans text-sm text-brand-slate">
-            No works allocated — this member sees nothing until you assign work.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-4">
-            <div>
-              <SubHeading title="Lines" count={alloc.lines.length} />
-              {alloc.lines.length === 0 ? (
-                <p className="font-sans text-xs text-brand-slate/70">None.</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {alloc.lines.map((slug) => (
-                    <GrantChip
-                      key={slug}
-                      label={lineTitle(slug)}
-                      removeLabel={`Remove line ${lineTitle(slug)}`}
-                      onRemove={() => remove('line', slug)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <SubHeading title="Programs (whole series)" count={alloc.programs.length} />
-              {alloc.programs.length === 0 ? (
-                <p className="font-sans text-xs text-brand-slate/70">None.</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {alloc.programs.map((slug) => (
-                    <GrantChip
-                      key={slug}
-                      label={programTitle(slug)}
-                      removeLabel={`Remove program ${programTitle(slug)}`}
-                      onRemove={() => remove('program', slug)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <SubHeading title="Figures" count={alloc.figures.length} />
-              {alloc.figures.length === 0 ? (
-                <p className="font-sans text-xs text-brand-slate/70">None.</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {alloc.figures.map((slug) => (
-                    <GrantChip
-                      key={slug}
-                      label={titleCaseSlug(slug)}
-                      removeLabel={`Remove figure ${titleCaseSlug(slug)}`}
-                      onRemove={() => remove('figure', slug)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <SubHeading title="Comics" count={alloc.comics.length} />
-              {alloc.comics.length === 0 ? (
-                <p className="font-sans text-xs text-brand-slate/70">None.</p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {alloc.comics.map((id) => (
-                    <GrantChip
-                      key={id}
-                      label={comicTitle(id)}
-                      removeLabel={`Remove comic ${comicTitle(id)}`}
-                      onRemove={() => remove('comic', id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* ── Add controls ────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-6 border-t border-brand-pale-dusk pt-6">
-        <AddProgram programs={programs} granted={alloc.programs} onAdd={(slug) => add('program', slug)} />
-        <AddLine lines={lines} granted={alloc.lines} onAdd={(slug) => add('line', slug)} />
-        <AddFigure
-          figures={figures}
-          comics={comics}
-          lines={lines}
-          granted={alloc.figures}
-          onAdd={(slug) => add('figure', slug)}
-        />
-        <AddComic
-          comics={comics}
-          lines={lines}
-          comicTitle={comicTitle}
-          granted={alloc.comics}
-          onAdd={(id) => add('comic', id)}
-        />
-      </div>
-    </div>
-  )
-}
-
-// ── Add a program (whole series) ─────────────────────────────────────────────────
-
-function AddProgram({
-  programs, granted, onAdd,
-}: { programs: { slug: string; title: string }[]; granted: string[]; onAdd: (slug: string) => void }) {
-  const [sel, setSel] = useState('')
-  const already = sel !== '' && granted.includes(sel)
-  return (
-    <div>
-      <label htmlFor="alloc-add-program" className="mb-1 block font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
-        Add a program (grants the whole series — current &amp; future)
-      </label>
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          id="alloc-add-program"
-          aria-label="Program to add"
-          value={sel}
-          onChange={(e) => setSel(e.target.value)}
-          className={SELECT_CLS}
-        >
-          <option value="">Select a program…</option>
-          {programs.map((p) => (
-            <option key={p.slug} value={p.slug}>{p.title}</option>
-          ))}
-        </select>
-        <AddButton
-          label="Add program grant"
-          disabled={sel === '' || already}
-          onClick={() => { onAdd(sel); setSel('') }}
-        />
-        {already && <span className="font-sans text-xs text-brand-slate">Already granted.</span>}
-      </div>
-    </div>
-  )
-}
-
-// ── Add a line ─────────────────────────────────────────────────────────────────────
-
-function AddLine({ lines, granted, onAdd }: { lines: Line[]; granted: string[]; onAdd: (slug: string) => void }) {
-  const [sel, setSel] = useState('')
-  const already = sel !== '' && granted.includes(sel)
-  return (
-    <div>
-      <label htmlFor="alloc-add-line" className="mb-1 block font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
-        Add a line
-      </label>
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          id="alloc-add-line"
-          aria-label="Line to add"
-          value={sel}
-          onChange={(e) => setSel(e.target.value)}
-          className={SELECT_CLS}
-        >
-          <option value="">Select a line…</option>
-          {lines.map((l) => (
-            <option key={l.slug} value={l.slug}>{l.title}</option>
-          ))}
-        </select>
-        <AddButton
-          label="Add line grant"
-          disabled={sel === '' || already}
-          onClick={() => { onAdd(sel); setSel('') }}
-        />
-        {already && <span className="font-sans text-xs text-brand-slate">Already granted.</span>}
-      </div>
-    </div>
-  )
-}
-
-// ── Add a figure ────────────────────────────────────────────────────────────────────
-
-/** subject_slug → line, inferred from comics (figures carry no line field). */
-function lineForSubject(comics: Comic[]): Map<string, string> {
-  const m = new Map<string, string>()
-  for (const c of comics) if (c.subject_slug) m.set(c.subject_slug, c.line)
-  return m
-}
-
-function AddFigure({
-  figures, comics, lines, granted, onAdd,
-}: {
-  figures: Figure[]
-  comics: Comic[]
-  lines: Line[]
-  granted: string[]
-  onAdd: (slug: string) => void
-}) {
-  const [lineFilter, setLineFilter] = useState('')
-  const [sel, setSel] = useState('')
-  const subjectLine = useMemo(() => lineForSubject(comics), [comics])
-
-  const visible = useMemo(() => {
-    if (!lineFilter) return figures
-    // Keep figures whose comics live in the chosen line; if a figure can't be
-    // mapped to any line (no comics yet), drop it under an active filter.
-    return figures.filter((f) => subjectLine.get(f.slug) === lineFilter)
-  }, [figures, lineFilter, subjectLine])
-
-  const already = sel !== '' && granted.includes(sel)
-  return (
-    <div>
-      <label htmlFor="alloc-add-figure" className="mb-1 block font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
-        Add a figure
-      </label>
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          aria-label="Filter figures by line"
-          value={lineFilter}
-          onChange={(e) => { setLineFilter(e.target.value); setSel('') }}
-          className={SELECT_CLS}
-        >
-          <option value="">All lines</option>
-          {lines.map((l) => (
-            <option key={l.slug} value={l.slug}>{l.title}</option>
-          ))}
-        </select>
-        <select
-          id="alloc-add-figure"
-          aria-label="Figure to add"
-          value={sel}
-          onChange={(e) => setSel(e.target.value)}
-          className={SELECT_CLS}
-        >
-          <option value="">Select a figure…</option>
-          {visible.map((f) => (
-            <option key={f.slug} value={f.slug}>{titleCaseSlug(f.slug)}</option>
-          ))}
-        </select>
-        <AddButton
-          label="Add figure grant"
-          disabled={sel === '' || already}
-          onClick={() => { onAdd(sel); setSel('') }}
-        />
-        {already && <span className="font-sans text-xs text-brand-slate">Already granted.</span>}
-      </div>
-    </div>
-  )
-}
-
-// ── Add a comic ─────────────────────────────────────────────────────────────────────
-
-function AddComic({
-  comics, lines, comicTitle, granted, onAdd,
-}: {
-  comics: Comic[]
-  lines: Line[]
-  comicTitle: (id: string) => string
-  granted: string[]
-  onAdd: (id: string) => void
-}) {
-  const [lineFilter, setLineFilter] = useState('')
-  const [figureFilter, setFigureFilter] = useState('')
-  const [sel, setSel] = useState('')
-
-  // Figures available in the chosen line (by comic subjects).
-  const figuresInLine = useMemo(() => {
-    const seen = new Map<string, string>() // subject_slug → display
-    for (const c of comics) {
-      if (lineFilter && c.line !== lineFilter) continue
-      if (c.subject_slug) seen.set(c.subject_slug, titleCaseSlug(c.subject_slug))
-    }
-    return Array.from(seen.entries()).map(([slug, name]) => ({ slug, name }))
-  }, [comics, lineFilter])
-
-  // Comics filtered by chosen line + figure.
-  const visible = useMemo(() => {
-    return comics.filter((c) => {
-      if (lineFilter && c.line !== lineFilter) return false
-      if (figureFilter && c.subject_slug !== figureFilter) return false
-      return true
-    })
-  }, [comics, lineFilter, figureFilter])
-
-  const already = sel !== '' && granted.includes(sel)
-  return (
-    <div>
-      <label htmlFor="alloc-add-comic" className="mb-1 block font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">
-        Add a comic
-      </label>
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          aria-label="Filter comics by line"
-          value={lineFilter}
-          onChange={(e) => { setLineFilter(e.target.value); setFigureFilter(''); setSel('') }}
-          className={SELECT_CLS}
-        >
-          <option value="">All lines</option>
-          {lines.map((l) => (
-            <option key={l.slug} value={l.slug}>{l.title}</option>
-          ))}
-        </select>
-        <select
-          aria-label="Filter comics by figure"
-          value={figureFilter}
-          onChange={(e) => { setFigureFilter(e.target.value); setSel('') }}
-          className={SELECT_CLS}
-        >
-          <option value="">All figures</option>
-          {figuresInLine.map((f) => (
-            <option key={f.slug} value={f.slug}>{f.name}</option>
-          ))}
-        </select>
-        <select
-          id="alloc-add-comic"
-          aria-label="Comic to add"
-          value={sel}
-          onChange={(e) => setSel(e.target.value)}
-          className={SELECT_CLS}
-        >
-          <option value="">Select a comic…</option>
-          {visible.map((c) => (
-            <option key={comicId(c)} value={comicId(c)}>{comicTitle(comicId(c))}</option>
-          ))}
-        </select>
-        <AddButton
-          label="Add comic grant"
-          disabled={sel === '' || already}
-          onClick={() => { onAdd(sel); setSel('') }}
-        />
-        {already && <span className="font-sans text-xs text-brand-slate">Already granted.</span>}
-      </div>
-    </div>
   )
 }

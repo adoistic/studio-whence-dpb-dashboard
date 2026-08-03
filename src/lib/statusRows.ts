@@ -95,6 +95,41 @@ export function titleCaseSlug(slug: string): string {
 /** `_`-prefixed keys are metadata (the row's link) and are never written as columns. */
 export type Row = { [column: string]: string | number | null | undefined; _href?: string }
 
+// ── Billable pages ────────────────────────────────────────────────────────────
+//
+// What a finished comic actually bills for is more than its interior: the cover,
+// the inside covers (IFC/IBC), the back cover and the activity pages are all
+// drawn pages. The counting rule is Adnan's (2026-08-03):
+//   · cover — the three cover OPTIONS collapse to ONE page (they are drafts of
+//     the same cover, not three covers); a shipped coverKey is that same page
+//   · inside covers and activity pages — counted on actuals
+//   · back cover — one page when present
+// This is the single place the rule lives; the dashboard and any export import
+// it rather than restating it.
+
+export interface PageBreakdown {
+  interior: number
+  cover: 0 | 1
+  insideCovers: number
+  backCover: 0 | 1
+  activities: number
+  /** cover + insideCovers + backCover + activities */
+  extras: number
+  /** interior + extras — the billable page count */
+  billable: number
+}
+
+export function pageBreakdown(c: Comic): PageBreakdown {
+  const interior = c.pages?.count ?? 0
+  const cover: 0 | 1 =
+    c.pages?.coverKey || (c.coverOptions?.options?.length ?? 0) > 0 ? 1 : 0
+  const insideCovers = c.insideCovers?.images?.length ?? 0
+  const backCover: 0 | 1 = c.backCover?.image ? 1 : 0
+  const activities = c.activities?.pages?.length ?? 0
+  const extras = cover + insideCovers + backCover + activities
+  return { interior, cover, insideCovers, backCover, activities, extras, billable: interior + extras }
+}
+
 /**
  * Whether a comic's interior is fully drawn — the ONE rule, used by the Comics,
  * Subjects, Programs and Lines sheets so no two of them can disagree.

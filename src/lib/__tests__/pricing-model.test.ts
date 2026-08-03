@@ -33,6 +33,7 @@ import {
   type PricingConfig,
 } from '@/lib/pricing'
 import { buildModel, buildTrend, tallyOf, exportRows } from '@/lib/productionModel'
+import { pageBreakdown } from '@/lib/statusRows'
 import type { Comic } from '@/types/content'
 
 function comic(over: Partial<Comic> = {}): Comic {
@@ -91,10 +92,55 @@ describe('rate resolution', () => {
   })
 })
 
+describe('pageBreakdown (the billing count)', () => {
+  it('collapses the three cover options to ONE page', () => {
+    const b = pageBreakdown(comic({
+      coverOptions: { options: [{ key: 'a' }, { key: 'b' }, { key: 'c' }] },
+    } as Partial<Comic>))
+    expect(b.cover).toBe(1)
+    expect(b.billable).toBe(25)
+  })
+
+  it('does not double-count a shipped cover on top of the options', () => {
+    const b = pageBreakdown(comic({
+      pages: { hasPages: true, count: 24, coverKey: 'images/cover.jpg' },
+      coverOptions: { options: [{ key: 'a' }, { key: 'b' }] },
+    } as Partial<Comic>))
+    expect(b.cover).toBe(1)
+  })
+
+  it('counts inside covers, back cover and activity pages on actuals', () => {
+    const b = pageBreakdown(comic({
+      insideCovers: { images: [{ key: 'i1' }, { key: 'i2' }] },
+      backCover: { image: { key: 'bc' } },
+      activities: { pages: [{ key: 'a1' }, { key: 'a2' }, { key: 'a3' }] },
+    } as Partial<Comic>))
+    expect(b.insideCovers).toBe(2)
+    expect(b.backCover).toBe(1)
+    expect(b.activities).toBe(3)
+    expect(b.extras).toBe(6)
+    expect(b.billable).toBe(30)
+  })
+
+  it('a bare interior bills as just its interior', () => {
+    expect(pageBreakdown(comic())).toMatchObject({ extras: 0, billable: 24 })
+  })
+})
+
 describe('value', () => {
   it('separates delivered from contracted', () => {
     const v = valueOf(comic(), CFG)
     expect(v.delivered).toBe(24 * 250)
+    expect(v.contracted).toBe(48 * 250)
+  })
+
+  it('delivered includes covers and activity pages', () => {
+    const v = valueOf(comic({
+      backCover: { image: { key: 'bc' } },
+      activities: { pages: [{ key: 'a1' }, { key: 'a2' }] },
+    } as Partial<Comic>), CFG)
+    expect(v.delivered).toBe((24 + 3) * 250)
+    // contracted stays the script commitment
     expect(v.contracted).toBe(48 * 250)
   })
 
@@ -113,6 +159,11 @@ describe('money formatting', () => {
     expect(formatMoneyShort(1_200_000)).toBe('₹12 L')
     expect(formatMoneyShort(15_000_000)).toBe('₹1.5 Cr')
     expect(formatMoneyShort(12_000)).toBe('₹12,000')
+  })
+  it('never shows a trailing .0', () => {
+    expect(formatMoneyShort(100_000)).toBe('₹1 L')
+    expect(formatMoneyShort(150_000)).toBe('₹1.5 L')
+    expect(formatMoneyShort(10_000_000)).toBe('₹1 Cr')
   })
 })
 
@@ -133,6 +184,8 @@ describe('tally', () => {
     expect(t.byStatus.approved).toBe(1)
     // two at ₹250 (24 + 48 pages) plus the ₹1000 override on 24 pages
     expect(t.delivered).toBe(72 * 250 + 24 * 1000)
+    expect(t.pagesExtras).toBe(0)
+    expect(t.pagesBillable).toBe(t.pagesMade)
   })
 
   it('reports the distinct rates inside it, so a mixed tier is visible', () => {
@@ -225,7 +278,8 @@ describe('export', () => {
     expect(rows).toHaveLength(1)
     expect(rows[0]['Rate per page (INR)']).toBe(1000)
     expect(rows[0]['Rate source']).toBe('comic')
-    expect(rows[0]['Pages %']).toBe(50)
+    expect(rows[0]['Interior %']).toBe(50)
+    expect(rows[0]['Billable pages']).toBe(24)
   })
 })
 

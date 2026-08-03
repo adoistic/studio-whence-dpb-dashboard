@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 
-// ── auth: admin user ──────────────────────────────────────────────────────────────
+// ── auth: admin user ──────────────────────────────────────────────────────────
 
 vi.mock('@/lib/auth', () => ({
   useUser: () => ({ user: { email: 'adnan@thothica.com' }, loading: false }),
   useAllowStatus: () => 'admin',
 }))
 
-// ── members ─────────────────────────────────────────────────────────────────────────
+// ── members ───────────────────────────────────────────────────────────────────
 
 vi.mock('@/lib/admin', () => ({
   useMembers: () => ({
@@ -20,33 +20,27 @@ vi.mock('@/lib/admin', () => ({
   }),
 }))
 
-// ── allocation lib: controllable useAllocation + spy setGrants + real pure helpers ──
+// ── allocation lib: controllable useAllAllocations + spy setGrants + pure helpers ──
 
 const { setGrants } = vi.hoisted(() => ({
   setGrants: vi.fn<
     (
       email: string,
-      grants: { lines: string[]; figures: string[]; comics: string[] },
+      grants: { lines: string[]; figures: string[]; comics: string[]; programs: string[] },
       opts: { adminEmail: string; subjectByComic: Record<string, string | undefined> },
     ) => Promise<void>
   >(() => Promise.resolve()),
 }))
 
-// The Allocation the hook returns, swapped per test before render.
-let allocData: {
-  email: string
-  lines: string[]
-  figures: string[]
-  comics: string[]
-  programs: string[]
-  figures_effective: string[]
-} | null = null
-
-// The real allocation module imports @/lib/firebase (auth init blows up under
-// jsdom), so we reimplement the small, pure add/remove helpers here to test the
-// real add/remove semantics without dragging in Firebase.
 type Grants = { lines: string[]; figures: string[]; comics: string[]; programs: string[] }
 type Alloc = Grants & { email: string; figures_effective: string[] }
+
+// The whole allocations collection, swapped per test before render.
+let allocsData: Alloc[] = []
+
+// The real allocation module imports @/lib/firebase (auth init blows up under
+// jsdom), so the small pure add/remove helpers are reimplemented here to test
+// real add/remove semantics without dragging in Firebase.
 const listKey = (k: 'line' | 'figure' | 'comic' | 'program') =>
   (k === 'line' ? 'lines' : k === 'figure' ? 'figures'
     : k === 'comic' ? 'comics' : 'programs') as keyof Grants
@@ -54,7 +48,7 @@ const grantsOf = (a: Alloc): Grants =>
   ({ lines: [...a.lines], figures: [...a.figures], comics: [...a.comics], programs: [...a.programs] })
 
 vi.mock('@/lib/allocation', () => ({
-  useAllocation: () => ({ data: allocData, loading: false }),
+  useAllAllocations: () => ({ data: allocsData, loading: false }),
   setGrants,
   addGrant: (a: Alloc, kind: 'line' | 'figure' | 'comic' | 'program', value: string): Grants => {
     const base = grantsOf(a)
@@ -70,7 +64,7 @@ vi.mock('@/lib/allocation', () => ({
   },
 }))
 
-// ── catalog fixture ───────────────────────────────────────────────────────────────
+// ── catalog fixture ───────────────────────────────────────────────────────────
 
 const LINES = [
   { slug: 'biographies', title: 'Biographies', subtitle: '', comics: [], figures: [] },
@@ -81,7 +75,7 @@ const FIGURES = [
   { series: 'tech', slug: 'steve-jobs', sources_count: 1, words: 10 },
 ]
 const COMICS = [
-  { title: 'The Polyester Dream', line: 'biographies', slug: '01-polyester', status: 'approved', subject_slug: 'dhirubhai-ambani' },
+  { title: 'The Polyester Dream', line: 'biographies', slug: '01-polyester', status: 'approved', subject_slug: 'dhirubhai-ambani', series: 'Cricket Legends', program_slug: 'cricket-legends' },
   { title: 'Master Blaster', line: 'biographies', slug: '01-master', status: 'approved', subject_slug: 'sachin-tendulkar' },
 ]
 
@@ -95,110 +89,97 @@ import { AllocationsSection } from '@/components/admin/AllocationsSection'
 
 const ADMIN = 'adnan@thothica.com'
 
-function selectMember(email = 'ankit@dpb.in') {
-  fireEvent.change(screen.getByLabelText('Member'), { target: { value: email } })
+const alloc = (email: string, over: Partial<Grants> = {}): Alloc => ({
+  email, lines: [], figures: [], comics: [], programs: [], figures_effective: [],
+  ...over,
+})
+
+function openEditor(email = 'ankit@dpb.in') {
+  fireEvent.click(screen.getByLabelText(`Edit access for ${email}`))
 }
 
 beforeEach(() => {
   setGrants.mockClear()
-  allocData = null
+  allocsData = []
 })
 
-// ── Tests ─────────────────────────────────────────────────────────────────────────
+// ── Tests ─────────────────────────────────────────────────────────────────────
 
-describe('AllocationsSection', () => {
-  it('shows a seeded member’s grants grouped under Lines / Figures / Comics', () => {
-    allocData = {
-      email: 'ankit@dpb.in',
-      lines: ['awareness'],
-      figures: ['steve-jobs'],
-      comics: ['biographies__01-master'],
-      programs: [],
-      figures_effective: ['steve-jobs', 'sachin-tendulkar'],
-    }
+describe('AllocationsSection (who sees what)', () => {
+  it('lists every member with a plain-English summary of their access', () => {
+    allocsData = [alloc('ankit@dpb.in', { lines: ['biographies'], comics: ['biographies__01-master'] })]
     render(<AllocationsSection adminEmail={ADMIN} />)
-    selectMember()
-
-    // Grouped subheadings present.
-    expect(screen.getByRole('heading', { name: /^lines$/i })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /^figures$/i })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: /^comics$/i })).toBeInTheDocument()
-
-    // A friendly label per chip; raw slug stored, title-cased / titled shown.
-    // (Some labels — e.g. "Awareness" — also appear as picker <option>s, so we
-    // assert via each chip's unique remove-button accessible name.)
-    expect(screen.getByRole('button', { name: 'Remove line Awareness' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Remove figure Steve Jobs' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Remove comic Master Blaster' })).toBeInTheDocument()
+    expect(screen.getByText('ankit@dpb.in')).toBeInTheDocument()
+    expect(screen.getByText(/Biographies \(line\) · Master Blaster/)).toBeInTheDocument()
   })
 
-  it('adding a comic calls setGrants with the comic id appended + subjectByComic map', () => {
-    allocData = {
-      email: 'ankit@dpb.in', lines: [], figures: [], comics: [], programs: [], figures_effective: [],
-    }
+  it('marks a sub-admin as seeing everything, with no editor', () => {
     render(<AllocationsSection adminEmail={ADMIN} />)
-    selectMember()
+    expect(screen.getByText('sa@dpb.in')).toBeInTheDocument()
+    expect(screen.getByText('sub-admin · sees everything')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Edit access for sa@dpb.in')).not.toBeInTheDocument()
+  })
 
-    fireEvent.change(screen.getByLabelText('Comic to add'), {
-      target: { value: 'biographies__01-polyester' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Add comic grant' }))
+  it('flags a member with no grants, so nobody wonders why they see a blank site', () => {
+    render(<AllocationsSection adminEmail={ADMIN} />)
+    expect(screen.getByText(/Nothing yet — this person sees no work/)).toBeInTheDocument()
+  })
+
+  it('also lists an allocation for an email that is not on the allowlist (domain user)', () => {
+    allocsData = [alloc('someone@thothica.com', { lines: ['awareness'] })]
+    render(<AllocationsSection adminEmail={ADMIN} />)
+    expect(screen.getByText('someone@thothica.com')).toBeInTheDocument()
+    expect(screen.getByText(/Awareness \(line\)/)).toBeInTheDocument()
+  })
+
+  it('granting a comic writes the full grant set with the comic appended + subject map', () => {
+    allocsData = [alloc('ankit@dpb.in', { lines: ['biographies'] })]
+    render(<AllocationsSection adminEmail={ADMIN} />)
+    openEditor()
+    fireEvent.change(screen.getByLabelText('What to grant'), { target: { value: 'comic' } })
+    fireEvent.change(screen.getByLabelText('Which one'), { target: { value: 'biographies__01-master' } })
+    fireEvent.click(screen.getByLabelText('Grant access'))
 
     expect(setGrants).toHaveBeenCalledTimes(1)
     const [email, grants, opts] = setGrants.mock.calls[0]
     expect(email).toBe('ankit@dpb.in')
-    expect(grants.comics).toEqual(['biographies__01-polyester'])
-    expect(opts.adminEmail).toBe(ADMIN)
-    // subjectByComic is derived from useComics(): comicId → subject_slug.
-    expect(opts.subjectByComic).toEqual({
-      'biographies__01-polyester': 'dhirubhai-ambani',
-      'biographies__01-master': 'sachin-tendulkar',
-    })
-  })
-
-  it('removing a chip calls setGrants without that value', () => {
-    allocData = {
-      email: 'ankit@dpb.in',
-      lines: ['biographies', 'awareness'],
-      figures: [],
-      comics: [],
-      programs: [],
-      figures_effective: [],
-    }
-    render(<AllocationsSection adminEmail={ADMIN} />)
-    selectMember()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Remove line Awareness' }))
-    expect(setGrants).toHaveBeenCalledTimes(1)
-    const grants = setGrants.mock.calls[0][1]
+    expect(grants.comics).toEqual(['biographies__01-master'])
     expect(grants.lines).toEqual(['biographies'])
+    expect(opts.adminEmail).toBe(ADMIN)
+    expect(opts.subjectByComic['biographies__01-master']).toBe('sachin-tendulkar')
   })
 
-  it('a member with an empty allocation shows the "No works allocated" message', () => {
-    allocData = {
-      email: 'ankit@dpb.in', lines: [], figures: [], comics: [], programs: [], figures_effective: [],
-    }
+  it('removing a chip writes the grant set without that value', () => {
+    allocsData = [alloc('ankit@dpb.in', { lines: ['biographies', 'awareness'] })]
     render(<AllocationsSection adminEmail={ADMIN} />)
-    selectMember()
-    expect(screen.getByText(/no works allocated/i)).toBeInTheDocument()
+    openEditor()
+    fireEvent.click(screen.getByLabelText('Remove line Biographies'))
+
+    expect(setGrants).toHaveBeenCalledTimes(1)
+    const [, grants] = setGrants.mock.calls[0]
+    expect(grants.lines).toEqual(['awareness'])
   })
 
-  it('an "Add" button is disabled when the selected target is already granted', () => {
-    allocData = {
-      email: 'ankit@dpb.in',
-      lines: ['biographies'],
-      figures: [],
-      comics: [],
-      programs: [],
-      figures_effective: [],
-    }
+  it('disables Grant when the chosen thing is already granted', () => {
+    allocsData = [alloc('ankit@dpb.in', { lines: ['biographies'] })]
     render(<AllocationsSection adminEmail={ADMIN} />)
-    selectMember()
+    openEditor()
+    // kind defaults to 'line'
+    fireEvent.change(screen.getByLabelText('Which one'), { target: { value: 'biographies' } })
+    expect(screen.getByLabelText('Grant access')).toBeDisabled()
+    expect(screen.getByText('Already granted.')).toBeInTheDocument()
+  })
 
-    const addLineBtn = screen.getByRole('button', { name: 'Add line grant' })
-    expect(addLineBtn).toBeDisabled()             // nothing selected yet
-    fireEvent.change(screen.getByLabelText('Line to add'), { target: { value: 'biographies' } })
-    expect(addLineBtn).toBeDisabled()             // already granted
-    expect(screen.getByText(/already granted/i)).toBeInTheDocument()
+  it('shows each grant as a removable chip with its kind named', () => {
+    allocsData = [alloc('ankit@dpb.in', {
+      lines: ['biographies'], programs: ['cricket-legends'],
+      figures: ['sachin-tendulkar'], comics: ['biographies__01-master'],
+    })]
+    render(<AllocationsSection adminEmail={ADMIN} />)
+    openEditor()
+    expect(screen.getByLabelText('Remove line Biographies')).toBeInTheDocument()
+    expect(screen.getByLabelText('Remove series Cricket Legends')).toBeInTheDocument()
+    expect(screen.getByLabelText('Remove figure Sachin Tendulkar')).toBeInTheDocument()
+    expect(screen.getByLabelText('Remove comic Master Blaster')).toBeInTheDocument()
   })
 })

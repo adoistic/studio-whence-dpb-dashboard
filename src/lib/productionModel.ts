@@ -15,7 +15,7 @@
  * would be worse than either being wrong on its own.
  */
 
-import { isComplete, normStatus, titleCaseSlug, STATUS_ORDER } from '@/lib/statusRows'
+import { isComplete, normStatus, pageBreakdown, titleCaseSlug, STATUS_ORDER, type PageBreakdown } from '@/lib/statusRows'
 import { rateFor, type PricingConfig } from '@/lib/pricing'
 import type { Comic, Line, Program } from '@/types/content'
 
@@ -26,8 +26,14 @@ export interface Tally {
   comics: number
   /** Comics whose interior is fully drawn (statusRows.isComplete). */
   complete: number
+  /** Interior pages drawn. */
   pagesMade: number
+  /** Interior pages the scripts commit to. */
   pagesTarget: number
+  /** Covers (options collapse to one) + inside covers + back covers + activity pages. */
+  pagesExtras: number
+  /** pagesMade + pagesExtras — what actually bills. */
+  pagesBillable: number
   /** pagesMade / pagesTarget, 0–1. Null when nothing is targeted. */
   progress: number | null
   byStatus: Record<string, number>
@@ -48,6 +54,7 @@ export function tallyOf(key: string, label: string, comics: Comic[], pricing: Pr
   const rates = new Set<number>()
   let pagesMade = 0
   let pagesTarget = 0
+  let pagesExtras = 0
   let contracted = 0
   let delivered = 0
   let complete = 0
@@ -55,14 +62,15 @@ export function tallyOf(key: string, label: string, comics: Comic[], pricing: Pr
   for (const c of comics) {
     const status = normStatus(c.status)
     byStatus[status] = (byStatus[status] ?? 0) + 1
-    const made = c.pages?.count ?? 0
+    const pages = pageBreakdown(c)
     const target = c.target_length_pages ?? 0
-    pagesMade += made
+    pagesMade += pages.interior
     pagesTarget += target
+    pagesExtras += pages.extras
     const { rate } = rateFor(c, pricing)
     rates.add(rate)
     contracted += rate * target
-    delivered += rate * made
+    delivered += rate * pages.billable
     if (isComplete(c)) complete += 1
   }
 
@@ -73,6 +81,8 @@ export function tallyOf(key: string, label: string, comics: Comic[], pricing: Pr
     complete,
     pagesMade,
     pagesTarget,
+    pagesExtras,
+    pagesBillable: pagesMade + pagesExtras,
     progress: pagesTarget > 0 ? pagesMade / pagesTarget : null,
     byStatus,
     contracted,
@@ -91,6 +101,8 @@ export interface ComicRowModel {
   status: string
   pagesMade: number
   pagesTarget: number
+  /** Per-component page counts — the tooltip behind the Extras column. */
+  breakdown: PageBreakdown
   progress: number | null
   complete: boolean
   rate: number
@@ -104,7 +116,7 @@ export interface ComicRowModel {
 
 export function comicModel(c: Comic, pricing: PricingConfig | null): ComicRowModel {
   const { rate, source, overridden } = rateFor(c, pricing)
-  const made = c.pages?.count ?? 0
+  const pages = pageBreakdown(c)
   const target = c.target_length_pages ?? 0
   return {
     comic: c,
@@ -114,15 +126,16 @@ export function comicModel(c: Comic, pricing: PricingConfig | null): ComicRowMod
     program: c.program_slug ?? '',
     subject: c.subject_slug ?? '',
     status: normStatus(c.status),
-    pagesMade: made,
+    pagesMade: pages.interior,
     pagesTarget: target,
-    progress: target > 0 ? made / target : null,
+    breakdown: pages,
+    progress: target > 0 ? pages.interior / target : null,
     complete: isComplete(c),
     rate,
     rateSource: source,
     overridden,
     contracted: rate * target,
-    delivered: rate * made,
+    delivered: rate * pages.billable,
     updated: c.updated ?? c.created ?? '',
     href: `/${c.line}/${c.slug}`,
   }
@@ -283,9 +296,14 @@ export function exportRows(model: ProductionModel, currency = 'INR'): Record<str
     Comic: c.title,
     Slug: c.comic.slug,
     Status: c.status,
-    'Pages made': c.pagesMade,
+    'Interior pages': c.pagesMade,
     'Target pages': c.pagesTarget,
-    'Pages %': c.progress === null ? '' : Math.round(c.progress * 100),
+    'Interior %': c.progress === null ? '' : Math.round(c.progress * 100),
+    Cover: c.breakdown.cover,
+    'Inside covers': c.breakdown.insideCovers,
+    'Back cover': c.breakdown.backCover,
+    'Activity pages': c.breakdown.activities,
+    'Billable pages': c.breakdown.billable,
     Complete: c.complete ? 'Yes' : 'No',
     [`Rate per page (${currency})`]: c.rate,
     'Rate source': c.rateSource,

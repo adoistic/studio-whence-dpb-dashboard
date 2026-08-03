@@ -136,6 +136,16 @@ export function AdminPanel() {
   // A single inline failure note surfaced near the top of the panel.
   const [errMsg, setErrMsg] = useState<string | null>(null)
 
+  // ── Tabs ──
+  // Three jobs, three tabs — People (who may sign in), Access (who sees what),
+  // Pricing (what a page is worth). One long scroll of all three is what made
+  // this page unreadable. `?tab=pricing` deep-links from the status page.
+  const [tab, setTab] = useState<'people' | 'access' | 'pricing'>(() => {
+    if (typeof window === 'undefined') return 'people'
+    const t = new URLSearchParams(window.location.search).get('tab')
+    return t === 'pricing' || t === 'access' ? t : 'people'
+  })
+
   // Run a mutation, then refresh the lists; surface failures inline.
   const run = async (fn: () => Promise<void>) => {
     setErrMsg(null)
@@ -189,10 +199,11 @@ export function AdminPanel() {
           </span>
         </span>
         <h1 className="mt-4 font-serif font-light leading-tight text-brand-umber text-[2rem] md:text-[2.8rem]">
-          Access &amp; roles
+          Administration
         </h1>
         <p className="mt-2 max-w-xl font-serif text-brand-umber/70 leading-relaxed">
-          Approve access requests, manage members and sub-admins, and suspend or reinstate accounts.
+          Three jobs, one each per tab: who may sign in, who sees which work, and what a page
+          of finished comic is worth.
         </p>
       </div>
 
@@ -202,7 +213,35 @@ export function AdminPanel() {
         </p>
       )}
 
-      <div className="flex flex-col gap-12">
+      {/* ── Tab bar ── */}
+      <div role="tablist" aria-label="Admin sections" className="mb-8 flex flex-wrap gap-1 border-b border-brand-pale-dusk">
+        {([
+          ['people', 'People & roles', requests.data?.length ?? 0],
+          ['access', 'Who sees what', 0],
+          ['pricing', 'Pricing', 0],
+        ] as const).map(([key, label, badge]) => (
+          <button
+            key={key}
+            role="tab"
+            aria-selected={tab === key}
+            onClick={() => setTab(key)}
+            className={`-mb-px rounded-t-md border-b-2 px-4 py-2.5 font-sans text-[0.8rem] transition-colors ${
+              tab === key
+                ? 'border-brand-indigo font-semibold text-brand-indigo'
+                : 'border-transparent text-brand-slate hover:text-brand-umber'
+            }`}
+          >
+            {label}
+            {badge > 0 ? (
+              <span className="ml-2 rounded-full bg-brand-gold/25 px-1.5 py-0.5 font-sans text-[0.62rem] tabular-nums text-brand-indigo">
+                {badge}
+              </span>
+            ) : null}
+          </button>
+        ))}
+      </div>
+
+      <div className={tab === 'people' ? 'flex flex-col gap-12' : 'hidden'}>
         {/* ── 1. Access requests ─────────────────────────────────────── */}
         <section>
           <SectionHeading title="Access requests" count={requests.data?.length} />
@@ -328,10 +367,14 @@ export function AdminPanel() {
           onSuspend={(email) => run(() => suspendEmail(email, { adminEmail }))}
         />
 
-        {/* ── 5. Allocations ─────────────────────────────────────────── */}
-        <AllocationsSection adminEmail={adminEmail} />
+      </div>
 
-        {/* ── 6. Pricing ─────────────────────────────────────────────── */}
+      {/* Hidden-not-unmounted, so switching tabs never refetches or loses form state. */}
+      <div className={tab === 'access' ? '' : 'hidden'}>
+        <AllocationsSection adminEmail={adminEmail} />
+      </div>
+
+      <div className={tab === 'pricing' ? '' : 'hidden'}>
         <PricingPanel
           pricing={pricing.data}
           lines={allLines}

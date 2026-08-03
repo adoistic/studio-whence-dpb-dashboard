@@ -61,9 +61,9 @@ describe('ProductionDashboard', () => {
     setup()
     const tile = screen.getByText('Comics in production').closest('div')!.parentElement!.parentElement!
     expect(within(tile).getByText('3')).toBeInTheDocument()
-    // 24 pages × 3 books, shown on the pages tile
+    // 24 interior pages × 3 books on the delivered-pages tile
     expect(screen.getByText(/^72$/)).toBeInTheDocument()
-    expect(screen.getByText(/of 144 targeted/)).toBeInTheDocument()
+    expect(screen.getByText(/72 interior/)).toBeInTheDocument()
   })
 
   it('lists every line as a section heading', () => {
@@ -96,19 +96,19 @@ describe('ProductionDashboard', () => {
     fireEvent.click(screen.getByRole('heading', { name: 'Biographies' }))
     fireEvent.click(screen.getByText('Tech Legends'))
     expect(screen.getByText('override')).toBeInTheDocument()
-    expect(screen.getByText('₹1,000')).toBeInTheDocument()
+    expect(screen.getAllByText('₹1,000').length).toBeGreaterThan(0)
   })
 
   it('filters to one line', () => {
     setup()
-    fireEvent.click(screen.getByRole('button', { name: 'Indic' }))
+    fireEvent.change(screen.getByLabelText('Filter by line'), { target: { value: 'indic' } })
     expect(screen.queryByRole('heading', { name: 'Biographies' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Indic' })).toBeInTheDocument()
   })
 
   it('filters by status', () => {
     setup()
-    fireEvent.click(screen.getByRole('button', { name: 'Published' }))
+    fireEvent.change(screen.getByLabelText('Filter by status'), { target: { value: 'published' } })
     // Only the Indic book is published.
     expect(screen.queryByRole('heading', { name: 'Biographies' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Indic' })).toBeInTheDocument()
@@ -152,10 +152,26 @@ describe('ProductionDashboard', () => {
     expect(screen.getByText(/authoring activity, not pages drawn/)).toBeInTheDocument()
   })
 
-  it('explains delivered vs contracted in the footnote', () => {
+  it('explains the counting rule in the footnote', () => {
     setup()
-    const note = screen.getByText(/pages actually drawn/)
+    const note = screen.getByText(/three cover options count as one page/)
     expect(within(note).getByText('Delivered')).toBeInTheDocument()
     expect(within(note).getByText('Contracted')).toBeInTheDocument()
+  })
+
+  it('shows extras with an itemised tooltip', () => {
+    setup({
+      comics: [
+        comic({
+          slug: 'shiva', title: 'Shiva', line: 'indic', program_slug: null,
+          insideCovers: { images: [{ key: 'i1' }, { key: 'i2' }] },
+          backCover: { image: { key: 'bc' } },
+          activities: { pages: [{ key: 'a1' }] },
+        } as Partial<Comic>),
+      ],
+    })
+    // single line auto-opens; extras = 2 + 1 + 1 = 4
+    const cell = screen.getByTitle('inside covers 2 · back cover 1 · activity pages 1')
+    expect(cell).toHaveTextContent('4')
   })
 })

@@ -48,6 +48,7 @@ vi.mock('@/lib/admin', () => ({
 
 vi.mock('@/lib/allocation', () => ({
   useAllocation: () => ({ data: null, loading: false }),
+  useAllAllocations: () => ({ data: [], loading: false }),
   setGrants: vi.fn(() => Promise.resolve()),
   addGrant: () => ({ lines: [], figures: [], comics: [] }),
   removeGrant: () => ({ lines: [], figures: [], comics: [] }),
@@ -238,7 +239,9 @@ describe('AdminPanel add by email', () => {
   it('reinstate row and members coexist without id collisions', () => {
     membersData = [{ email: 'm@x.com', role: 'sub_admin' }]
     render(<AdminPanel />)
-    const memberRow = screen.getByText('m@x.com').closest('li')!
-    expect(within(memberRow).getByRole('button', { name: 'Make m@x.com a member' })).toBeInTheDocument()
+    // The email now also appears in the (mounted) Who-sees-what overview, so
+    // anchor on the role button and walk up to its Members row.
+    const btn = screen.getByRole('button', { name: 'Make m@x.com a member' })
+    expect(within(btn.closest('li')!).getByText('m@x.com')).toBeInTheDocument()
   })
 })

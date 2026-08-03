@@ -122,10 +122,11 @@ export function PricingPanel({
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h2 className="font-serif text-xl font-light text-brand-indigo">Pricing</h2>
-          <p className="mt-1 max-w-prose font-sans text-[0.75rem] leading-relaxed text-brand-slate">
-            A rate per page. A comic uses its own override if it has one, otherwise its line’s rate,
-            otherwise the studio default.
+          <h2 className="font-serif font-light text-brand-umber text-[1.4rem]">What a page is worth</h2>
+          <p className="mt-1 max-w-2xl font-serif text-sm leading-relaxed text-brand-umber/70">
+            Every drawn page bills at a rate. A comic uses its own override if you set one,
+            otherwise its line’s rate, otherwise the studio default — and the status page always
+            shows which one applied.
           </p>
         </div>
         {note ? (
@@ -192,6 +193,12 @@ export function PricingPanel({
         </div>
 
         <table className="mt-4 w-full border-collapse">
+          <thead>
+            <tr className="border-b border-brand-pale-dusk">
+              <th className="pb-2 text-left font-sans text-[0.6rem] font-normal uppercase tracking-label text-brand-slate">Line</th>
+              <th className="pb-2 text-right font-sans text-[0.6rem] font-normal uppercase tracking-label text-brand-slate">Rate per page</th>
+            </tr>
+          </thead>
           <tbody>
             {lineSlugs.map((slug) => {
               const resolved = lineRate(slug, pricing)

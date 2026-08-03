@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, setDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { normalizeEmail } from '@/lib/admin'
 
@@ -83,6 +83,28 @@ export function useAllocation(email: string | null, refreshKey = 0): Async<Alloc
       figures_effective: d.figures_effective ?? [],
     }
   }, [email, refreshKey])
+}
+
+/**
+ * Every allocation doc at once — the admin overview ("who sees what").
+ * Rules-safe for the admin only: the collection read passes because isAdmin()
+ * satisfies the per-doc rule for every doc. Members never call this.
+ */
+export function useAllAllocations(refreshKey = 0): Async<Allocation[]> {
+  return useAsync<Allocation[]>(async () => {
+    const snap = await getDocs(collection(db, 'allocations'))
+    return snap.docs.map((d) => {
+      const x = d.data() as Partial<Allocation>
+      return {
+        email: d.id,
+        lines: x.lines ?? [],
+        figures: x.figures ?? [],
+        comics: x.comics ?? [],
+        programs: x.programs ?? [],
+        figures_effective: x.figures_effective ?? [],
+      }
+    })
+  }, [refreshKey])
 }
 
 // ─── Mutation ────────────────────────────────────────────────────────────────────
