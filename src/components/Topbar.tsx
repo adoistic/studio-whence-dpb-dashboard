@@ -10,6 +10,7 @@ import { useLines } from '@/lib/catalog'
 import { useUnreadIdeaCount } from '@/lib/ideas'
 
 const HOME_LINK = { label: 'Home', href: '/' }
+const STATUS_LINK = { label: 'Production status', href: '/status' }
 const METHODOLOGY_LINK = { label: 'Methodology', href: '/methodology' }
 const REVIEWS_LINK = { label: 'Reviews', href: '/reviews' }
 const IDEAS_LINK = { label: 'Ideas', href: '/ideas' }
@@ -146,6 +147,15 @@ export function Topbar() {
               label={HOME_LINK.label}
               href={HOME_LINK.href}
               active={isActive(HOME_LINK.href, pathname)}
+              onNavigate={closeMenu}
+            />
+            {/* Production status — the studio dashboard. Any authed user; the
+                catalog it reads is already allocation-scoped, so a member sees
+                a real dashboard of exactly their own allocated comics. */}
+            <MenuItem
+              label={STATUS_LINK.label}
+              href={STATUS_LINK.href}
+              active={isActive(STATUS_LINK.href, pathname)}
               onNavigate={closeMenu}
             />
             {/* Methodology — the pipeline playbook; visible to any authed user. */}

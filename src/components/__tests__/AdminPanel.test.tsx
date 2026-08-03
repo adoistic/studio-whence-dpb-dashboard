@@ -59,6 +59,24 @@ vi.mock('@/lib/catalog', () => ({
   useComics: () => ({ data: [], loading: false }),
 }))
 
+// The panel now carries a pricing section. Stub the store (it reaches Firestore
+// via firebase.ts, which needs a real API key at module load) but let the pure
+// rate arithmetic run for real, so the section renders as it does in the app.
+vi.mock('@/lib/pricing', async (orig) => ({
+  ...(await orig<typeof import('@/lib/pricing')>()),
+  usePricing: () => ({ data: null, loading: false }),
+  setDefaultRate: vi.fn(() => Promise.resolve()),
+  setLineRate: vi.fn(() => Promise.resolve()),
+  setComicRate: vi.fn(() => Promise.resolve()),
+  clearLineRate: vi.fn(() => Promise.resolve()),
+  clearComicRate: vi.fn(() => Promise.resolve()),
+  seedLineRates: vi.fn(() => Promise.resolve()),
+}))
+vi.mock('@/lib/firebase', () => ({ db: {}, auth: {} }))
+vi.mock('@/lib/visibleCatalog', () => ({
+  useVisibleComics: () => ({ data: [], loading: false }),
+}))
+
 import { AdminPanel } from '@/components/AdminPanel'
 
 beforeEach(() => {

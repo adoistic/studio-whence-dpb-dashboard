@@ -6,22 +6,47 @@
   "functions": {
     "source": "functions",
     "runtime": "nodejs22",
-    "predeploy": ["npm --prefix \"$RESOURCE_DIR\" run build"]
+    "predeploy": [
+      "npm --prefix \"$RESOURCE_DIR\" run build"
+    ]
   },
   "hosting": {
     "public": "out",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
     "cleanUrls": true,
     "trailingSlash": false,
     "rewrites": [
       {
         "source": "/api/**",
-        "function": { "functionId": "dataApi", "region": "us-central1" }
+        "function": {
+          "functionId": "dataApi",
+          "region": "us-central1"
+        }
       },
-      { "source": "/figures/*", "destination": "/figure.html" },
-      { "source": "/programs/*/*", "destination": "/program.html" },
-      { "source": "/*/*", "destination": "/comic.html" },
-      { "source": "/*", "destination": "/line.html" }
+      {
+        "source": "/status",
+        "destination": "/status.html"
+      },
+      {
+        "source": "/figures/*",
+        "destination": "/figure.html"
+      },
+      {
+        "source": "/programs/*/*",
+        "destination": "/program.html"
+      },
+      {
+        "source": "/*/*",
+        "destination": "/comic.html"
+      },
+      {
+        "source": "/*",
+        "destination": "/line.html"
+      }
     ]
   }
 }

@@ -11,6 +11,10 @@ import {
   type AccessRequest, type Member, type SuspendedEntry,
 } from '@/lib/admin'
 import { AllocationsSection } from '@/components/admin/AllocationsSection'
+import { PricingPanel } from '@/components/admin/PricingPanel'
+import { usePricing } from '@/lib/pricing'
+import { useLines } from '@/lib/catalog'
+import { useVisibleComics } from '@/lib/visibleCatalog'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -142,6 +146,12 @@ export function AdminPanel() {
       setErrMsg('Couldn’t apply change.')
     }
   }
+
+  // Pricing needs the full catalog: an admin prices every line and can override
+  // any single comic, so it reads with moderator scope rather than allocation scope.
+  const pricing = usePricing(refreshKey)
+  const { data: allLines } = useLines()
+  const { data: allComics } = useVisibleComics(true, adminEmail || null)
 
   const requests = usePendingRequests(refreshKey)
   const members = useMembers(refreshKey)
@@ -320,6 +330,15 @@ export function AdminPanel() {
 
         {/* ── 5. Allocations ─────────────────────────────────────────── */}
         <AllocationsSection adminEmail={adminEmail} />
+
+        {/* ── 6. Pricing ─────────────────────────────────────────────── */}
+        <PricingPanel
+          pricing={pricing.data}
+          lines={allLines}
+          comics={allComics ?? []}
+          email={adminEmail}
+          onSaved={bump}
+        />
       </div>
     </div>
   )

@@ -143,6 +143,20 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── Pricing (what a page is worth) ──
+    // ONE doc, `pricing/config`: the studio default, a rate per line, and
+    // per-comic overrides. Readable by any allowlisted member, because the
+    // status dashboard shows every member the value of the work they can see and
+    // a rate they cannot read would render as a blank column.
+    //
+    // Writing is admin + sub_admin (isSubAdmin), matching who may already
+    // allocate work. Rates are commercial terms, not content, so they are
+    // deliberately NOT open to ordinary members.
+    match /pricing/{d} {
+      allow read:  if isAllowlisted();
+      allow write: if isSubAdmin();
+    }
+
     // ── B2.7 catalog (read-only for allowlisted clients; written only by the
     //    publish Action's Admin SDK, which bypasses rules) ──
     match /meta/{d}      { allow read: if isAllowlisted(); allow write: if false; }
