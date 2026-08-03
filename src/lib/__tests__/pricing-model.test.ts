@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { renderHook, waitFor } from '@testing-library/react'
 
 // ── Firestore mock ────────────────────────────────────────────────────────────
 // pricing.ts imports firebase.ts, which initializes real Auth at module load and
@@ -28,6 +29,7 @@ import {
   setComicRate,
   setLineRate,
   seedLineRates,
+  usePricing,
   type PricingConfig,
 } from '@/lib/pricing'
 import { buildModel, buildTrend, tallyOf, exportRows } from '@/lib/productionModel'
@@ -266,5 +268,42 @@ describe('writes', () => {
     const body = mockSetDoc.mock.calls[0][1]
     expect(body.lines).toEqual({ biographies: 250, indic: 250 })
     expect(body.defaultRatePerPage).toBe(250)
+  })
+})
+
+describe('usePricing degradation', () => {
+  beforeEach(() => {
+    mockGetDoc.mockReset()
+  })
+
+  it('a denied read falls back to the studio default rather than an error state', async () => {
+    // Load-bearing until firestore.rules ships the pricing block: without the
+    // rule the read is denied, and the dashboard must still render every comic
+    // at the default rate instead of showing a broken page.
+    mockGetDoc.mockRejectedValue(new Error('permission-denied'))
+    const { result } = renderHook(() => usePricing())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.data?.defaultRatePerPage).toBe(250)
+    expect(result.current.data?.lines).toEqual({})
+    expect(result.current.error).toBeDefined()
+  })
+
+  it('a missing doc is not an error — it is a studio that has never set a rate', async () => {
+    mockGetDoc.mockResolvedValue({ exists: () => false, data: () => undefined })
+    const { result } = renderHook(() => usePricing())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.data?.defaultRatePerPage).toBe(250)
+    expect(result.current.error).toBeUndefined()
+  })
+
+  it('reads stored rates when the doc is present', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ defaultRatePerPage: 300, lines: { indic: 400 }, comics: {}, currency: 'INR' }),
+    })
+    const { result } = renderHook(() => usePricing())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.data?.defaultRatePerPage).toBe(300)
+    expect(result.current.data?.lines.indic).toBe(400)
   })
 })
