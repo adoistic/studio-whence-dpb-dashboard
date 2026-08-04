@@ -16,7 +16,7 @@
  */
 
 import { isComplete, normStatus, pageBreakdown, titleCaseSlug, STATUS_ORDER, type PageBreakdown } from '@/lib/statusRows'
-import { rateFor, type PricingConfig } from '@/lib/pricing'
+import { billedPagesFor, rateFor, type PricingConfig } from '@/lib/pricing'
 import type { Comic, Line, Program } from '@/types/content'
 
 export interface Tally {
@@ -37,7 +37,11 @@ export interface Tally {
   /** pagesMade / pagesTarget, 0–1. Null when nothing is targeted. */
   progress: number | null
   byStatus: Record<string, number>
+  /** Pages BILLED — contracted interior + the cover/activity allotment. */
+  pagesBilled: number
+  /** rate × pagesBilled — the invoice value, on the accounting basis. */
   contracted: number
+  /** rate × pages that exist today — production progress, not an invoice. */
   delivered: number
   /** Distinct per-page rates inside this tier — >1 means "mixed". */
   rates: number[]
@@ -55,6 +59,7 @@ export function tallyOf(key: string, label: string, comics: Comic[], pricing: Pr
   let pagesMade = 0
   let pagesTarget = 0
   let pagesExtras = 0
+  let pagesBilled = 0
   let contracted = 0
   let delivered = 0
   let complete = 0
@@ -63,13 +68,15 @@ export function tallyOf(key: string, label: string, comics: Comic[], pricing: Pr
     const status = normStatus(c.status)
     byStatus[status] = (byStatus[status] ?? 0) + 1
     const pages = pageBreakdown(c)
+    const billed = billedPagesFor(c, pricing)
     const target = c.target_length_pages ?? 0
     pagesMade += pages.interior
     pagesTarget += target
     pagesExtras += pages.extras
+    pagesBilled += billed.total
     const { rate } = rateFor(c, pricing)
     rates.add(rate)
-    contracted += rate * target
+    contracted += rate * billed.total
     delivered += rate * pages.billable
     if (isComplete(c)) complete += 1
   }
@@ -85,6 +92,7 @@ export function tallyOf(key: string, label: string, comics: Comic[], pricing: Pr
     pagesBillable: pagesMade + pagesExtras,
     progress: pagesTarget > 0 ? pagesMade / pagesTarget : null,
     byStatus,
+    pagesBilled,
     contracted,
     delivered,
     rates: Array.from(rates).sort((a, b) => a - b),
@@ -108,7 +116,11 @@ export interface ComicRowModel {
   rate: number
   rateSource: 'comic' | 'line' | 'default'
   overridden: boolean
+  /** Pages BILLED — contracted interior + the cover/activity allotment. */
+  pagesBilled: number
+  /** rate × pagesBilled — the invoice value, on the accounting basis. */
   contracted: number
+  /** rate × pages that exist today — production progress, not an invoice. */
   delivered: number
   updated: string
   href: string
@@ -117,6 +129,7 @@ export interface ComicRowModel {
 export function comicModel(c: Comic, pricing: PricingConfig | null): ComicRowModel {
   const { rate, source, overridden } = rateFor(c, pricing)
   const pages = pageBreakdown(c)
+  const billed = billedPagesFor(c, pricing)
   const target = c.target_length_pages ?? 0
   return {
     comic: c,
@@ -134,7 +147,8 @@ export function comicModel(c: Comic, pricing: PricingConfig | null): ComicRowMod
     rate,
     rateSource: source,
     overridden,
-    contracted: rate * target,
+    pagesBilled: billed.total,
+    contracted: rate * billed.total,
     delivered: rate * pages.billable,
     updated: c.updated ?? c.created ?? '',
     href: `/${c.line}/${c.slug}`,
@@ -305,6 +319,7 @@ export function exportRows(model: ProductionModel, currency = 'INR'): Record<str
     'Back cover': c.breakdown.backCover,
     'Activity pages': c.breakdown.activities,
     'Billable pages': c.breakdown.billable,
+    'Billed pages': c.pagesBilled,
     Complete: c.complete ? 'Yes' : 'No',
     [`Rate per page (${currency})`]: c.rate,
     'Rate source': c.rateSource,

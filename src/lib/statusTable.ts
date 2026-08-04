@@ -3,8 +3,13 @@
  * (2026-08-04), in spreadsheet order:
  *
  *   Classification · Sub-classification · Comic · Interior · Covers · IFC/IBC
- *   · Activities · Total pages · Rate · Total value · Script · Dossier
- *   · Illustration · Marketing
+ *   · Activities · Total pages · Rate · Total value · GST · Total with GST
+ *   · TDS · Net of TDS · Script · Dossier · Illustration · Marketing
+ *
+ * The money columns follow the accounting team's chain (2026-08-04): pages are
+ * billed on the CONTRACTED basis, not on what has been drawn — see
+ * statusRows.billedPages — then value → GST 18% → TDS 2% (taken on the value
+ * net of GST) → net of TDS. The arithmetic lives in pricing.billingFor.
  *
  * Each deliverable is its OWN column carrying its OWN approval, because a book
  * is signed off stage by stage rather than all at once. IFC/IBC and activity
@@ -20,8 +25,8 @@
  */
 
 import { STAGES, stageReady, type ComicApprovals, type Stage, type StageApproval } from '@/lib/approvals'
-import { rateFor, type PricingConfig } from '@/lib/pricing'
-import { hasResearch, pageBreakdown, titleCaseSlug, type PageBreakdown } from '@/lib/statusRows'
+import { billingFor, sumTaxes, type PricingConfig, type TaxBreakdown } from '@/lib/pricing'
+import { hasResearch, pageBreakdown, titleCaseSlug, type BilledPages, type PageBreakdown } from '@/lib/statusRows'
 import type { Comic, Figure, Line, Program } from '@/types/content'
 
 /** What one stage cell needs to render itself. */
@@ -34,20 +39,23 @@ export interface StageCell {
   approval: StageApproval | null
 }
 
-export interface StatusTableRow {
+export interface StatusTableRow extends TaxBreakdown {
   key: string
   classification: string
   subClassification: string
   title: string
   href: string
+  /** Interior pages actually drawn — production progress, not the billing basis. */
   interior: number
   target: number
+  /** What exists today, per component. */
   breakdown: PageBreakdown
-  /** Interior + cover + back cover + IFC + IBC + activity pages. */
+  /** What bills: contracted interior + the cover/activity allotment. */
+  billed: BilledPages
+  /** billed.total — the page count the invoice multiplies by the rate. */
   totalPages: number
   rate: number
   rateSource: 'comic' | 'line' | 'default'
-  totalValue: number
   scriptDate: string
   /** Every stage, keyed — the table renders one column per stage. */
   stages: Record<Stage, StageCell>
@@ -118,7 +126,7 @@ export function buildStatusTable(
 
   const rows = comics.map((c): StatusTableRow => {
     const b = pageBreakdown(c)
-    const { rate, source } = rateFor(c, pricing)
+    const billing = billingFor(c, pricing)
     const key = `${c.line}__${c.slug}`
     const figure = figureBySlug.get(c.subject_slug ?? '')
     const approved = approvals?.[key] ?? {}
@@ -146,10 +154,15 @@ export function buildStatusTable(
       interior: b.interior,
       target: c.target_length_pages ?? 0,
       breakdown: b,
-      totalPages: b.billable,
-      rate,
-      rateSource: source,
-      totalValue: rate * b.billable,
+      billed: billing.pages,
+      totalPages: billing.pages.total,
+      rate: billing.rate,
+      rateSource: billing.rateSource,
+      totalValue: billing.totalValue,
+      gst: billing.gst,
+      totalWithGst: billing.totalWithGst,
+      tds: billing.tds,
+      netOfTds: billing.netOfTds,
       scriptDate: (c.created ?? '').slice(0, 10),
       stages,
       approvedCount,
@@ -167,23 +180,31 @@ export function buildStatusTable(
   )
 }
 
-export interface StatusTableTotals {
+export interface StatusTableTotals extends TaxBreakdown {
   comics: number
+  /** Delivered actuals — what exists today. */
   interior: number
   target: number
   covers: number
   insideCovers: number
   activities: number
+  /** Billed basis — contracted interior pages. */
+  billedInterior: number
+  /** Billed basis — cover + activity pages. */
+  billedExtras: number
   totalPages: number
-  totalValue: number
   approvedStages: number
   readyStages: number
 }
 
 export function statusTableTotals(rows: StatusTableRow[]): StatusTableTotals {
+  // Money totals are summed per line, each line already rounded — the way an
+  // invoice adds up, so the footer matches the rows a reader can see.
+  const money = sumTaxes(rows)
   const t: StatusTableTotals = {
     comics: rows.length, interior: 0, target: 0, covers: 0, insideCovers: 0,
-    activities: 0, totalPages: 0, totalValue: 0, approvedStages: 0, readyStages: 0,
+    activities: 0, billedInterior: 0, billedExtras: 0, totalPages: 0,
+    approvedStages: 0, readyStages: 0, ...money,
   }
   for (const r of rows) {
     t.interior += r.interior
@@ -191,8 +212,9 @@ export function statusTableTotals(rows: StatusTableRow[]): StatusTableTotals {
     t.covers += r.breakdown.cover + r.breakdown.backCover
     t.insideCovers += r.breakdown.insideFront + r.breakdown.insideBack
     t.activities += r.breakdown.activities
+    t.billedInterior += r.billed.interior
+    t.billedExtras += r.billed.extras
     t.totalPages += r.totalPages
-    t.totalValue += r.totalValue
     t.approvedStages += r.approvedCount
     t.readyStages += r.readyCount
   }
@@ -216,9 +238,16 @@ export function statusTableCsvRows(rows: StatusTableRow[], currency = 'INR'): Re
     IFC: r.breakdown.insideFront,
     IBC: r.breakdown.insideBack,
     'Activity pages': r.breakdown.activities,
+    // The billed basis, spelled out so the invoice arithmetic is checkable.
+    'Interior pages billed': r.billed.interior,
+    'Cover & activity pages billed': r.billed.extras,
     'Total pages': r.totalPages,
     [`Rate per page (${currency})`]: r.rate,
     [`Total value (${currency})`]: r.totalValue,
+    [`GST 18% (${currency})`]: r.gst,
+    [`Total value with GST (${currency})`]: r.totalWithGst,
+    [`TDS 2% (${currency})`]: r.tds,
+    [`Net of TDS (${currency})`]: r.netOfTds,
     'Script date': r.scriptDate,
     'Script approval': cell(r, 'script'),
     Dossier: r.stages.dossier.detail,

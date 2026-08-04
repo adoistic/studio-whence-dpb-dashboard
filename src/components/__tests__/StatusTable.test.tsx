@@ -80,6 +80,7 @@ describe('StatusTable', () => {
     setup()
     for (const col of [
       'Classification', 'Sub-classification', 'Comic', 'Total pages', 'Rate', 'Total value',
+      'GST 18%', 'Total value with GST', 'TDS 2%', 'Net of TDS',
       'Script', 'Dossier', 'Illustration', 'Covers', 'IFC / IBC', 'Activity pages', 'Marketing',
     ]) {
       expect(screen.getByText(col)).toBeInTheDocument()

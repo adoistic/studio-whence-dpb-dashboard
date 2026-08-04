@@ -25,6 +25,10 @@ import {
   lineRate,
   rateFor,
   valueOf,
+  billedPagesFor,
+  billingFor,
+  taxesOn,
+  sumTaxes,
   clearComicRate,
   setComicRate,
   setLineRate,
@@ -167,7 +171,8 @@ describe('value', () => {
   it('separates delivered from contracted', () => {
     const v = valueOf(comic(), CFG)
     expect(v.delivered).toBe(24 * 250)
-    expect(v.contracted).toBe(48 * 250)
+    // Contracted bills the script's 48 interior pages plus the standard 8.
+    expect(v.contracted).toBe(56 * 250)
   })
 
   it('delivered includes covers and activity pages', () => {
@@ -176,14 +181,109 @@ describe('value', () => {
       activities: { pages: [{ key: 'a1' }, { key: 'a2' }] },
     } as Partial<Comic>), CFG)
     expect(v.delivered).toBe((24 + 3) * 250)
-    // contracted stays the script commitment
-    expect(v.contracted).toBe(48 * 250)
+    // Three extras produced is below the standard 8, so the standard still bills.
+    expect(v.contracted).toBe(56 * 250)
   })
 
-  it('a book with no art delivers nothing but is still contracted', () => {
+  it('a book with no art delivers nothing but is still contracted in full', () => {
     const v = valueOf(comic({ pages: undefined }), CFG)
     expect(v.delivered).toBe(0)
-    expect(v.contracted).toBe(12_000)
+    expect(v.contracted).toBe(56 * 250)
+  })
+})
+
+// The accounting team's rule, 2026-08-04. These are the numbers on the invoice.
+describe('billed pages — the accounting basis', () => {
+  it('bills the CONTRACTED interior, not what has been drawn: 0/48 bills 48', () => {
+    const p = billedPagesFor(comic({ pages: undefined, target_length_pages: 48 }), CFG)
+    expect(p.interior).toBe(48)
+    expect(p.interiorSource).toBe('target')
+  })
+
+  it('converts nothing into eight cover and activity pages, so 0/48 totals 56', () => {
+    const p = billedPagesFor(comic({ pages: undefined, target_length_pages: 48 }), CFG)
+    expect(p.extras).toBe(8)
+    expect(p.actualExtras).toBe(0)
+    expect(p.extrasSource).toBe('standard')
+    expect(p.total).toBe(56)
+  })
+
+  it('bills actuals when a book has produced more than the standard eight', () => {
+    const p = billedPagesFor(
+      comic({
+        backCover: { image: { key: 'bc' } },
+        coverOptions: { options: [{ key: 'a' }] },
+        insideCovers: { images: [{ key: 'inside-front-cover.png' }, { key: 'inside-back-cover.png' }] },
+        activities: { pages: Array.from({ length: 9 }, (_, i) => ({ key: `a${i}` })) },
+      } as Partial<Comic>),
+      CFG,
+    )
+    expect(p.actualExtras).toBe(13)
+    expect(p.extras).toBe(13)
+    expect(p.extrasSource).toBe('actual')
+  })
+
+  it('an explicit per-comic figure beats both — "unless it is said otherwise"', () => {
+    const cfg = { ...CFG, extraPages: { 'biographies__a-book': 4 } }
+    const p = billedPagesFor(comic({ pages: undefined }), cfg)
+    expect(p.extras).toBe(4)
+    expect(p.extrasSource).toBe('override')
+    expect(p.total).toBe(52)
+  })
+
+  it('falls back to actuals when no target is recorded — never bills zero interior', () => {
+    const p = billedPagesFor(comic({ target_length_pages: 0 }), CFG)
+    expect(p.interior).toBe(24)
+    expect(p.interiorSource).toBe('actual')
+  })
+
+  it('the studio can move the standard allotment centrally', () => {
+    const p = billedPagesFor(comic({ pages: undefined }), { ...CFG, standardExtraPages: 6 })
+    expect(p.extras).toBe(6)
+    expect(p.total).toBe(54)
+  })
+})
+
+describe('GST and TDS', () => {
+  it('runs the worked example: 56 pages at 250 → 14,000 · 2,520 · 16,520 · 280 · 16,240', () => {
+    const t = taxesOn(56 * 250)
+    expect(t.totalValue).toBe(14_000)
+    expect(t.gst).toBe(2_520)
+    expect(t.totalWithGst).toBe(16_520)
+    expect(t.tds).toBe(280)
+    expect(t.netOfTds).toBe(16_240)
+  })
+
+  it('takes TDS on the value NET of GST, not on the GST-inclusive total', () => {
+    const t = taxesOn(10_000)
+    expect(t.tds).toBe(200)
+    // 2% of the GST-inclusive 11,800 would be 236 — the wrong number.
+    expect(t.tds).not.toBe(236)
+    expect(t.netOfTds).toBe(11_600)
+  })
+
+  it('billingFor chains pages → value → GST → TDS for one comic', () => {
+    const b = billingFor(comic({ pages: undefined }), CFG)
+    expect(b.pages.total).toBe(56)
+    expect(b.rate).toBe(250)
+    expect(b.totalValue).toBe(14_000)
+    expect(b.gst).toBe(2_520)
+    expect(b.netOfTds).toBe(16_240)
+  })
+
+  it('rounds to paise so a fractional rate cannot leak a long float', () => {
+    const t = taxesOn(1_111)
+    expect(t.gst).toBe(199.98)
+    expect(t.tds).toBe(22.22)
+    expect(t.netOfTds).toBe(1_288.76)
+  })
+
+  it('sums line by line, the way an invoice adds up', () => {
+    const t = sumTaxes([taxesOn(14_000), taxesOn(10_000)])
+    expect(t.totalValue).toBe(24_000)
+    expect(t.gst).toBe(4_320)
+    expect(t.tds).toBe(480)
+    expect(t.netOfTds).toBe(27_840)
   })
 })
 

@@ -102,7 +102,7 @@ describe('buildStatusTable', () => {
     ])
   })
 
-  it('total pages counts IFC and IBC separately', () => {
+  it('total pages counts IFC and IBC separately, on the contracted interior', () => {
     const rows = buildStatusTable(
       [comic({
         coverOptions: { options: [{ key: 'a' }, { key: 'b' }, { key: 'c' }] },
@@ -112,8 +112,45 @@ describe('buildStatusTable', () => {
       } as Partial<Comic>)],
       null, LINES, PROGRAMS, PRICING, {},
     )
-    expect(rows[0].totalPages).toBe(24 + 8)
-    expect(rows[0].totalValue).toBe(32 * 250)
+    // Three cover options collapse to one page: 1 + 1 back + IFC + IBC + 4 = 8.
+    expect(rows[0].breakdown.extras).toBe(8)
+    // 48 contracted interior + those 8 — not the 24 pages drawn so far.
+    expect(rows[0].totalPages).toBe(56)
+    expect(rows[0].totalValue).toBe(56 * 250)
+  })
+
+  // The accounting rule, 2026-08-04.
+  it('bills a book showing 0 / 48 with nothing else at 48 + 8 = 56 pages', () => {
+    const rows = buildStatusTable(
+      [comic({ pages: undefined, target_length_pages: 48 })],
+      null, LINES, PROGRAMS, PRICING, {},
+    )
+    const r = rows[0]
+    expect(r.stages.illustration.detail).toBe('0 / 48')
+    expect(r.billed.interior).toBe(48)
+    expect(r.billed.extras).toBe(8)
+    expect(r.totalPages).toBe(56)
+    expect(r.totalValue).toBe(14_000)
+  })
+
+  it('carries GST, TDS and the net through to the row', () => {
+    const rows = buildStatusTable(
+      [comic({ pages: undefined, target_length_pages: 48 })],
+      null, LINES, PROGRAMS, PRICING, {},
+    )
+    const r = rows[0]
+    expect(r.gst).toBe(2_520)
+    expect(r.totalWithGst).toBe(16_520)
+    expect(r.tds).toBe(280)
+    expect(r.netOfTds).toBe(16_240)
+  })
+
+  it('the delivered breakdown stays honest even though billing ignores it', () => {
+    const rows = buildStatusTable([comic({ pages: undefined })], null, LINES, PROGRAMS, PRICING, {})
+    expect(rows[0].interior).toBe(0)
+    expect(rows[0].breakdown.extras).toBe(0)
+    expect(rows[0].billed.actualExtras).toBe(0)
+    expect(rows[0].billed.extrasSource).toBe('standard')
   })
 
   it('the IFC/IBC cell says WHICH one exists — the reason they were split', () => {
@@ -203,9 +240,22 @@ describe('totals + CSV', () => {
     expect(t.covers).toBe(1)
     expect(t.insideCovers).toBe(1)
     expect(t.activities).toBe(0)
-    expect(t.totalPages).toBe(50)
-    expect(t.totalValue).toBe(50 * 250)
+    // Billed: two books at 48 contracted interior + the standard 8 each.
+    expect(t.billedInterior).toBe(96)
+    expect(t.billedExtras).toBe(16)
+    expect(t.totalPages).toBe(112)
+    expect(t.totalValue).toBe(112 * 250)
     expect(t.approvedStages).toBe(1)
+  })
+
+  it('totals the tax columns line by line', () => {
+    const rows = buildStatusTable(comics, FIGURES, LINES, null, PRICING, {})
+    const t = statusTableTotals(rows)
+    expect(t.totalValue).toBe(28_000)
+    expect(t.gst).toBe(5_040)
+    expect(t.totalWithGst).toBe(33_040)
+    expect(t.tds).toBe(560)
+    expect(t.netOfTds).toBe(32_480)
   })
 
   it('the CSV carries IFC and IBC as separate columns and one approval per stage', () => {
@@ -220,5 +270,19 @@ describe('totals + CSV', () => {
     expect(csv[1]['IFC']).toBe(1)
     expect(csv[1]['IBC']).toBe(0)
     expect(csv[1]['Covers approval']).toBe('Awaiting approval')
+  })
+
+  it('the CSV shows the billed basis and the full tax chain', () => {
+    const csv = statusTableCsvRows(buildStatusTable(comics, FIGURES, LINES, null, PRICING, {}))
+    expect(csv[0]['Interior pages billed']).toBe(48)
+    expect(csv[0]['Cover & activity pages billed']).toBe(8)
+    expect(csv[0]['Total pages']).toBe(56)
+    expect(csv[0]['Total value (INR)']).toBe(14_000)
+    expect(csv[0]['GST 18% (INR)']).toBe(2_520)
+    expect(csv[0]['Total value with GST (INR)']).toBe(16_520)
+    expect(csv[0]['TDS 2% (INR)']).toBe(280)
+    expect(csv[0]['Net of TDS (INR)']).toBe(16_240)
+    // The delivered actuals stay alongside, so progress is still readable.
+    expect(csv[0]['Interior pages']).toBe(24)
   })
 })

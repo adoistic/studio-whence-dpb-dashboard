@@ -22,11 +22,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { pageBreakdown } from '@/lib/statusRows'
+import { billedPages, pageBreakdown, STANDARD_EXTRA_PAGES, type BilledPages } from '@/lib/statusRows'
 import type { Comic } from '@/types/content'
 
 /** Studio default until someone sets otherwise. */
 export const DEFAULT_RATE_PER_PAGE = 250
+
+/** GST charged on the invoice value. */
+export const GST_RATE = 0.18
+
+/** TDS the party deducts at payment — on the value NET of GST. */
+export const TDS_RATE = 0.02
 
 export const PRICING_DOC = 'config'
 export const PRICING_COLLECTION = 'pricing'
@@ -38,6 +44,10 @@ export interface PricingConfig {
   lines: Record<string, number>
   /** `${line}__${slug}` → rate per page (beats the line rate) */
   comics: Record<string, number>
+  /** Standard cover + activity page allotment. 8 unless the studio says otherwise. */
+  standardExtraPages?: number
+  /** `${line}__${slug}` → an explicit cover + activity page count for one book. */
+  extraPages?: Record<string, number>
   updatedAt?: string
   updatedBy?: string
 }
@@ -91,25 +101,113 @@ export function lineRate(line: string, cfg: PricingConfig | null): ResolvedRate 
 export interface ComicValue {
   rate: number
   source: RateSource
-  /** rate × target interior pages — what the script commits to. */
+  /** rate × billed pages — the invoice value (statusRows.billedPages). */
   contracted: number
-  /** rate × billable pages drawn (interior + cover + IFC/IBC + back + activities). */
+  /** rate × pages that actually exist — production progress, not an invoice. */
   delivered: number
 }
 
 /**
  * Two numbers per comic, never one.
  *
- * `delivered` counts every billable page that exists — interior art plus the
- * cover (options collapse to one), inside covers, back cover and activity
- * pages, per statusRows.pageBreakdown. `contracted` counts the interior pages
- * the script commits to. Reporting a single "value" would have to pick one and
- * would read as the other to half the people looking at it.
+ * `contracted` is what the book bills: the contracted interior plus the
+ * cover/activity allotment, per the accounting rule in statusRows.billedPages.
+ * `delivered` counts only pages that exist today — interior art plus the cover
+ * (options collapse to one), inside covers, back cover and activity pages, per
+ * statusRows.pageBreakdown. Reporting a single "value" would have to pick one
+ * and would read as the other to half the people looking at it.
  */
 export function valueOf(comic: Comic, cfg: PricingConfig | null): ComicValue {
   const { rate, source } = rateFor(comic, cfg)
-  const target = comic.target_length_pages ?? 0
-  return { rate, source, contracted: rate * target, delivered: rate * pageBreakdown(comic).billable }
+  return {
+    rate,
+    source,
+    contracted: rate * billedPagesFor(comic, cfg).total,
+    delivered: rate * pageBreakdown(comic).billable,
+  }
+}
+
+// ── Billing: pages → value → GST → TDS ────────────────────────────────────────
+//
+// The invoice chain the accounting team set out (2026-08-04):
+//
+//   total pages   = contracted interior + cover/activity pages (statusRows.billedPages)
+//   total value   = total pages × rate
+//   GST 18%       = total value × 0.18
+//   with GST      = total value + GST
+//   TDS 2%        = total value × 0.02      ← on the value NET of GST
+//   net of TDS    = total value + GST − TDS
+//
+// Worked example: a book at 0/48 with nothing else recorded, at ₹250/page —
+// (48 + 8) × 250 = ₹14,000 · GST ₹2,520 · with GST ₹16,520 · TDS ₹280 ·
+// net of TDS ₹16,240.
+
+/** Money to paise. Rates of 18% and 2% on whole rupees never need more. */
+const round2 = (n: number) => Math.round(n * 100) / 100
+
+/** The cover/activity rule for one comic: the studio standard, and any explicit figure. */
+export function extraPagesRuleFor(
+  comic: Pick<Comic, 'line' | 'slug'>,
+  cfg: PricingConfig | null,
+): { standard: number; override?: number } {
+  const p = cfg ?? EMPTY_PRICING
+  const standard = Number.isFinite(p.standardExtraPages)
+    ? (p.standardExtraPages as number)
+    : STANDARD_EXTRA_PAGES
+  const override = p.extraPages?.[comicKey(comic.line, comic.slug)]
+  return Number.isFinite(override) ? { standard, override: override as number } : { standard }
+}
+
+/** The pages one comic bills for, with the studio's cover/activity rule applied. */
+export function billedPagesFor(comic: Comic, cfg: PricingConfig | null): BilledPages {
+  return billedPages(comic, extraPagesRuleFor(comic, cfg))
+}
+
+export interface TaxBreakdown {
+  /** Pages × rate, before tax. This is the base BOTH GST and TDS are taken on. */
+  totalValue: number
+  gst: number
+  totalWithGst: number
+  /** Deducted by the party at payment, on the value net of GST. */
+  tds: number
+  /** total value + GST − TDS — what actually lands in the bank. */
+  netOfTds: number
+}
+
+export function taxesOn(totalValue: number, gstRate = GST_RATE, tdsRate = TDS_RATE): TaxBreakdown {
+  const base = round2(totalValue)
+  const gst = round2(base * gstRate)
+  const tds = round2(base * tdsRate)
+  return { totalValue: base, gst, totalWithGst: round2(base + gst), tds, netOfTds: round2(base + gst - tds) }
+}
+
+/** Sum a set of line items — each already rounded, as an invoice line would be. */
+export function sumTaxes(items: TaxBreakdown[]): TaxBreakdown {
+  const t: TaxBreakdown = { totalValue: 0, gst: 0, totalWithGst: 0, tds: 0, netOfTds: 0 }
+  for (const i of items) {
+    t.totalValue += i.totalValue
+    t.gst += i.gst
+    t.totalWithGst += i.totalWithGst
+    t.tds += i.tds
+    t.netOfTds += i.netOfTds
+  }
+  return {
+    totalValue: round2(t.totalValue), gst: round2(t.gst), totalWithGst: round2(t.totalWithGst),
+    tds: round2(t.tds), netOfTds: round2(t.netOfTds),
+  }
+}
+
+export interface ComicBilling extends TaxBreakdown {
+  rate: number
+  rateSource: RateSource
+  pages: BilledPages
+}
+
+/** Everything one invoice line needs: pages billed, rate, value, GST, TDS, net. */
+export function billingFor(comic: Comic, cfg: PricingConfig | null): ComicBilling {
+  const { rate, source } = rateFor(comic, cfg)
+  const pages = billedPagesFor(comic, cfg)
+  return { rate, rateSource: source, pages, ...taxesOn(rate * pages.total) }
 }
 
 const FMT = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 })

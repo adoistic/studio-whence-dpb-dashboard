@@ -83,7 +83,7 @@ function Headline({ t, currency }: { t: Tally; currency: string }) {
       <Tile
         label="Contracted value"
         value={formatMoneyShort(t.contracted, currency)}
-        sub={`${n(t.pagesTarget)} script pages × their rate`}
+        sub={`${n(t.pagesBilled)} billed pages × their rate`}
       />
     </dl>
   )

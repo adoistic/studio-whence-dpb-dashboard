@@ -276,7 +276,7 @@ export function StatusTable({
       </div>
 
       <div className="mt-5 overflow-x-auto rounded-xl border border-brand-pale-dusk bg-white">
-        <table className="w-full min-w-[1640px] border-collapse">
+        <table className="w-full min-w-[2140px] border-collapse">
           <thead>
             <tr>
               <th className={TH}>Classification</th>
@@ -285,6 +285,10 @@ export function StatusTable({
               <th className={`${TH} text-right`}>Total pages</th>
               <th className={`${TH} text-right`}>Rate</th>
               <th className={`${TH} text-right`}>Total value</th>
+              <th className={`${TH} text-right`}>GST 18%</th>
+              <th className={`${TH} text-right`}>Total value with GST</th>
+              <th className={`${TH} text-right`}>TDS 2%</th>
+              <th className={`${TH} text-right`}>Net of TDS</th>
               {STAGE_COLUMNS.map((s) => (
                 <th key={s} className={TH}>{STAGE_LABEL[s]}</th>
               ))}
@@ -295,7 +299,17 @@ export function StatusTable({
               const groupStart = r.classification !== prevClassification
               prevClassification = r.classification
               const b = r.breakdown
-              const totalTitle = `${b.interior} interior · cover ${b.cover} · back cover ${b.backCover} · IFC ${b.insideFront} · IBC ${b.insideBack} · activity pages ${b.activities}`
+              const extrasNote =
+                r.billed.extrasSource === 'override'
+                  ? 'set for this book'
+                  : r.billed.extrasSource === 'standard'
+                    ? `standard allotment; ${b.extras} produced so far`
+                    : 'on actuals'
+              const totalTitle =
+                `Billed: ${r.billed.interior} interior ` +
+                `(${r.billed.interiorSource === 'target' ? 'contracted' : 'no target recorded — on actuals'})` +
+                ` + ${r.billed.extras} cover & activity pages (${extrasNote}).\n` +
+                `Produced so far: ${b.interior} interior · cover ${b.cover} · back cover ${b.backCover} · IFC ${b.insideFront} · IBC ${b.insideBack} · activity pages ${b.activities}`
               return (
                 <tr
                   key={r.key}
@@ -327,6 +341,18 @@ export function StatusTable({
                   </td>
                   <td className={`${TD} text-right font-semibold tabular-nums`}>
                     {formatMoney(r.totalValue, currency)}
+                  </td>
+                  <td className={`${TD} text-right tabular-nums text-brand-slate`}>
+                    {formatMoney(r.gst, currency)}
+                  </td>
+                  <td className={`${TD} text-right tabular-nums`}>
+                    {formatMoney(r.totalWithGst, currency)}
+                  </td>
+                  <td className={`${TD} text-right tabular-nums text-brand-slate`}>
+                    −{formatMoney(r.tds, currency)}
+                  </td>
+                  <td className={`${TD} text-right font-semibold tabular-nums`}>
+                    {formatMoney(r.netOfTds, currency)}
                   </td>
                   {STAGE_COLUMNS.map((s) => {
                     const busyId = `${r.key}::${s}`
@@ -365,13 +391,26 @@ export function StatusTable({
                 Total · {n(totals.comics)} comics
               </td>
               <td className={`${TD} text-right font-semibold tabular-nums`} title={
-                `${n(totals.interior)} interior · ${n(totals.covers)} covers · ${n(totals.insideCovers)} IFC/IBC · ${n(totals.activities)} activity pages`
+                `Billed: ${n(totals.billedInterior)} interior + ${n(totals.billedExtras)} cover & activity pages.\n` +
+                `Produced so far: ${n(totals.interior)} interior · ${n(totals.covers)} covers · ${n(totals.insideCovers)} IFC/IBC · ${n(totals.activities)} activity pages`
               }>
                 {n(totals.totalPages)}
               </td>
               <td className={TD} />
               <td className={`${TD} text-right font-semibold tabular-nums`}>
                 {formatMoney(totals.totalValue, currency)}
+              </td>
+              <td className={`${TD} text-right font-semibold tabular-nums`}>
+                {formatMoney(totals.gst, currency)}
+              </td>
+              <td className={`${TD} text-right font-semibold tabular-nums`}>
+                {formatMoney(totals.totalWithGst, currency)}
+              </td>
+              <td className={`${TD} text-right font-semibold tabular-nums`}>
+                −{formatMoney(totals.tds, currency)}
+              </td>
+              <td className={`${TD} text-right font-semibold tabular-nums`}>
+                {formatMoney(totals.netOfTds, currency)}
               </td>
               <td className={`${TD} font-semibold`} colSpan={STAGE_COLUMNS.length}>
                 {n(totals.approvedStages)} of {n(totals.readyStages)} delivered stages approved
@@ -388,12 +427,25 @@ export function StatusTable({
       ) : null}
 
       <p className="mt-6 max-w-3xl font-sans text-[0.72rem] leading-relaxed text-brand-slate">
-        Counting: the three cover options count as <strong className="font-semibold text-brand-indigo">one</strong> cover
-        page; the back cover is one; the inside front cover and inside back cover are{' '}
-        <strong className="font-semibold text-brand-indigo">separate pages, one each</strong>; activity pages count on
-        actuals. Total value = total pages × the rate (per-comic override → line rate → studio default).
-        A stage with nothing delivered has no Approve button — you cannot sign off an empty cell.
-        The approval ledger was reset on 2026-08-04; every approval is explicit, attributed and dated.
+        <strong className="font-semibold text-brand-indigo">Counting.</strong> Interior pages bill at the{' '}
+        <strong className="font-semibold text-brand-indigo">contracted</strong> count, not at what has been drawn — a
+        book reading 0 / 48 bills 48. Cover and activity pages are a standard{' '}
+        <strong className="font-semibold text-brand-indigo">eight</strong> (front cover, back cover, IFC, IBC and four
+        activity pages) unless a book has produced more or has a figure set for it. So 0 / 48 with nothing else
+        recorded bills 48 + 8 = 56 pages. The three cover options count as one cover page; the IFC and IBC are
+        separate pages, one each. Hover a page count to see the split.
+      </p>
+      <p className="mt-3 max-w-3xl font-sans text-[0.72rem] leading-relaxed text-brand-slate">
+        <strong className="font-semibold text-brand-indigo">Money.</strong> Total value = total pages × the rate
+        (per-comic override → line rate → studio default). GST is 18% of the total value; total value with GST adds
+        the two. TDS is 2%, taken on the total value{' '}
+        <strong className="font-semibold text-brand-indigo">net of GST</strong>, and is deducted by the party at
+        payment. Net of TDS = total value + GST − TDS.
+      </p>
+      <p className="mt-3 max-w-3xl font-sans text-[0.72rem] leading-relaxed text-brand-slate">
+        <strong className="font-semibold text-brand-indigo">Approvals.</strong> A stage with nothing delivered has no
+        Approve button — you cannot sign off an empty cell. The approval ledger was reset on 2026-08-04; every
+        approval is explicit, attributed and dated.
       </p>
     </main>
   )

@@ -165,6 +165,84 @@ export function pageBreakdown(c: Comic): PageBreakdown {
   }
 }
 
+// ── Billed pages: the ACCOUNTING basis ────────────────────────────────────────
+//
+// What a book invoices for is not what has been drawn so far. The rule is the
+// accounting team's (2026-08-04):
+//
+//   · Interior — bill the page count the book is contracted at, i.e. the script
+//     TARGET. A book reading "0 / 48" bills 48, not 0. How much of it has been
+//     drawn is production progress (pageBreakdown above) and never moves the
+//     invoice.
+//   · Cover and activities — a standard EIGHT pages unless stated otherwise:
+//     front cover, back cover, IFC, IBC and four activity pages. A book with
+//     none of them recorded still bills those 8 ("nothing converts into eight").
+//     A book that has actually produced more than the standard bills the
+//     actuals, and an explicit per-comic figure overrides both.
+//
+// So 0/48 with nothing else recorded bills 48 + 8 = 56 pages.
+//
+// This is the single place the billing rule lives. pageBreakdown stays the
+// truth about what exists; the two must not be conflated.
+
+/** Cover + back cover + IFC + IBC + four activity pages. */
+export const STANDARD_EXTRA_PAGES = 8
+
+export interface BilledPages {
+  /** Interior pages billed — the contracted target. */
+  interior: number
+  /** Where that came from: the script target, or actuals when no target is recorded. */
+  interiorSource: 'target' | 'actual'
+  /** Cover + inside covers + back cover + activity pages, as billed. */
+  extras: number
+  /** How many of those actually exist today. */
+  actualExtras: number
+  /** Why the billed extras are what they are. */
+  extrasSource: 'standard' | 'actual' | 'override'
+  /** interior + extras — the page count the invoice multiplies by the rate. */
+  total: number
+}
+
+export interface ExtraPagesRule {
+  /** The standard allotment when fewer extras exist. Defaults to 8. */
+  standard?: number
+  /** An explicit figure for this comic — "unless it is said otherwise". */
+  override?: number
+}
+
+export function billedPages(c: Comic, rule: ExtraPagesRule = {}): BilledPages {
+  const b = pageBreakdown(c)
+  const target = c.target_length_pages ?? 0
+  // No target recorded is not a licence to bill nothing: fall back to actuals.
+  const interior = target > 0 ? target : b.interior
+
+  const standard = Number.isFinite(rule.standard)
+    ? Math.max(0, rule.standard as number)
+    : STANDARD_EXTRA_PAGES
+
+  let extras: number
+  let extrasSource: BilledPages['extrasSource']
+  if (Number.isFinite(rule.override)) {
+    extras = Math.max(0, rule.override as number)
+    extrasSource = 'override'
+  } else if (b.extras > standard) {
+    extras = b.extras
+    extrasSource = 'actual'
+  } else {
+    extras = standard
+    extrasSource = 'standard'
+  }
+
+  return {
+    interior,
+    interiorSource: target > 0 ? 'target' : 'actual',
+    extras,
+    actualExtras: b.extras,
+    extrasSource,
+    total: interior + extras,
+  }
+}
+
 /**
  * Whether a comic's interior is fully drawn — the ONE rule, used by the Comics,
  * Subjects, Programs and Lines sheets so no two of them can disagree.
