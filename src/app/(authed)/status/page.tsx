@@ -82,6 +82,7 @@ export default function StatusPage() {
       email={email}
       canModerate={canMod}
       canAdmin={canMod}
+      viewer={status === 'viewer'}
       viewSwitcher={switcher}
     />
   ) : view === 'invoices' ? (
@@ -93,6 +94,7 @@ export default function StatusPage() {
       pricing={pricing}
       email={email}
       canModerate={canMod}
+      viewer={status === 'viewer'}
       viewSwitcher={switcher}
     />
   ) : view === 'accounts' ? (

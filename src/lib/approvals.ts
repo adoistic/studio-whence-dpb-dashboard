@@ -115,9 +115,12 @@ export function stageReady(stage: Stage, c: Comic, figure?: Figure | null): bool
 
 /**
  * Diamond signs off; the admin side can act too (to fix a mis-click, and
- * because Adnan runs the ledger). A plain member cannot.
+ * because Adnan runs the ledger). A plain member cannot — and neither can a
+ * VIEWER, even from a @dpb.in address: that role reads everything and acts on
+ * nothing (mirrored in firestore.rules isViewer, so this is not just UI).
  */
-export function canApprove(email: string | null, canModerate: boolean): boolean {
+export function canApprove(email: string | null, canModerate: boolean, viewer = false): boolean {
+  if (viewer) return false
   if (canModerate) return true
   return !!email && /@dpb\.in$/i.test(email.trim())
 }

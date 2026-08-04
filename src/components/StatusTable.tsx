@@ -236,6 +236,7 @@ export function StatusTable({
   email,
   canModerate,
   canAdmin,
+  viewer = false,
   viewSwitcher,
 }: {
   comics: Comic[]
@@ -246,6 +247,8 @@ export function StatusTable({
   email: string | null
   canModerate: boolean
   canAdmin: boolean
+  /** Read-only role: sees everything, gets no approve controls at all. */
+  viewer?: boolean
   viewSwitcher?: React.ReactNode
 }) {
   const [scope, setScope] = useState('all')
@@ -257,7 +260,7 @@ export function StatusTable({
 
   const approvals = useApprovals(refreshKey)
   const currency = pricing?.currency ?? 'INR'
-  const canAct = canApprove(email, canModerate)
+  const canAct = canApprove(email, canModerate, viewer)
 
   const allRows = useMemo(
     () =>

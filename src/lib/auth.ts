@@ -11,6 +11,14 @@ export type AllowStatus =
   | 'admin'
   | 'sub_admin'
   | 'allow'
+  /**
+   * Read-everything, act-on-nothing (allowlist role 'viewer'). Sees whatever
+   * their allocation grants — but no approvals, even from a @dpb.in address
+   * that would otherwise carry Diamond sign-off powers. First holder:
+   * ankur@dpb.in (Adnan, 2026-08-04 — "so he can also see it", prices and
+   * approvals excluded). Enforced in rules too (isViewer), not just here.
+   */
+  | 'viewer'
   | 'pending'
   | 'suspended'
   | 'loading'
@@ -78,6 +86,7 @@ export function useUser(): { user: User | null; loading: boolean } {
 //       - else allowlist/{email} exists:
 //           - role === 'sub_admin'             → 'sub_admin'
 //           - role === 'admin'                 → 'admin'
+//           - role === 'viewer'                → 'viewer' (read-only, no approvals)
 //           - any other role                   → 'allow'
 //       - else allowlist/{email} missing:
 //           - @thothica.com / @dpb.in domain   → 'allow'
@@ -151,7 +160,9 @@ export function useAllowStatus(
               ? 'sub_admin'
               : role === 'admin'
                 ? 'admin'
-                : 'allow',
+                : role === 'viewer'
+                  ? 'viewer'
+                  : 'allow',
           )
           return
         }

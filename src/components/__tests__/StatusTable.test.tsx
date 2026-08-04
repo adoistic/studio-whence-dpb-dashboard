@@ -180,6 +180,17 @@ describe('StatusTable', () => {
     expect(screen.getByText('IFC only')).toBeInTheDocument()
   })
 
+  it('a VIEWER at a @dpb.in address gets no controls either — stages or invoice', () => {
+    // ankur@dpb.in: the domain would grant Diamond sign-off, the viewer role
+    // takes it away. Read everything, act on nothing.
+    setup({ email: 'ankur@dpb.in', viewer: true })
+    expect(screen.queryByLabelText(/^Approve /)).not.toBeInTheDocument()
+    expect(screen.queryByText('Approve for invoice')).not.toBeInTheDocument()
+    // The data is all still there.
+    expect(screen.getByText('Think Different')).toBeInTheDocument()
+    expect(screen.getByText('IFC only')).toBeInTheDocument()
+  })
+
   it('filters to rows with something still awaiting approval', () => {
     // Every delivered stage of The Little Master signed off → it drops out.
     stagesData = {
@@ -267,5 +278,13 @@ describe('InvoiceTable — the Approved-for-invoice tab', () => {
   it('is honest when nothing is approved yet', () => {
     setupInvoices()
     expect(screen.getByText(/Nothing is approved for invoice yet/)).toBeInTheDocument()
+  })
+
+  it('a VIEWER sees the queue but cannot mark invoices generated', () => {
+    invoicesData = { biographies__jobs: { approved: { by: 'e', at: '2026-08-04T10:00:00Z' } } }
+    setupInvoices({ email: 'ankur@dpb.in', viewer: true })
+    expect(screen.getByText('Think Different')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Mark invoice generated/)).not.toBeInTheDocument()
+    expect(screen.getByText('Awaiting invoice')).toBeInTheDocument()
   })
 })

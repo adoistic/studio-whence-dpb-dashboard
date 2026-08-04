@@ -151,12 +151,21 @@ service cloud.firestore {
     // approve writes the doc, withdrawing deletes it. The collection started
     // empty on 2026-08-04: that reset is the baseline, so every approval is
     // explicit, attributed and dated.
+    //
+    // EXCEPT viewers: allowlist role 'viewer' is read-everything, act-on-
+    // nothing — a @dpb.in viewer (ankur@dpb.in, Adnan 2026-08-04) sees the
+    // ledger but cannot approve, mark invoices, or withdraw. The role check
+    // lives here so the restriction holds even outside our UI.
+    function isViewer() {
+      return hasAllowDoc()
+        && get(/databases/$(database)/documents/allowlist/$(userEmail())).data.role == 'viewer';
+    }
     function isDiamond() {
       return isSignedIn() && userEmail().matches('.*@dpb[.]in$') && !isSuspended();
     }
     match /diamondApprovals/{comicId} {
       allow read:  if isAllowlisted();
-      allow write: if isDiamond() || isSubAdmin();
+      allow write: if (isDiamond() && !isViewer()) || isSubAdmin();
     }
 
     // ── Pricing (what a page is worth) ──

@@ -972,6 +972,9 @@ describe('firestore.rules — diamondApprovals (the sign-off ledger)', () => {
   const subAdmin = () => env.authenticatedContext('da-sa', { email: 'sub@dpb.in' }).firestore()
   const stranger = () => env.authenticatedContext('da-s', { email: 'nope@gmail.com' }).firestore()
   const suspendedDiamond = () => env.authenticatedContext('da-x', { email: 'banned@dpb.in' }).firestore()
+  // viewer@dpb.in has an allowlist doc with role 'viewer': the read-everything,
+  // act-on-nothing role — a Diamond address that must NOT be able to approve.
+  const viewer   = () => env.authenticatedContext('da-v', { email: 'viewer@dpb.in' }).firestore()
 
   beforeAll(async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
@@ -980,6 +983,7 @@ describe('firestore.rules — diamondApprovals (the sign-off ledger)', () => {
         stages: { script: { by: 'e@dpb.in', at: '2026-08-04T00:00:00Z' } },
       })
       await setDoc(doc(db, 'suspended/banned@dpb.in'), {})
+      await setDoc(doc(db, 'allowlist/viewer@dpb.in'), { role: 'viewer' })
     })
   })
 
@@ -989,6 +993,23 @@ describe('firestore.rules — diamondApprovals (the sign-off ledger)', () => {
   })
   it('a stranger cannot read the ledger', async () => {
     await assertFails(getDoc(doc(stranger(), 'diamondApprovals/biographies__seeded')))
+  })
+  it('a VIEWER at @dpb.in reads the ledger but cannot approve — read-everything, act-on-nothing', async () => {
+    await assertSucceeds(getDoc(doc(viewer(), 'diamondApprovals/biographies__seeded')))
+    await assertFails(
+      setDoc(
+        doc(viewer(), 'diamondApprovals/biographies__seeded'),
+        { stages: { covers: { by: 'viewer@dpb.in', at: '2026-08-04T00:00:00Z' } } },
+        { merge: true },
+      ),
+    )
+    await assertFails(
+      setDoc(
+        doc(viewer(), 'diamondApprovals/biographies__seeded'),
+        { invoice: { approved: { by: 'viewer@dpb.in', at: '2026-08-04T00:00:00Z' } } },
+        { merge: true },
+      ),
+    )
   })
   // Approvals are PER STAGE: the doc holds a `stages` map, merge-written one
   // stage at a time so two people signing off different stages of the same book

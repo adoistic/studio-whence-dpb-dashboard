@@ -163,6 +163,7 @@ export function InvoiceTable({
   pricing,
   email,
   canModerate,
+  viewer = false,
   viewSwitcher,
 }: {
   comics: Comic[]
@@ -172,6 +173,8 @@ export function InvoiceTable({
   pricing: PricingConfig | null
   email: string | null
   canModerate: boolean
+  /** Read-only role: sees the invoice trail, gets no buttons. */
+  viewer?: boolean
   viewSwitcher?: React.ReactNode
 }) {
   const [refreshKey, setRefreshKey] = useState(0)
@@ -180,7 +183,7 @@ export function InvoiceTable({
 
   const approvals = useApprovals(refreshKey)
   const currency = pricing?.currency ?? 'INR'
-  const canAct = canApprove(email, canModerate)
+  const canAct = canApprove(email, canModerate, viewer)
 
   const rows = useMemo(
     () =>
