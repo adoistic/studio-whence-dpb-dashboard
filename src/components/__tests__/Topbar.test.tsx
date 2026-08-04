@@ -142,6 +142,18 @@ describe('Topbar — open menu contents', () => {
 
     expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Methodology' })).toBeInTheDocument()
+  })
+
+  test('Production status is in the menu for ANYONE with access — plain members included', () => {
+    // Adnan, 2026-08-04: whoever can open /status must be able to FIND it.
+    // The link is deliberately ungated: every authed role has access (the page
+    // scopes its own catalog), so every authed role sees the entry.
+    mockUseAllowStatus = () => 'allow'
+    render(<Topbar />)
+    openMenu()
+    const status = screen.getByRole('link', { name: 'Production status' })
+    expect(status).toBeInTheDocument()
+    expect(status.getAttribute('href')).toBe('/status')
 
     const businessLink = screen.getByRole('link', { name: 'Business Legends' })
     expect(businessLink).toBeInTheDocument()
