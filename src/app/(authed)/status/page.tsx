@@ -8,10 +8,11 @@ import { usePricing } from '@/lib/pricing'
 import { ProductionDashboard } from '@/components/ProductionDashboard'
 import { StatusTable } from '@/components/StatusTable'
 import { InvoiceTable } from '@/components/InvoiceTable'
+import { AccountsPanel } from '@/components/AccountsPanel'
 import { LoadingState, ErrorState } from '@/components/QuietStates'
 
 /**
- * /status — the production status page, three renderings of the same data:
+ * /status — the production status page, four renderings of the same data:
  *
  *   Table (default) — one row per comic with the financial summary strip on
  *   top, every deliverable a column, plus the Diamond approval ledger and the
@@ -19,6 +20,9 @@ import { LoadingState, ErrorState } from '@/components/QuietStates'
  *
  *   Approved for invoice — only books explicitly approved for invoicing;
  *   the place where a raised invoice is marked generated.
+ *
+ *   Accounts — advances received from the group companies, invoices raised,
+ *   and the un-invoiced pipeline (work in progress), reconciled in one place.
  *
  *   Overview — the rolled-up drill-down (headline → line → series → comic).
  *
@@ -32,7 +36,7 @@ export default function StatusPage() {
   const canMod = canModerate(status)
   const email = user?.email ?? null
 
-  const [view, setView] = useState<'table' | 'invoices' | 'overview'>('table')
+  const [view, setView] = useState<'table' | 'invoices' | 'accounts' | 'overview'>('table')
 
   const { data: comics, loading: comicsLoading, error } = useVisibleComics(canMod, email)
   const { data: figures } = useVisibleFigures(canMod, email)
@@ -49,6 +53,7 @@ export default function StatusPage() {
         [
           ['table', 'Table'],
           ['invoices', 'Approved for invoice'],
+          ['accounts', 'Accounts'],
           ['overview', 'Overview'],
         ] as const
       ).map(([key, label]) => (
@@ -88,6 +93,17 @@ export default function StatusPage() {
       pricing={pricing}
       email={email}
       canModerate={canMod}
+      viewSwitcher={switcher}
+    />
+  ) : view === 'accounts' ? (
+    <AccountsPanel
+      comics={comics ?? []}
+      figures={figures}
+      lines={lines}
+      programs={programs}
+      pricing={pricing}
+      email={email}
+      canAdmin={canMod}
       viewSwitcher={switcher}
     />
   ) : (

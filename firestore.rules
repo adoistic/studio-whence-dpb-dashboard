@@ -173,6 +173,18 @@ service cloud.firestore {
       allow write: if isSubAdmin();
     }
 
+    // ── Accounts (the advances ledger) ──
+    // ONE doc, `accounts/advances`: the advances received from Diamond group
+    // companies, rendered on the status page's Accounts tab next to invoices
+    // raised and work in progress. Same visibility model as pricing: these are
+    // transactions between the two houses that both sides already know, so any
+    // allowlisted member may read; writing (recording or correcting a receipt)
+    // is the admin side only — Diamond does not edit our bank ledger.
+    match /accounts/{d} {
+      allow read:  if isAllowlisted();
+      allow write: if isSubAdmin();
+    }
+
     // ── B2.7 catalog (read-only for allowlisted clients; written only by the
     //    publish Action's Admin SDK, which bypasses rules) ──
     match /meta/{d}      { allow read: if isAllowlisted(); allow write: if false; }

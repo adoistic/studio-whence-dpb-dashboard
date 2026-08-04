@@ -13,6 +13,7 @@ import { useState } from 'react'
 import { ProductionDashboard } from '@/components/ProductionDashboard'
 import { StatusTable } from '@/components/StatusTable'
 import { InvoiceTable } from '@/components/InvoiceTable'
+import { AccountsPanel } from '@/components/AccountsPanel'
 import type { Comic, Line, Program } from '@/types/content'
 
 const fake = (i: number, over: Partial<Comic>): Comic =>
@@ -80,7 +81,7 @@ const PRICING = {
 }
 
 export default function DevStatusPreview() {
-  const [view, setView] = useState<'table' | 'invoices' | 'overview'>('table')
+  const [view, setView] = useState<'table' | 'invoices' | 'accounts' | 'overview'>('table')
   if (process.env.NODE_ENV === 'production') {
     return <main className="p-10 font-sans text-sm">Not available.</main>
   }
@@ -90,6 +91,7 @@ export default function DevStatusPreview() {
         [
           ['table', 'Table'],
           ['invoices', 'Approved for invoice'],
+          ['accounts', 'Accounts'],
           ['overview', 'Overview'],
         ] as const
       ).map(([key, label]) => (
@@ -126,6 +128,17 @@ export default function DevStatusPreview() {
       pricing={PRICING}
       email="preview@dpb.in"
       canModerate={false}
+      viewSwitcher={switcher}
+    />
+  ) : view === 'accounts' ? (
+    <AccountsPanel
+      comics={COMICS}
+      figures={FIGURES}
+      lines={LINES}
+      programs={PROGRAMS}
+      pricing={PRICING}
+      email="preview@dpb.in"
+      canAdmin
       viewSwitcher={switcher}
     />
   ) : (

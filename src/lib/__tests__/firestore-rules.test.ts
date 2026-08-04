@@ -938,6 +938,33 @@ describe('firestore.rules — pricing (what a page is worth)', () => {
   })
 })
 
+describe('firestore.rules — accounts (the advances ledger)', () => {
+  const member   = () => env.authenticatedContext('ac-m', { email: 'x@thothica.com' }).firestore()
+  const subAdmin = () => env.authenticatedContext('ac-sa', { email: 'sub@dpb.in' }).firestore()
+  const stranger = () => env.authenticatedContext('ac-s', { email: 'nope@gmail.com' }).firestore()
+
+  beforeAll(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'accounts/advances'), {
+        items: [{ id: 'a1', date: '2026-05-13', company: 'X', amount: 100, tdsDeducted: false }],
+      })
+    })
+  })
+
+  it('an allowlisted member READS the ledger (the Accounts tab shows it)', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'accounts/advances')))
+  })
+  it('a stranger cannot read the ledger', async () => {
+    await assertFails(getDoc(doc(stranger(), 'accounts/advances')))
+  })
+  it('a plain member cannot WRITE the ledger — it is our bank record', async () => {
+    await assertFails(setDoc(doc(member(), 'accounts/advances'), { items: [] }, { merge: true }))
+  })
+  it('a sub_admin records a receipt', async () => {
+    await assertSucceeds(setDoc(doc(subAdmin(), 'accounts/advances'), { items: [] }, { merge: true }))
+  })
+})
+
 describe('firestore.rules — diamondApprovals (the sign-off ledger)', () => {
   // member@dpb.in is domain-allowed with NO allowlist role doc: pure "Diamond".
   const diamond  = () => env.authenticatedContext('da-d', { email: 'member@dpb.in' }).firestore()
