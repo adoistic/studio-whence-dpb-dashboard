@@ -420,12 +420,14 @@ export function ProductionDashboard({
   programs,
   pricing,
   canAdmin,
+  viewSwitcher,
 }: {
   comics: Comic[]
   lines: Line[] | null
   programs: Program[] | null
   pricing: PricingConfig | null
   canAdmin: boolean
+  viewSwitcher?: React.ReactNode
 }) {
   const [scope, setScope] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -491,6 +493,7 @@ export function ProductionDashboard({
           </p>
         </div>
         <div className="flex items-center gap-2 pb-1">
+          {viewSwitcher}
           <button
             type="button"
             onClick={downloadCsv}

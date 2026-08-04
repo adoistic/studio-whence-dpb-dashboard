@@ -99,10 +99,14 @@ export type Row = { [column: string]: string | number | null | undefined; _href?
 //
 // What a finished comic actually bills for is more than its interior: the cover,
 // the inside covers (IFC/IBC), the back cover and the activity pages are all
-// drawn pages. The counting rule is Adnan's (2026-08-03):
+// drawn pages. The counting rule is Adnan's (2026-08-03), with his worked
+// example: cover 1 + back cover 1 + IFC 1 + IBC 1 + four activity pages = 8.
 //   · cover — the three cover OPTIONS collapse to ONE page (they are drafts of
 //     the same cover, not three covers); a shipped coverKey is that same page
-//   · inside covers and activity pages — counted on actuals
+//   · IFC and IBC — ONE page each. The insideCovers key glob can hold variant
+//     renders of the same page, so the image count caps at two pages: one
+//     inside-front, one inside-back. Variants never inflate the bill.
+//   · activity pages — on actuals (four activity pages bill as four)
 //   · back cover — one page when present
 // This is the single place the rule lives; the dashboard and any export import
 // it rather than restating it.
@@ -123,7 +127,7 @@ export function pageBreakdown(c: Comic): PageBreakdown {
   const interior = c.pages?.count ?? 0
   const cover: 0 | 1 =
     c.pages?.coverKey || (c.coverOptions?.options?.length ?? 0) > 0 ? 1 : 0
-  const insideCovers = c.insideCovers?.images?.length ?? 0
+  const insideCovers = Math.min(c.insideCovers?.images?.length ?? 0, 2)
   const backCover: 0 | 1 = c.backCover?.image ? 1 : 0
   const activities = c.activities?.pages?.length ?? 0
   const extras = cover + insideCovers + backCover + activities

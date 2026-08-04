@@ -109,7 +109,7 @@ describe('pageBreakdown (the billing count)', () => {
     expect(b.cover).toBe(1)
   })
 
-  it('counts inside covers, back cover and activity pages on actuals', () => {
+  it('counts IFC + IBC as one page each and activity pages on actuals', () => {
     const b = pageBreakdown(comic({
       insideCovers: { images: [{ key: 'i1' }, { key: 'i2' }] },
       backCover: { image: { key: 'bc' } },
@@ -120,6 +120,23 @@ describe('pageBreakdown (the billing count)', () => {
     expect(b.activities).toBe(3)
     expect(b.extras).toBe(6)
     expect(b.billable).toBe(30)
+  })
+
+  it('caps inside covers at two pages — variants of the same IFC never inflate the bill', () => {
+    const b = pageBreakdown(comic({
+      insideCovers: { images: [{ key: 'a' }, { key: 'b' }, { key: 'c' }, { key: 'd' }] },
+    } as Partial<Comic>))
+    expect(b.insideCovers).toBe(2)
+  })
+
+  it("matches Adnan's worked example: covers + IFC + IBC + 4 activities = 8 extras", () => {
+    const b = pageBreakdown(comic({
+      coverOptions: { options: [{ key: 'a' }, { key: 'b' }, { key: 'c' }] },
+      backCover: { image: { key: 'bc' } },
+      insideCovers: { images: [{ key: 'ifc' }, { key: 'ibc' }] },
+      activities: { pages: [{ key: '1' }, { key: '2' }, { key: '3' }, { key: '4' }] },
+    } as Partial<Comic>))
+    expect(b.extras).toBe(8)
   })
 
   it('a bare interior bills as just its interior', () => {
