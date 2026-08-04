@@ -3,16 +3,22 @@
 /**
  * The Accounts tab — the money story in one place (accounts team, 2026-08-04):
  *
- *   1. Advances received — what their group companies have already paid us,
- *      receipt by receipt, with the TDS they deducted at source.
- *   2. Invoices generated — how many invoices exist, their value, and what
- *      they pay after TDS.
- *   3. Work in progress — how many books are not yet invoiced, and what that
- *      pipeline is worth net of TDS.
+ * On top, THE STATEMENT — a reconciliation an accountant can read line by
+ * line, each line a count and a net-of-TDS value:
  *
- * The strip on top answers the three questions at a glance and adds the one
- * derived number an accountant reaches for first: advances minus invoices —
- * how much of their money is still to be adjusted against future invoices.
+ *   Advances received        5 receipts      ₹2,18,294   (cash at the bank)
+ *   Invoices generated       N books         ₹…          (raised against them)
+ *   Advance still to adjust                  ₹…          (the difference)
+ *   Work in progress         M books         ₹…          (invoiced after the
+ *                                                         work completes and
+ *                                                         the client approves)
+ *
+ * Every book is in exactly ONE of the two book lines — invoiced or in
+ * progress — so the counts visibly add up to the whole catalog, and a book
+ * already approved for invoice but not yet generated is called out inside
+ * WIP (it is still "invoice not generated", but it is no longer waiting on
+ * approval). Below the statement sit the three detail sections: the advances
+ * ledger, the invoices, and the WIP rollup by line.
  *
  * Same builder, same arithmetic as the status table — the tabs cannot
  * disagree. The advances ledger itself lives in ONE Firestore doc
@@ -43,14 +49,114 @@ const TD =
   'whitespace-nowrap border-b border-brand-pale-dusk/50 px-3 py-2 align-middle font-sans text-[0.78rem] text-brand-indigo'
 const FOOT = 'border-t-2 border-brand-pale-dusk bg-brand-pale-dusk/20'
 
-function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+// ── The statement ─────────────────────────────────────────────────────────────
+
+const books = (k: number) => `${n(k)} ${k === 1 ? 'book' : 'books'}`
+
+function StatementRow({
+  label, sub, count, value, derived, indent,
+}: {
+  label: string
+  sub?: string
+  count?: string
+  value: string
+  /** The computed balance line — set apart so it reads as arithmetic, not data. */
+  derived?: boolean
+  /** An "of which" line inside the row above it. */
+  indent?: boolean
+}) {
+  const base = derived ? 'bg-brand-gold/10' : indent ? 'bg-white' : 'bg-white'
   return (
-    <div className="rounded-xl border border-brand-pale-dusk bg-white px-4 py-3">
-      <div className="font-sans text-[0.58rem] uppercase tracking-label text-brand-slate">{label}</div>
-      <div className="mt-1 font-serif text-[1.35rem] font-light leading-none text-brand-umber tabular-nums">
+    <tr className={base}>
+      <td className={`${TD} ${indent ? 'pl-10' : ''} whitespace-normal`}>
+        <span className={`${derived ? 'font-semibold' : ''} ${indent ? 'text-[0.72rem] text-brand-slate' : ''}`}>
+          {label}
+        </span>
+        {sub ? <span className="ml-2 font-sans text-[0.68rem] text-brand-slate">{sub}</span> : null}
+      </td>
+      <td className={`${TD} text-right tabular-nums ${indent ? 'text-[0.72rem] text-brand-slate' : ''}`}>
+        {count ?? ''}
+      </td>
+      <td
+        className={`${TD} text-right tabular-nums ${derived ? 'font-semibold' : indent ? 'text-[0.72rem] text-brand-slate' : 'font-semibold'}`}
+      >
         {value}
-      </div>
-      {sub ? <div className="mt-1.5 font-sans text-[0.66rem] leading-snug text-brand-slate/90">{sub}</div> : null}
+      </td>
+    </tr>
+  )
+}
+
+/**
+ * The reconciliation the accounts team asked to see in one place: the advance,
+ * the invoices raised against it, the balance, and the pipeline that will be
+ * invoiced once work completes and the client approves. One count column, one
+ * net-of-TDS value column, and the two book lines partition the catalog.
+ */
+function Statement({
+  advTotals, invoiced, wip, allCount, currency,
+}: {
+  advTotals: ReturnType<typeof advanceTotals>
+  invoiced: StatusTableRow[]
+  wip: StatusTableRow[]
+  allCount: number
+  currency: string
+}) {
+  const invNet = sumTaxes(invoiced).netOfTds
+  const wipNet = sumTaxes(wip).netOfTds
+  const pending = wip.filter((r) => r.invoice.approved)
+  const pendingNet = sumTaxes(pending).netOfTds
+  const toAdjust = Math.round((advTotals.received - invNet) * 100) / 100
+
+  return (
+    <div className="mt-6 overflow-x-auto rounded-xl border border-brand-pale-dusk bg-white">
+      <table className="w-full min-w-[700px] border-collapse">
+        <thead>
+          <tr>
+            <th className={TH}>The position</th>
+            <th className={`${TH} text-right`}>Count</th>
+            <th className={`${TH} text-right`}>Value (net of TDS)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <StatementRow
+            label="Advances received"
+            sub="cash from the group companies, after their TDS deductions"
+            count={`${n(advTotals.receipts)} ${advTotals.receipts === 1 ? 'receipt' : 'receipts'}`}
+            value={formatMoney(advTotals.received, currency)}
+          />
+          <StatementRow
+            label="Invoices generated"
+            sub="raised against those advances"
+            count={books(invoiced.length)}
+            value={formatMoney(sumTaxes(invoiced).netOfTds, currency)}
+          />
+          <StatementRow
+            label={toAdjust >= 0 ? 'Advance still to adjust' : 'Invoices exceed the advances'}
+            sub={toAdjust >= 0 ? '= advances − invoices' : '= invoices − advances'}
+            value={formatMoney(Math.abs(toAdjust), currency)}
+            derived
+          />
+          <StatementRow
+            label="Work in progress"
+            sub="invoiced once the work completes and the client approves it"
+            count={books(wip.length)}
+            value={formatMoney(wipNet, currency)}
+          />
+          {pending.length > 0 ? (
+            <StatementRow
+              label="…of which already approved for invoice, awaiting generation"
+              count={books(pending.length)}
+              value={formatMoney(pendingNet, currency)}
+              indent
+            />
+          ) : null}
+        </tbody>
+      </table>
+      <p className="border-t border-brand-pale-dusk/60 px-3 py-2 font-sans text-[0.66rem] text-brand-slate">
+        Every book is on exactly one line: {books(invoiced.length)} invoiced + {books(wip.length)} in
+        progress = {books(allCount)} in the catalog. Values are net of TDS — what the invoice pays after
+        the client deducts 2% of the base.
+      </p>
     </div>
   )
 }
@@ -411,9 +517,6 @@ export function AccountsPanel({
   const invoiced = rows.filter((r) => r.invoice.generated)
   const wip = rows.filter((r) => !r.invoice.generated)
   const adv = advanceTotals(items)
-  const invTotals = sumTaxes(invoiced)
-  const wipTotals = sumTaxes(wip)
-  const toAdjust = Math.round((adv.received - invTotals.netOfTds) * 100) / 100
 
   async function save(next: Advance[], okMsg: string) {
     setBusy(true)
@@ -448,42 +551,7 @@ export function AccountsPanel({
         <div className="flex items-center gap-2 pb-1">{viewSwitcher}</div>
       </header>
 
-      <div className="mt-6 grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-6">
-        <Tile
-          label="Advances received"
-          value={formatMoney(adv.received, currency)}
-          sub={`${n(adv.receipts)} receipts · ${adv.companies.length} ${adv.companies.length === 1 ? 'company' : 'companies'} · gross ${formatMoney(adv.gross, currency)} incl ${formatMoney(adv.tds, currency)} TDS`}
-        />
-        <Tile
-          label="Invoices generated"
-          value={n(invoiced.length)}
-          sub={`invoice value ${formatMoney(invTotals.totalValue, currency)} · with GST ${formatMoney(invTotals.totalWithGst, currency)}`}
-        />
-        <Tile
-          label="Invoices net of TDS"
-          value={formatMoney(invTotals.netOfTds, currency)}
-          sub="what the raised invoices pay after 2% TDS"
-        />
-        <Tile
-          label={toAdjust >= 0 ? 'Advance left to adjust' : 'Invoiced beyond advances'}
-          value={formatMoney(Math.abs(toAdjust), currency)}
-          sub={
-            toAdjust >= 0
-              ? 'advances received minus invoices (net of TDS)'
-              : 'invoices (net of TDS) exceed the advances received'
-          }
-        />
-        <Tile
-          label="Work in progress"
-          value={n(wip.length)}
-          sub={`books not yet invoiced · ${n(wip.reduce((s, r) => s + r.totalPages, 0))} billable pages`}
-        />
-        <Tile
-          label="WIP net of TDS"
-          value={formatMoney(wipTotals.netOfTds, currency)}
-          sub="what the pipeline pays once invoiced"
-        />
-      </div>
+      <Statement advTotals={adv} invoiced={invoiced} wip={wip} allCount={rows.length} currency={currency} />
 
       {note ? (
         <p role="status" className="mt-4 font-sans text-[0.72rem] text-brand-indigo">{note}</p>

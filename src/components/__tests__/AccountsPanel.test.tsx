@@ -82,11 +82,12 @@ beforeEach(() => {
 describe('AccountsPanel', () => {
   it('totals the advances: ₹2,18,294 received across five receipts', () => {
     setup()
-    // Appears twice: the Advances tile, and (with no invoices yet) the
-    // advance-left-to-adjust tile equals the whole amount.
+    // The statement's advances line and (with no invoices yet) its balance
+    // line both carry the full amount.
     expect(screen.getAllByText('₹2,18,294').length).toBeGreaterThanOrEqual(1)
-    // Tile sub AND the ledger's totals row both state the receipt count.
-    expect(screen.getAllByText(/5 receipts · 2 companies/).length).toBe(2)
+    // Count in the statement, count in the ledger's totals row.
+    expect(screen.getByText('5 receipts')).toBeInTheDocument()
+    expect(screen.getByText(/5 receipts · 2 companies/)).toBeInTheDocument()
     // Each receipt is a row, with the payer named as dictated.
     expect(screen.getByText('Trijal TradeCop Pvt Ltd')).toBeInTheDocument()
     expect(screen.getAllByText('Diamond Magazines Private Limited').length).toBe(4)
@@ -102,7 +103,7 @@ describe('AccountsPanel', () => {
     expect(screen.getAllByText('None').length).toBe(3)
   })
 
-  it('splits invoiced books from work in progress', () => {
+  it('partitions the statement: every book is invoiced OR in progress, never both', () => {
     invoicesData = {
       biographies__jobs: {
         approved: { by: 'e', at: '2026-08-01T00:00:00Z' },
@@ -110,15 +111,17 @@ describe('AccountsPanel', () => {
       },
     }
     setup()
-    // Think Different is in the invoices section…
+    // One book on each line (invoiced / WIP), and the footnote reconciles them.
+    expect(screen.getAllByText('1 book').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getByText(/1 book invoiced \+ 1 book in progress = 2 books in the catalog/)).toBeInTheDocument()
+    // Think Different is in the invoices section with its date…
     expect(screen.getByText('Think Different')).toBeInTheDocument()
     expect(screen.getByText('2026-08-02')).toBeInTheDocument()
-    // …and WIP counts only the other book: 1 book, 56 billed pages.
-    expect(screen.getByText(/books not yet invoiced · 56 billable pages/)).toBeInTheDocument()
+    // …and the WIP section still totals the rest.
     expect(screen.getByText('Total work in progress')).toBeInTheDocument()
   })
 
-  it('reconciles advances against invoices: advance left to adjust', () => {
+  it('reconciles advances against invoices: advance still to adjust', () => {
     invoicesData = {
       biographies__jobs: {
         approved: { by: 'e', at: '2026-08-01T00:00:00Z' },
@@ -127,8 +130,35 @@ describe('AccountsPanel', () => {
     }
     setup()
     // ₹2,18,294 received − ₹16,240 invoiced net = ₹2,02,054 still to adjust.
-    expect(screen.getByText('Advance left to adjust')).toBeInTheDocument()
+    expect(screen.getByText('Advance still to adjust')).toBeInTheDocument()
     expect(screen.getByText('₹2,02,054')).toBeInTheDocument()
+  })
+
+  it('flips the balance line when invoices exceed the advances', () => {
+    advancesData = []
+    invoicesData = {
+      biographies__jobs: {
+        approved: { by: 'e', at: '2026-08-01T00:00:00Z' },
+        generated: { by: 'e', at: '2026-08-02T00:00:00Z' },
+      },
+    }
+    setup()
+    // ₹0 advances − ₹16,240 invoiced → the label says which way the balance runs.
+    expect(screen.getByText('Invoices exceed the advances')).toBeInTheDocument()
+    expect(screen.queryByText('Advance still to adjust')).not.toBeInTheDocument()
+  })
+
+  it('calls out books approved for invoice but still awaiting generation, inside WIP', () => {
+    invoicesData = {
+      biographies__jobs: { approved: { by: 'e', at: '2026-08-01T00:00:00Z' } },
+    }
+    setup()
+    // Not yet generated → still WIP (2 books), but the "of which" line shows it.
+    expect(screen.getByText('2 books')).toBeInTheDocument()
+    expect(
+      screen.getByText('…of which already approved for invoice, awaiting generation'),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/0 books invoiced \+ 2 books in progress = 2 books in the catalog/)).toBeInTheDocument()
   })
 
   it('records a new receipt through the admin form', async () => {
