@@ -25,9 +25,12 @@ const fake = (i: number, over: Partial<Comic>): Comic =>
     created: `2026-0${(i % 6) + 1}-10`,
     updated: `2026-0${(i % 6) + 2}-15`,
     pages: { hasPages: true, count: (i * 7) % 49, coverKey: i % 3 === 0 ? 'cover.jpg' : null },
+    ...(i % 3 === 0 && i % 4 !== 0
+      ? { insideCovers: { images: [{ key: 'inside-front-cover.png' }] } }
+      : {}),
     ...(i % 4 === 0
       ? {
-          insideCovers: { images: [{ key: 'a' }, { key: 'b' }] },
+          insideCovers: { images: [{ key: 'inside-front-cover.png' }, { key: 'inside-back-cover.png' }] },
           backCover: { image: { key: 'bc' } },
           activities: { pages: [{ key: 'x' }, { key: 'y' }, { key: 'z' }, { key: 'w' }] },
           amazonModules: { groups: [{ images: [{ key: '1' }, { key: '2' }] }] } as unknown,

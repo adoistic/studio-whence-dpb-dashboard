@@ -109,31 +109,50 @@ describe('pageBreakdown (the billing count)', () => {
     expect(b.cover).toBe(1)
   })
 
-  it('counts IFC + IBC as one page each and activity pages on actuals', () => {
+  it('counts the IFC and the IBC as SEPARATE pages, read from their keys', () => {
     const b = pageBreakdown(comic({
-      insideCovers: { images: [{ key: 'i1' }, { key: 'i2' }] },
+      insideCovers: { images: [{ key: 'x/inside-front-cover.png' }, { key: 'x/inside-back-cover.png' }] },
       backCover: { image: { key: 'bc' } },
       activities: { pages: [{ key: 'a1' }, { key: 'a2' }, { key: 'a3' }] },
     } as Partial<Comic>))
-    expect(b.insideCovers).toBe(2)
+    expect(b.insideFront).toBe(1)
+    expect(b.insideBack).toBe(1)
     expect(b.backCover).toBe(1)
     expect(b.activities).toBe(3)
     expect(b.extras).toBe(6)
     expect(b.billable).toBe(30)
   })
 
-  it('caps inside covers at two pages — variants of the same IFC never inflate the bill', () => {
+  it('a book with only the IFC made counts one, and says so — the IBC is genuinely missing', () => {
+    const b = pageBreakdown(comic({
+      insideCovers: { images: [{ key: 'x/inside-front-cover.png', label: 'Inside front cover — Meet the Characters' }] },
+    } as Partial<Comic>))
+    expect(b.insideFront).toBe(1)
+    expect(b.insideBack).toBe(0)
+  })
+
+  it('identifies the inside covers from the LABEL when the key is uninformative', () => {
+    const b = pageBreakdown(comic({
+      insideCovers: { images: [{ key: 'a.png', label: 'Inside back cover — The World of the Ramayana' }] },
+    } as Partial<Comic>))
+    expect(b.insideFront).toBe(0)
+    expect(b.insideBack).toBe(1)
+  })
+
+  it('an oddly-named artifact still counts, but can never exceed one IFC and one IBC', () => {
     const b = pageBreakdown(comic({
       insideCovers: { images: [{ key: 'a' }, { key: 'b' }, { key: 'c' }, { key: 'd' }] },
     } as Partial<Comic>))
-    expect(b.insideCovers).toBe(2)
+    expect(b.insideFront).toBe(1)
+    expect(b.insideBack).toBe(1)
+    expect(b.extras).toBe(2)
   })
 
-  it("matches Adnan's worked example: covers + IFC + IBC + 4 activities = 8 extras", () => {
+  it("matches Adnan's worked example: cover 1 + back 1 + IFC 1 + IBC 1 + 4 activities = 8", () => {
     const b = pageBreakdown(comic({
       coverOptions: { options: [{ key: 'a' }, { key: 'b' }, { key: 'c' }] },
       backCover: { image: { key: 'bc' } },
-      insideCovers: { images: [{ key: 'ifc' }, { key: 'ibc' }] },
+      insideCovers: { images: [{ key: 'inside-front-cover.png' }, { key: 'inside-back-cover.png' }] },
       activities: { pages: [{ key: '1' }, { key: '2' }, { key: '3' }, { key: '4' }] },
     } as Partial<Comic>))
     expect(b.extras).toBe(8)

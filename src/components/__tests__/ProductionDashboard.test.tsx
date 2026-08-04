@@ -164,14 +164,14 @@ describe('ProductionDashboard', () => {
       comics: [
         comic({
           slug: 'shiva', title: 'Shiva', line: 'indic', program_slug: null,
-          insideCovers: { images: [{ key: 'i1' }, { key: 'i2' }] },
+          insideCovers: { images: [{ key: 'inside-front-cover.png' }, { key: 'inside-back-cover.png' }] },
           backCover: { image: { key: 'bc' } },
           activities: { pages: [{ key: 'a1' }] },
         } as Partial<Comic>),
       ],
     })
-    // single line auto-opens; extras = 2 + 1 + 1 = 4
-    const cell = screen.getByTitle('inside covers 2 · back cover 1 · activity pages 1')
+    // single line auto-opens; extras = IFC 1 + IBC 1 + back 1 + activity 1 = 4
+    const cell = screen.getByTitle('IFC 1 · IBC 1 · back cover 1 · activity pages 1')
     expect(cell).toHaveTextContent('4')
   })
 })

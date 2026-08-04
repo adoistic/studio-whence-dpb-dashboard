@@ -949,7 +949,9 @@ describe('firestore.rules — diamondApprovals (the sign-off ledger)', () => {
   beforeAll(async () => {
     await env.withSecurityRulesDisabled(async (ctx) => {
       const db = ctx.firestore()
-      await setDoc(doc(db, 'diamondApprovals/biographies__seeded'), { approved: true, by: 'e@dpb.in', at: '2026-08-04' })
+      await setDoc(doc(db, 'diamondApprovals/biographies__seeded'), {
+        stages: { script: { by: 'e@dpb.in', at: '2026-08-04T00:00:00Z' } },
+      })
       await setDoc(doc(db, 'suspended/banned@dpb.in'), {})
     })
   })
@@ -961,23 +963,41 @@ describe('firestore.rules — diamondApprovals (the sign-off ledger)', () => {
   it('a stranger cannot read the ledger', async () => {
     await assertFails(getDoc(doc(stranger(), 'diamondApprovals/biographies__seeded')))
   })
-  it('Diamond (@dpb.in) APPROVES a comic', async () => {
+  // Approvals are PER STAGE: the doc holds a `stages` map, merge-written one
+  // stage at a time so two people signing off different stages of the same book
+  // cannot overwrite each other.
+  const stagePatch = (stage: string, by: string) => ({
+    stages: { [stage]: { by, at: '2026-08-04T00:00:00Z' } }, updatedBy: by, updatedAt: '2026-08-04T00:00:00Z',
+  })
+
+  it('Diamond (@dpb.in) approves ONE stage', async () => {
     await assertSucceeds(
-      setDoc(doc(diamond(), 'diamondApprovals/biographies__01-x'), { approved: true, by: 'member@dpb.in', at: '2026-08-04' }),
+      setDoc(doc(diamond(), 'diamondApprovals/biographies__01-x'), stagePatch('illustration', 'member@dpb.in'), { merge: true }),
     )
   })
-  it('Diamond WITHDRAWS an approval (delete)', async () => {
-    await assertSucceeds(deleteDoc(doc(diamond(), 'diamondApprovals/biographies__seeded')))
+  it('Diamond approves a second stage without disturbing the first (merge)', async () => {
+    await assertSucceeds(
+      setDoc(doc(diamond(), 'diamondApprovals/biographies__01-x'), stagePatch('covers', 'member@dpb.in'), { merge: true }),
+    )
+  })
+  it('Diamond withdraws a stage by rewriting the surviving map', async () => {
+    await assertSucceeds(
+      setDoc(doc(diamond(), 'diamondApprovals/biographies__seeded'), { stages: {}, updatedBy: 'member@dpb.in', updatedAt: 'now' }, { merge: true }),
+    )
   })
   it('a sub_admin can also act (fixing a mis-click from our side)', async () => {
     await assertSucceeds(
-      setDoc(doc(subAdmin(), 'diamondApprovals/biographies__sa'), { approved: true, by: 'sub@dpb.in', at: '2026-08-04' }),
+      setDoc(doc(subAdmin(), 'diamondApprovals/biographies__sa'), stagePatch('script', 'sub@dpb.in'), { merge: true }),
     )
   })
   it('a plain member cannot touch the ledger', async () => {
-    await assertFails(setDoc(doc(member(), 'diamondApprovals/biographies__01-x'), { approved: true, by: 'x', at: 'now' }))
+    await assertFails(
+      setDoc(doc(member(), 'diamondApprovals/biographies__01-x'), stagePatch('script', 'x@thothica.com'), { merge: true }),
+    )
   })
   it('a suspended @dpb.in account cannot approve', async () => {
-    await assertFails(setDoc(doc(suspendedDiamond(), 'diamondApprovals/biographies__01-x'), { approved: true, by: 'b', at: 'now' }))
+    await assertFails(
+      setDoc(doc(suspendedDiamond(), 'diamondApprovals/biographies__01-x'), stagePatch('script', 'banned@dpb.in'), { merge: true }),
+    )
   })
 })

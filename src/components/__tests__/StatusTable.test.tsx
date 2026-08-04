@@ -4,17 +4,19 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 vi.mock('@/lib/firebase', () => ({ db: {}, auth: {} }))
 
 // Approvals store mocked; the pure derivation fns stay real via importOriginal.
-const { approveSpy, unapproveSpy } = vi.hoisted(() => ({
-  approveSpy: vi.fn(() => Promise.resolve()),
-  unapproveSpy: vi.fn(() => Promise.resolve()),
+const { approveSpy, withdrawSpy } = vi.hoisted(() => ({
+  approveSpy: vi.fn<(id: string, stage: string, by: string) => Promise<void>>(() => Promise.resolve()),
+  withdrawSpy: vi.fn<(id: string, stage: string, current: unknown, by: string) => Promise<void>>(
+    () => Promise.resolve(),
+  ),
 }))
-let approvalsData: Record<string, { approved: boolean; by: string; at: string }> = {}
+let approvalsData: Record<string, Record<string, { by: string; at: string }>> = {}
 
 vi.mock('@/lib/approvals', async (orig) => ({
   ...(await orig<typeof import('@/lib/approvals')>()),
   useApprovals: () => ({ data: approvalsData, loading: false }),
-  approve: approveSpy,
-  unapprove: unapproveSpy,
+  approveStage: approveSpy,
+  withdrawStage: withdrawSpy,
 }))
 
 import { StatusTable } from '@/components/StatusTable'
@@ -40,7 +42,14 @@ const LINES = [
 const PROGRAMS = [{ slug: 'tech-legends', line: 'biographies', title: 'Tech Legends' }] as Program[]
 
 const COMICS = [
-  comic({ slug: 'jobs', title: 'Think Different', program_slug: 'tech-legends' }),
+  comic({
+    slug: 'jobs',
+    title: 'Think Different',
+    program_slug: 'tech-legends',
+    backCover: { image: { key: 'bc' } },
+    insideCovers: { images: [{ key: 'inside-front-cover.png' }] },
+    activities: { pages: [{ key: 'a' }, { key: 'b' }] },
+  } as Partial<Comic>),
   comic({ slug: 'sachin', title: 'The Little Master', program_slug: 'tech-legends' }),
 ]
 
@@ -62,72 +71,96 @@ function setup(over: Partial<Parameters<typeof StatusTable>[0]> = {}) {
 
 beforeEach(() => {
   approveSpy.mockClear()
-  unapproveSpy.mockClear()
+  withdrawSpy.mockClear()
   approvalsData = {}
 })
 
 describe('StatusTable', () => {
-  it('shows every column Adnan asked for', () => {
+  it('gives every deliverable its own column', () => {
     setup()
     for (const col of [
-      'Classification', 'Sub-classification', 'Comic', 'Pages', '+ Covers & activities', 'Total',
-      'Rate', 'Total value', 'Script', 'Dossier', 'Illustration', 'Complete set', 'Marketing', 'Diamond',
+      'Classification', 'Sub-classification', 'Comic', 'Total pages', 'Rate', 'Total value',
+      'Script', 'Dossier', 'Illustration', 'Covers', 'IFC / IBC', 'Activity pages', 'Marketing',
     ]) {
       expect(screen.getByText(col)).toBeInTheDocument()
     }
   })
 
-  it('renders one row per comic with classification and sub-classification', () => {
+  it('shows an Approve button per stage — no single overall approve control', () => {
     setup()
-    expect(screen.getByText('Think Different')).toBeInTheDocument()
-    expect(screen.getAllByText('Tech Legends').length).toBe(2)
-  })
-
-  it('shows a totals row that sums the visible rows', () => {
-    setup()
-    expect(screen.getByText(/Total · 2 comics/)).toBeInTheDocument()
-    expect(screen.getByText('0 approved')).toBeInTheDocument()
-  })
-
-  it('lets Diamond approve, attributed to their email', async () => {
-    setup()
-    fireEvent.click(screen.getByLabelText('Approve Think Different'))
-    await waitFor(() => expect(approveSpy).toHaveBeenCalledWith('biographies__jobs', 'editor@dpb.in'))
-  })
-
-  it('shows an approved book as Approved with date, and lets an approver withdraw', async () => {
-    approvalsData = { biographies__jobs: { approved: true, by: 'e@dpb.in', at: '2026-08-04T09:00:00Z' } }
-    setup()
-    expect(screen.getByText(/Approved · 2026-08-04/)).toBeInTheDocument()
-    fireEvent.click(screen.getByLabelText('Withdraw approval for Think Different'))
-    await waitFor(() => expect(unapproveSpy).toHaveBeenCalledWith('biographies__jobs'))
-  })
-
-  it('hides the approve controls from plain members', () => {
-    setup({ email: 'member@thothica.com' })
+    expect(screen.getByLabelText('Approve Illustration for Think Different')).toBeInTheDocument()
+    expect(screen.getByLabelText('Approve Covers for Think Different')).toBeInTheDocument()
+    expect(screen.getByLabelText('Approve IFC / IBC for Think Different')).toBeInTheDocument()
+    expect(screen.getByLabelText('Approve Activity pages for Think Different')).toBeInTheDocument()
+    // There is no book-level control.
     expect(screen.queryByLabelText('Approve Think Different')).not.toBeInTheDocument()
-    // The derived state still shows — nothing is editable, everything is visible.
-    expect(screen.getAllByText('Illustration underway').length).toBe(2)
   })
 
-  it('filters to awaiting-approval only', () => {
-    approvalsData = { biographies__jobs: { approved: true, by: 'e@dpb.in', at: '2026-08-04' } }
+  it('approves exactly the stage whose button was pressed', async () => {
     setup()
-    fireEvent.click(screen.getByLabelText(/Awaiting Diamond approval only/i))
-    expect(screen.queryByText('Think Different')).not.toBeInTheDocument()
-    expect(screen.getByText('The Little Master')).toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText('Approve Illustration for Think Different'))
+    await waitFor(() =>
+      expect(approveSpy).toHaveBeenCalledWith('biographies__jobs', 'illustration', 'editor@dpb.in'),
+    )
   })
 
-  it('searches by title', () => {
+  it('offers no button for a stage with nothing delivered', () => {
     setup()
-    fireEvent.change(screen.getByLabelText('Find a comic'), { target: { value: 'little master' } })
-    expect(screen.queryByText('Think Different')).not.toBeInTheDocument()
-    expect(screen.getByText('The Little Master')).toBeInTheDocument()
+    // The Little Master has no covers, no inside covers, no activities.
+    expect(screen.queryByLabelText('Approve Covers for The Little Master')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Approve IFC / IBC for The Little Master')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Approve Activity pages for The Little Master')).not.toBeInTheDocument()
+    // …but its script and illustration are real and approvable.
+    expect(screen.getByLabelText('Approve Script for The Little Master')).toBeInTheDocument()
+    expect(screen.getByLabelText('Approve Illustration for The Little Master')).toBeInTheDocument()
   })
 
-  it('states the counting rule and the reset date in the footnote', () => {
+  it('shows an approved stage as a dated tick, withdrawable on its own', async () => {
+    approvalsData = { biographies__jobs: { covers: { by: 'e@dpb.in', at: '2026-08-04T09:00:00Z' } } }
     setup()
-    expect(screen.getByText(/IFC and IBC are one page each/)).toBeInTheDocument()
-    expect(screen.getByText(/reset on 2026-08-04/)).toBeInTheDocument()
+    expect(screen.getByText('✓ 2026-08-04')).toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText('Withdraw Covers approval for Think Different'))
+    await waitFor(() => expect(withdrawSpy).toHaveBeenCalled())
+    expect(withdrawSpy.mock.calls[0][1]).toBe('covers')
+  })
+
+  it('says WHICH inside cover exists, so a missing IBC is visible', () => {
+    setup()
+    expect(screen.getByText('IFC only')).toBeInTheDocument()
+  })
+
+  it('keeps activity pages separate from the inside covers', () => {
+    setup()
+    expect(screen.getByText('2 pages')).toBeInTheDocument()
+  })
+
+  it('hides every approve control from a plain member but still shows the state', () => {
+    setup({ email: 'member@thothica.com' })
+    expect(screen.queryByLabelText(/^Approve /)).not.toBeInTheDocument()
+    expect(screen.getByText('IFC only')).toBeInTheDocument()
+  })
+
+  it('totals count stage approvals against delivered stages', () => {
+    setup()
+    expect(screen.getByText(/0 of \d+ delivered stages approved/)).toBeInTheDocument()
+  })
+
+  it('filters to rows with something still awaiting approval', () => {
+    // Every delivered stage of The Little Master signed off → it drops out.
+    approvalsData = {
+      biographies__sachin: {
+        script: { by: 'e@dpb.in', at: '2026-08-04' },
+        illustration: { by: 'e@dpb.in', at: '2026-08-04' },
+      },
+    }
+    setup()
+    fireEvent.click(screen.getByLabelText(/Only rows with something awaiting approval/i))
+    expect(screen.queryByText('The Little Master')).not.toBeInTheDocument()
+    expect(screen.getByText('Think Different')).toBeInTheDocument()
+  })
+
+  it('states the counting rule, including IFC and IBC as separate pages', () => {
+    setup()
+    expect(screen.getByText(/separate pages, one each/)).toBeInTheDocument()
   })
 })

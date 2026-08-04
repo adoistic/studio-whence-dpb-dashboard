@@ -73,7 +73,7 @@ function Headline({ t, currency }: { t: Tally; currency: string }) {
       <Tile
         label="Pages delivered"
         value={n(t.pagesBillable)}
-        sub={`${n(t.pagesMade)} interior · ${n(t.pagesExtras)} covers, IFC/IBC & activities`}
+        sub={`${n(t.pagesMade)} interior · ${n(t.pagesExtras)} covers, IFC, IBC & activities`}
       />
       <Tile
         label="Delivered value"
@@ -171,7 +171,8 @@ function ExtrasCell({ c }: { c: ComicRowModel }) {
   if (b.extras === 0) return <span className="text-brand-slate/50">—</span>
   const parts = [
     b.cover ? 'cover 1' : null,
-    b.insideCovers ? `inside covers ${b.insideCovers}` : null,
+    b.insideFront ? 'IFC 1' : null,
+    b.insideBack ? 'IBC 1' : null,
     b.backCover ? 'back cover 1' : null,
     b.activities ? `activity pages ${b.activities}` : null,
   ].filter(Boolean)

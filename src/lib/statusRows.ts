@@ -98,14 +98,16 @@ export type Row = { [column: string]: string | number | null | undefined; _href?
 // ── Billable pages ────────────────────────────────────────────────────────────
 //
 // What a finished comic actually bills for is more than its interior: the cover,
-// the inside covers (IFC/IBC), the back cover and the activity pages are all
-// drawn pages. The counting rule is Adnan's (2026-08-03), with his worked
-// example: cover 1 + back cover 1 + IFC 1 + IBC 1 + four activity pages = 8.
+// the inside front cover (IFC), the inside back cover (IBC), the back cover and
+// the activity pages are all drawn pages. The counting rule is Adnan's
+// (2026-08-04), with his worked example: cover 1 + back cover 1 + IFC 1 + IBC 1
+// + four activity pages = 8.
 //   · cover — the three cover OPTIONS collapse to ONE page (they are drafts of
 //     the same cover, not three covers); a shipped coverKey is that same page
-//   · IFC and IBC — ONE page each. The insideCovers key glob can hold variant
-//     renders of the same page, so the image count caps at two pages: one
-//     inside-front, one inside-back. Variants never inflate the bill.
+//   · IFC and IBC — SEPARATE pages, one each, counted independently. They are
+//     produced independently too: plenty of books have the IFC ("Meet the
+//     Characters") and no IBC yet, and merging them into one number hid exactly
+//     that. Which one exists is read from the artifact key/label.
 //   · activity pages — on actuals (four activity pages bill as four)
 //   · back cover — one page when present
 // This is the single place the rule lives; the dashboard and any export import
@@ -114,24 +116,53 @@ export type Row = { [column: string]: string | number | null | undefined; _href?
 export interface PageBreakdown {
   interior: number
   cover: 0 | 1
-  insideCovers: number
+  /** Inside FRONT cover — its own page. */
+  insideFront: 0 | 1
+  /** Inside BACK cover — its own page, produced independently of the IFC. */
+  insideBack: 0 | 1
   backCover: 0 | 1
   activities: number
-  /** cover + insideCovers + backCover + activities */
+  /** cover + insideFront + insideBack + backCover + activities */
   extras: number
   /** interior + extras — the billable page count */
   billable: number
+}
+
+/**
+ * Which inside covers exist, read from each artifact's key and label
+ * (`inside-front-cover.png`, "Inside back cover — …").
+ *
+ * An image matching neither pattern fills the front slot first, then the back,
+ * so an oddly-named artifact still counts as a real page instead of vanishing —
+ * but it can never inflate the count past one IFC and one IBC.
+ */
+export function insideCoverPages(c: Comic): { insideFront: 0 | 1; insideBack: 0 | 1 } {
+  let front = false
+  let back = false
+  let unlabelled = 0
+  for (const img of c.insideCovers?.images ?? []) {
+    const hay = `${img?.key ?? ''} ${img?.label ?? ''}`.toLowerCase()
+    if (/inside[-_\s]?front|\bifc\b/.test(hay)) front = true
+    else if (/inside[-_\s]?back|\bibc\b/.test(hay)) back = true
+    else unlabelled += 1
+  }
+  if (unlabelled > 0 && !front) { front = true; unlabelled -= 1 }
+  if (unlabelled > 0 && !back) back = true
+  return { insideFront: front ? 1 : 0, insideBack: back ? 1 : 0 }
 }
 
 export function pageBreakdown(c: Comic): PageBreakdown {
   const interior = c.pages?.count ?? 0
   const cover: 0 | 1 =
     c.pages?.coverKey || (c.coverOptions?.options?.length ?? 0) > 0 ? 1 : 0
-  const insideCovers = Math.min(c.insideCovers?.images?.length ?? 0, 2)
+  const { insideFront, insideBack } = insideCoverPages(c)
   const backCover: 0 | 1 = c.backCover?.image ? 1 : 0
   const activities = c.activities?.pages?.length ?? 0
-  const extras = cover + insideCovers + backCover + activities
-  return { interior, cover, insideCovers, backCover, activities, extras, billable: interior + extras }
+  const extras = cover + insideFront + insideBack + backCover + activities
+  return {
+    interior, cover, insideFront, insideBack, backCover, activities,
+    extras, billable: interior + extras,
+  }
 }
 
 /**

@@ -1,63 +1,80 @@
 'use client'
 
 /**
- * The status table — the no-nonsense view: one row per comic, every deliverable
- * a column, a totals row at the bottom. Someone looks at it and knows exactly
- * where everything stands.
+ * The status table — one row per comic, every deliverable its own column, and
+ * every deliverable carrying its OWN approve button right there in the cell.
  *
- * The Diamond column is the only editable thing on the page, and only Approve /
- * Withdraw: every other state is derived from what has actually been delivered,
- * so nobody can mark a delivered script "not received" or hand-set "complete".
+ * There is deliberately no single overall "approve this book" control: nobody
+ * signs off a whole book in one act, and a lone button at the end of the row
+ * meant Diamond had to decide what it even covered. Approving the illustration
+ * happens in the Illustration column, the covers in the Covers column, and so
+ * on — each one attributed and dated on its own.
+ *
+ * Everything except those approvals is derived from delivered content, so a
+ * stage with nothing in it simply has no button: you cannot sign off an empty
+ * cell, and you cannot mark a delivered thing "not received".
  */
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { Comic, Figure, Line, Program } from '@/types/content'
-import { approve, unapprove, useApprovals, canApprove } from '@/lib/approvals'
-import { buildStatusTable, statusTableCsvRows, statusTableTotals, type StatusTableRow } from '@/lib/statusTable'
+import {
+  approveStage,
+  canApprove,
+  useApprovals,
+  withdrawStage,
+  STAGE_LABEL,
+  type ComicApprovals,
+  type Stage,
+} from '@/lib/approvals'
+import { buildStatusTable, statusTableCsvRows, statusTableTotals, type StageCell, type StatusTableRow } from '@/lib/statusTable'
 import { formatMoney, type PricingConfig } from '@/lib/pricing'
 
 const n = (v: number) => Math.round(v).toLocaleString('en-IN')
 
 const TH =
   'sticky top-0 z-10 whitespace-nowrap border-b border-brand-pale-dusk bg-white px-3 py-2.5 text-left font-sans text-[0.6rem] font-normal uppercase tracking-label text-brand-slate'
-const TD = 'whitespace-nowrap border-b border-brand-pale-dusk/50 px-3 py-2 align-middle font-sans text-[0.78rem] text-brand-indigo'
+const TD =
+  'whitespace-nowrap border-b border-brand-pale-dusk/50 px-3 py-2 align-middle font-sans text-[0.78rem] text-brand-indigo'
 
-function Dot({ on, label }: { on: boolean; label: string }) {
-  return (
-    <span
-      title={`${label}: ${on ? 'done' : 'pending'}`}
-      className={`inline-block h-2 w-2 rounded-full ${on ? 'bg-brand-indigo' : 'border border-brand-slate/50 bg-transparent'}`}
-    />
-  )
-}
+/** The stage columns, left to right, in the order work actually happens. */
+const STAGE_COLUMNS: Stage[] = ['script', 'dossier', 'illustration', 'covers', 'insideCovers', 'activities', 'marketing']
 
-function DiamondCell({
-  row, canAct, busy, onApprove, onWithdraw,
+/**
+ * One deliverable's cell: what exists, and the approve control for THAT thing.
+ *
+ * Three states, and only one of them is actionable:
+ *   · nothing delivered → the detail, greyed, no button (nothing to approve)
+ *   · delivered, unapproved → the detail + an Approve button
+ *   · approved → a dated tick, with a × to withdraw
+ */
+function StageCellView({
+  cell, title, canAct, busy, onApprove, onWithdraw,
 }: {
-  row: StatusTableRow
+  cell: StageCell
+  title: string
   canAct: boolean
   busy: boolean
   onApprove: () => void
   onWithdraw: () => void
 }) {
-  if (row.approval) {
+  if (cell.approval) {
     return (
-      <span className="inline-flex items-center gap-1.5">
+      <span className="inline-flex items-center gap-1">
         <span
-          className="rounded-full bg-brand-gold/25 px-2 py-0.5 font-sans text-[0.66rem] font-semibold text-brand-indigo"
-          title={`Approved by ${row.approval.by} on ${row.approval.at.slice(0, 10)}`}
+          className="rounded-full bg-brand-gold/25 px-2 py-0.5 font-sans text-[0.64rem] font-semibold text-brand-indigo"
+          title={`${STAGE_LABEL[cell.stage]} approved by ${cell.approval.by} on ${cell.approval.at.slice(0, 10)}`}
         >
-          Approved · {row.approval.at.slice(0, 10)}
+          ✓ {cell.approval.at.slice(0, 10)}
         </span>
         {canAct ? (
           <button
             type="button"
-            aria-label={`Withdraw approval for ${row.title}`}
+            aria-label={`Withdraw ${STAGE_LABEL[cell.stage]} approval for ${title}`}
             disabled={busy}
             onClick={onWithdraw}
-            className="rounded-full px-1.5 font-sans text-[0.7rem] text-brand-slate hover:text-brand-indigo disabled:opacity-40"
             title="Withdraw this approval"
+            className="rounded-full px-1 font-sans text-[0.72rem] text-brand-slate transition hover:text-brand-indigo disabled:opacity-40"
           >
             ×
           </button>
@@ -65,16 +82,21 @@ function DiamondCell({
       </span>
     )
   }
+
+  if (!cell.ready) {
+    return <span className="font-sans text-[0.72rem] text-brand-slate/50">{cell.detail}</span>
+  }
+
   return (
-    <span className="inline-flex items-center gap-2">
-      <span className="font-sans text-[0.7rem] text-brand-slate">{row.delivery.label}</span>
+    <span className="inline-flex items-center gap-1.5">
+      <span className="font-sans text-[0.75rem]">{cell.detail}</span>
       {canAct ? (
         <button
           type="button"
-          aria-label={`Approve ${row.title}`}
+          aria-label={`Approve ${STAGE_LABEL[cell.stage]} for ${title}`}
           disabled={busy}
           onClick={onApprove}
-          className="rounded-full border border-brand-indigo px-2.5 py-0.5 font-sans text-[0.64rem] uppercase tracking-label text-brand-indigo transition hover:bg-brand-indigo hover:text-white disabled:opacity-40"
+          className="rounded-full border border-brand-indigo px-2 py-0.5 font-sans text-[0.6rem] uppercase tracking-label text-brand-indigo transition hover:bg-brand-indigo hover:text-white disabled:opacity-40"
         >
           Approve
         </button>
@@ -127,7 +149,8 @@ export function StatusTable({
     const q = query.trim().toLowerCase()
     return allRows.filter((r) => {
       if (scope !== 'all' && !r.key.startsWith(`${scope}__`)) return false
-      if (onlyUnapproved && r.approval) return false
+      // "Needs approval" = at least one delivered stage still unsigned.
+      if (onlyUnapproved && r.approvedCount >= r.readyCount) return false
       if (!q) return true
       return (
         r.title.toLowerCase().includes(q) ||
@@ -139,8 +162,8 @@ export function StatusTable({
 
   const totals = useMemo(() => statusTableTotals(rows), [rows])
 
-  async function act(key: string, fn: () => Promise<void>, okMsg: string) {
-    setBusyKey(key)
+  async function act(busyId: string, fn: () => Promise<void>, okMsg: string) {
+    setBusyKey(busyId)
     setNote(null)
     try {
       await fn()
@@ -171,11 +194,13 @@ export function StatusTable({
     URL.revokeObjectURL(url)
   }
 
+  const approvalsOf = (key: string): ComicApprovals => approvals.data?.[key] ?? {}
+
   // Group separators: a heavier border whenever the classification changes.
   let prevClassification = ''
 
   return (
-    <main className="mx-auto max-w-[1400px] px-6 pb-24 pt-10 md:pt-14">
+    <main className="mx-auto max-w-[1700px] px-6 pb-24 pt-10 md:pt-14">
       <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
         <div>
           <span className="flex items-center gap-3">
@@ -185,9 +210,10 @@ export function StatusTable({
           <h1 className="mt-3 font-serif font-light leading-tight text-brand-umber text-[2rem] md:text-[2.6rem]">
             Production status
           </h1>
-          <p className="mt-2 max-w-xl font-serif text-brand-umber/70 leading-relaxed">
-            One row per comic, every deliverable a column. The Diamond column is the only thing
-            anyone can set by hand — everything else reads straight off what has been delivered.
+          <p className="mt-2 max-w-2xl font-serif text-brand-umber/70 leading-relaxed">
+            One row per comic, one column per deliverable. Approve each thing where you see it —
+            the illustration in its column, the covers in theirs. Everything else reads straight
+            off what has been delivered.
           </p>
         </div>
         <div className="flex items-center gap-2 pb-1">
@@ -242,7 +268,7 @@ export function StatusTable({
             onChange={(e) => setOnlyUnapproved(e.target.checked)}
             className="h-3.5 w-3.5 accent-brand-indigo"
           />
-          Awaiting Diamond approval only
+          Only rows with something awaiting approval
         </label>
         {note ? (
           <p role="status" className="mb-2 ml-auto font-sans text-[0.72rem] text-brand-indigo">{note}</p>
@@ -250,25 +276,18 @@ export function StatusTable({
       </div>
 
       <div className="mt-5 overflow-x-auto rounded-xl border border-brand-pale-dusk bg-white">
-        <table className="w-full min-w-[1360px] border-collapse">
+        <table className="w-full min-w-[1640px] border-collapse">
           <thead>
             <tr>
               <th className={TH}>Classification</th>
               <th className={TH}>Sub-classification</th>
               <th className={TH}>Comic</th>
-              <th className={`${TH} text-right`}>Pages</th>
-              <th className={`${TH} text-right`} title="Cover 1 · IFC 1 · IBC 1 · back cover 1 · activity pages on actuals">
-                + Covers &amp; activities
-              </th>
-              <th className={`${TH} text-right`}>Total</th>
+              <th className={`${TH} text-right`}>Total pages</th>
               <th className={`${TH} text-right`}>Rate</th>
               <th className={`${TH} text-right`}>Total value</th>
-              <th className={TH}>Script</th>
-              <th className={TH}>Dossier</th>
-              <th className={TH}>Illustration</th>
-              <th className={TH} title="Cover · IFC/IBC · back cover · activity pages">Complete set</th>
-              <th className={TH}>Marketing</th>
-              <th className={TH}>Diamond</th>
+              {STAGE_COLUMNS.map((s) => (
+                <th key={s} className={TH}>{STAGE_LABEL[s]}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -276,79 +295,66 @@ export function StatusTable({
               const groupStart = r.classification !== prevClassification
               prevClassification = r.classification
               const b = r.breakdown
-              const extrasTitle = [
-                b.cover ? 'cover 1' : null,
-                b.insideCovers ? `IFC/IBC ${b.insideCovers}` : null,
-                b.backCover ? 'back cover 1' : null,
-                b.activities ? `activity pages ${b.activities}` : null,
-              ].filter(Boolean).join(' · ') || 'nothing beyond the interior yet'
+              const totalTitle = `${b.interior} interior · cover ${b.cover} · back cover ${b.backCover} · IFC ${b.insideFront} · IBC ${b.insideBack} · activity pages ${b.activities}`
               return (
-                <tr key={r.key} className={`${groupStart ? 'border-t-2 border-t-brand-pale-dusk' : ''} hover:bg-brand-pale-dusk/20`}>
+                <tr
+                  key={r.key}
+                  className={`${groupStart ? 'border-t-2 border-t-brand-pale-dusk' : ''} hover:bg-brand-pale-dusk/20`}
+                >
                   <td className={`${TD} ${groupStart ? '' : 'text-brand-slate/50'}`}>{r.classification}</td>
                   <td className={TD}>{r.subClassification}</td>
                   <td className={TD}>
-                    <Link href={r.href} className="underline decoration-brand-gold/60 underline-offset-2 hover:decoration-brand-gold">
+                    <Link
+                      href={r.href}
+                      className="underline decoration-brand-gold/60 underline-offset-2 hover:decoration-brand-gold"
+                    >
                       {r.title}
                     </Link>
                   </td>
-                  <td className={`${TD} text-right tabular-nums`}>
-                    {n(r.interior)}
-                    <span className="text-brand-slate/60"> / {r.target ? n(r.target) : '—'}</span>
+                  <td className={`${TD} text-right font-semibold tabular-nums`} title={totalTitle}>
+                    {n(r.totalPages)}
                   </td>
-                  <td className={`${TD} text-right tabular-nums`} title={extrasTitle}>
-                    {b.extras > 0 ? `+${b.extras}` : '—'}
-                  </td>
-                  <td className={`${TD} text-right font-semibold tabular-nums`}>{n(r.totalPages)}</td>
                   <td className={`${TD} text-right tabular-nums`}>
                     {formatMoney(r.rate, currency)}
                     {r.rateSource === 'comic' ? (
-                      <span className="ml-1 rounded-sm bg-brand-gold/25 px-1 font-sans text-[0.54rem] uppercase tracking-label" title="Per-comic override">o</span>
-                    ) : null}
-                  </td>
-                  <td className={`${TD} text-right font-semibold tabular-nums`}>{formatMoney(r.totalValue, currency)}</td>
-                  <td className={TD}>
-                    <span title="A comic appears here only once its validated script is in">✓</span>
-                    <span className="ml-1.5 text-brand-slate">{r.scriptDate || '—'}</span>
-                  </td>
-                  <td className={TD}>
-                    <span className={r.dossier.state === 'none' ? 'text-brand-gold' : r.dossier.state === 'n/a' ? 'text-brand-slate/60' : ''}>
-                      {r.dossier.state === 'n/a' ? '—' : r.dossier.label}
-                    </span>
-                  </td>
-                  <td className={TD}>
-                    {r.illustration.label}
-                    {r.illustration.pct !== null && r.illustration.label === 'In progress' ? (
-                      <span className="ml-1.5 text-brand-slate tabular-nums">{Math.round(r.illustration.pct * 100)}%</span>
-                    ) : null}
-                  </td>
-                  <td className={TD}>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Dot on={r.set.cover} label="Cover" />
-                      <Dot on={r.set.insideCovers} label="IFC/IBC" />
-                      <Dot on={r.set.backCover} label="Back cover" />
                       <span
-                        title={`Activity pages: ${r.set.activities}`}
-                        className={`font-sans text-[0.68rem] tabular-nums ${r.set.activities ? 'text-brand-indigo' : 'text-brand-slate/50'}`}
+                        className="ml-1 rounded-sm bg-brand-gold/25 px-1 font-sans text-[0.54rem] uppercase tracking-label"
+                        title="Per-comic override"
                       >
-                        {r.set.activities ? `Act ${r.set.activities}` : 'Act 0'}
+                        o
                       </span>
-                      {r.set.complete ? (
-                        <span className="font-sans text-[0.62rem] font-semibold uppercase tracking-label text-brand-indigo">✓ set</span>
-                      ) : null}
-                    </span>
+                    ) : null}
                   </td>
-                  <td className={TD}>
-                    <span className={r.marketing.label === '—' ? 'text-brand-slate/50' : ''}>{r.marketing.label}</span>
+                  <td className={`${TD} text-right font-semibold tabular-nums`}>
+                    {formatMoney(r.totalValue, currency)}
                   </td>
-                  <td className={TD}>
-                    <DiamondCell
-                      row={r}
-                      canAct={canAct}
-                      busy={busyKey === r.key}
-                      onApprove={() => void act(r.key, () => approve(r.key, email ?? ''), `${r.title} approved.`)}
-                      onWithdraw={() => void act(r.key, () => unapprove(r.key), `Approval withdrawn for ${r.title}.`)}
-                    />
-                  </td>
+                  {STAGE_COLUMNS.map((s) => {
+                    const busyId = `${r.key}::${s}`
+                    return (
+                      <td key={s} className={TD}>
+                        <StageCellView
+                          cell={r.stages[s]}
+                          title={r.title}
+                          canAct={canAct}
+                          busy={busyKey === busyId}
+                          onApprove={() =>
+                            void act(
+                              busyId,
+                              () => approveStage(r.key, s, email ?? ''),
+                              `${STAGE_LABEL[s]} approved for ${r.title}.`,
+                            )
+                          }
+                          onWithdraw={() =>
+                            void act(
+                              busyId,
+                              () => withdrawStage(r.key, s, approvalsOf(r.key), email ?? ''),
+                              `${STAGE_LABEL[s]} approval withdrawn for ${r.title}.`,
+                            )
+                          }
+                        />
+                      </td>
+                    )
+                  })}
                 </tr>
               )
             })}
@@ -358,16 +364,18 @@ export function StatusTable({
               <td className={`${TD} font-semibold`} colSpan={3}>
                 Total · {n(totals.comics)} comics
               </td>
-              <td className={`${TD} text-right font-semibold tabular-nums`}>
-                {n(totals.interior)}
-                <span className="font-normal text-brand-slate/60"> / {n(totals.target)}</span>
+              <td className={`${TD} text-right font-semibold tabular-nums`} title={
+                `${n(totals.interior)} interior · ${n(totals.covers)} covers · ${n(totals.insideCovers)} IFC/IBC · ${n(totals.activities)} activity pages`
+              }>
+                {n(totals.totalPages)}
               </td>
-              <td className={`${TD} text-right font-semibold tabular-nums`}>+{n(totals.extras)}</td>
-              <td className={`${TD} text-right font-semibold tabular-nums`}>{n(totals.totalPages)}</td>
               <td className={TD} />
-              <td className={`${TD} text-right font-semibold tabular-nums`}>{formatMoney(totals.totalValue, currency)}</td>
-              <td className={TD} colSpan={5} />
-              <td className={`${TD} font-semibold`}>{n(totals.approved)} approved</td>
+              <td className={`${TD} text-right font-semibold tabular-nums`}>
+                {formatMoney(totals.totalValue, currency)}
+              </td>
+              <td className={`${TD} font-semibold`} colSpan={STAGE_COLUMNS.length}>
+                {n(totals.approvedStages)} of {n(totals.readyStages)} delivered stages approved
+              </td>
             </tr>
           </tfoot>
         </table>
@@ -379,11 +387,13 @@ export function StatusTable({
         </p>
       ) : null}
 
-      <p className="mt-6 max-w-prose font-sans text-[0.72rem] leading-relaxed text-brand-slate">
+      <p className="mt-6 max-w-3xl font-sans text-[0.72rem] leading-relaxed text-brand-slate">
         Counting: the three cover options count as <strong className="font-semibold text-brand-indigo">one</strong> cover
-        page; IFC and IBC are one page each; the back cover is one; activity pages count on actuals.
-        Total value = total pages × the rate (per comic override → line rate → studio default).
-        The approval ledger was reset on 2026-08-04 — every approval shown is explicit, attributed and dated.
+        page; the back cover is one; the inside front cover and inside back cover are{' '}
+        <strong className="font-semibold text-brand-indigo">separate pages, one each</strong>; activity pages count on
+        actuals. Total value = total pages × the rate (per-comic override → line rate → studio default).
+        A stage with nothing delivered has no Approve button — you cannot sign off an empty cell.
+        The approval ledger was reset on 2026-08-04; every approval is explicit, attributed and dated.
       </p>
     </main>
   )
