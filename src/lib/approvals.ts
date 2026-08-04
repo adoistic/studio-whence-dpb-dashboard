@@ -18,7 +18,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { collection, doc, getDocs, setDoc } from 'firebase/firestore'
+import { collection, deleteField, doc, getDocs, setDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { hasResearch, pageBreakdown } from '@/lib/statusRows'
 import type { Comic, Figure } from '@/types/content'
@@ -39,6 +39,13 @@ export const STAGES = [
 
 export type Stage = (typeof STAGES)[number]
 
+/**
+ * The stages that gate INVOICING. Marketing review still exists as an internal
+ * process (its column and approve button stay), but it does not determine
+ * whether a book can be invoiced — Adnan, 2026-08-04.
+ */
+export const PRODUCTION_STAGES = STAGES.filter((s) => s !== 'marketing') as Stage[]
+
 export const STAGE_LABEL: Record<Stage, string> = {
   script: 'Script',
   dossier: 'Dossier',
@@ -56,6 +63,21 @@ export interface StageApproval {
 
 /** `stages` maps a stage to its approval; an absent key means not approved. */
 export type ComicApprovals = Partial<Record<Stage, StageApproval>>
+
+/**
+ * The invoice trail for one comic, two explicit human acts:
+ *
+ *   approved  — someone decided this book may be invoiced. It appears on the
+ *               "Approved for invoice" tab from that moment.
+ *   generated — the invoice has actually been raised, marked from that tab.
+ *
+ * Stored as an `invoice` map on the same diamondApprovals doc, so one document
+ * still tells a comic's whole sign-off story.
+ */
+export interface InvoiceState {
+  approved?: StageApproval
+  generated?: StageApproval
+}
 
 /**
  * Whether a stage has anything to approve yet.
@@ -104,34 +126,53 @@ export function canApprove(email: string | null, canModerate: boolean): boolean 
 
 export interface Async<T> { data: T | null; loading: boolean; error?: Error }
 
+/** Everything the sign-off ledger holds, keyed `{line}__{slug}`. */
+export interface ApprovalsData {
+  stages: Record<string, ComicApprovals>
+  invoices: Record<string, InvoiceState>
+}
+
+const EMPTY_LEDGER: ApprovalsData = { stages: {}, invoices: {} }
+
+function readMark(v: unknown): StageApproval | undefined {
+  const m = v as StageApproval | undefined
+  return m && typeof m.at === 'string' ? { by: m.by ?? '', at: m.at } : undefined
+}
+
 /**
- * Every comic's approvals, keyed `{line}__{slug}`.
+ * Every comic's approvals and invoice trail, keyed `{line}__{slug}`.
  *
- * A read failure (offline, rules change) degrades to an empty map — the table
- * then shows everything as awaiting approval, which is the honest post-reset
- * state, rather than an error page.
+ * A read failure (offline, rules change) degrades to an empty ledger — the
+ * table then shows everything as awaiting approval, which is the honest
+ * post-reset state, rather than an error page.
  */
-export function useApprovals(refreshKey = 0): Async<Record<string, ComicApprovals>> {
-  const [state, setState] = useState<Async<Record<string, ComicApprovals>>>({ data: null, loading: true })
+export function useApprovals(refreshKey = 0): Async<ApprovalsData> {
+  const [state, setState] = useState<Async<ApprovalsData>>({ data: null, loading: true })
   useEffect(() => {
     let alive = true
     ;(async () => {
       try {
         const snap = await getDocs(collection(db, APPROVALS_COLLECTION))
         if (!alive) return
-        const out: Record<string, ComicApprovals> = {}
+        const out: ApprovalsData = { stages: {}, invoices: {} }
         for (const d of snap.docs) {
-          const raw = (d.data() ?? {}) as { stages?: Record<string, StageApproval> }
+          const raw = (d.data() ?? {}) as {
+            stages?: Record<string, StageApproval>
+            invoice?: Record<string, StageApproval>
+          }
           const stages: ComicApprovals = {}
           for (const s of STAGES) {
-            const v = raw.stages?.[s]
-            if (v && typeof v.at === 'string') stages[s] = { by: v.by ?? '', at: v.at }
+            const v = readMark(raw.stages?.[s])
+            if (v) stages[s] = v
           }
-          out[d.id] = stages
+          out.stages[d.id] = stages
+          const approved = readMark(raw.invoice?.approved)
+          const generated = readMark(raw.invoice?.generated)
+          if (approved || generated) out.invoices[d.id] = { approved, generated }
         }
         setState({ data: out, loading: false })
       } catch (e) {
-        if (alive) setState({ data: {}, loading: false, error: e as Error })
+        if (alive) setState({ data: EMPTY_LEDGER, loading: false, error: e as Error })
       }
     })()
     return () => {
@@ -158,22 +199,62 @@ export async function approveStage(comicId: string, stage: Stage, by: string): P
 /**
  * Withdraw one stage's approval.
  *
- * A merge-write cannot delete a nested key, so the surviving stages are written
- * back whole. The map is tiny (at most seven entries) and withdrawal is rare.
+ * deleteField() inside a merge-write removes exactly that key. (Writing the
+ * surviving stages back whole — the first version of this — did NOT work:
+ * merge:true deep-merges maps, so the withdrawn stage quietly survived.)
  */
-export async function withdrawStage(
-  comicId: string,
-  stage: Stage,
-  current: ComicApprovals,
-  by: string,
-): Promise<void> {
-  const stages: Record<string, StageApproval> = {}
-  for (const s of STAGES) {
-    if (s !== stage && current[s]) stages[s] = current[s] as StageApproval
-  }
+export async function withdrawStage(comicId: string, stage: Stage, by: string): Promise<void> {
   await setDoc(
     doc(db, APPROVALS_COLLECTION, comicId),
-    { stages, updatedBy: by, updatedAt: new Date().toISOString() },
+    { stages: { [stage]: deleteField() }, updatedBy: by, updatedAt: new Date().toISOString() },
+    { merge: true },
+  )
+}
+
+// ── The invoice trail ─────────────────────────────────────────────────────────
+
+/** Mark a comic approved for invoice — it appears on the invoice tab from here. */
+export async function approveForInvoice(comicId: string, by: string): Promise<void> {
+  await setDoc(
+    doc(db, APPROVALS_COLLECTION, comicId),
+    {
+      invoice: { approved: { by, at: new Date().toISOString() } },
+      updatedBy: by,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true },
+  )
+}
+
+/** Mark the invoice raised. Only meaningful on an invoice-approved comic. */
+export async function markInvoiceGenerated(comicId: string, by: string): Promise<void> {
+  await setDoc(
+    doc(db, APPROVALS_COLLECTION, comicId),
+    {
+      invoice: { generated: { by, at: new Date().toISOString() } },
+      updatedBy: by,
+      updatedAt: new Date().toISOString(),
+    },
+    { merge: true },
+  )
+}
+
+/**
+ * Undo one invoice mark. Withdrawing the approval also clears `generated` —
+ * a book that is no longer approved for invoice cannot stay marked invoiced.
+ */
+export async function withdrawInvoiceMark(
+  comicId: string,
+  which: 'approved' | 'generated',
+  by: string,
+): Promise<void> {
+  const invoice =
+    which === 'approved'
+      ? { approved: deleteField(), generated: deleteField() }
+      : { generated: deleteField() }
+  await setDoc(
+    doc(db, APPROVALS_COLLECTION, comicId),
+    { invoice, updatedBy: by, updatedAt: new Date().toISOString() },
     { merge: true },
   )
 }

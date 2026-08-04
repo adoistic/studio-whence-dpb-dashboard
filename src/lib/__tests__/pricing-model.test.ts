@@ -192,12 +192,13 @@ describe('value', () => {
   })
 })
 
-// The accounting team's rule, 2026-08-04. These are the numbers on the invoice.
+// The accounting team's rule (2026-08-04), amended the same day: the script
+// bills from day one, and produced pages OVERWRITE the plan when they pass it.
 describe('billed pages — the accounting basis', () => {
-  it('bills the CONTRACTED interior, not what has been drawn: 0/48 bills 48', () => {
+  it('bills the script interior from day one: 0/48 bills 48', () => {
     const p = billedPagesFor(comic({ pages: undefined, target_length_pages: 48 }), CFG)
     expect(p.interior).toBe(48)
-    expect(p.interiorSource).toBe('target')
+    expect(p.interiorSource).toBe('script')
   })
 
   it('converts nothing into eight cover and activity pages, so 0/48 totals 56', () => {
@@ -206,6 +207,24 @@ describe('billed pages — the accounting basis', () => {
     expect(p.actualExtras).toBe(0)
     expect(p.extrasSource).toBe('standard')
     expect(p.total).toBe(56)
+  })
+
+  it('produced pages OVERWRITE the plan: a 48-page script grown to 52 bills 60', () => {
+    // The bug this kills: a book was planned at 48 (billing 56) and later grew
+    // by four pages; the table kept the stale 56. Actuals now win, everywhere.
+    const p = billedPagesFor(
+      comic({ target_length_pages: 48, pages: { hasPages: true, count: 52, coverKey: null } } as Partial<Comic>),
+      CFG,
+    )
+    expect(p.interior).toBe(52)
+    expect(p.interiorSource).toBe('produced')
+    expect(p.total).toBe(60)
+  })
+
+  it('a plan still ahead of production keeps billing the script count', () => {
+    const p = billedPagesFor(comic(), CFG) // 24 drawn of 48
+    expect(p.interior).toBe(48)
+    expect(p.interiorSource).toBe('script')
   })
 
   it('bills actuals when a book has produced more than the standard eight', () => {
@@ -220,10 +239,10 @@ describe('billed pages — the accounting basis', () => {
     )
     expect(p.actualExtras).toBe(13)
     expect(p.extras).toBe(13)
-    expect(p.extrasSource).toBe('actual')
+    expect(p.extrasSource).toBe('produced')
   })
 
-  it('an explicit per-comic figure beats both — "unless it is said otherwise"', () => {
+  it('an explicit per-comic figure replaces the standard as the floor', () => {
     const cfg = { ...CFG, extraPages: { 'biographies__a-book': 4 } }
     const p = billedPagesFor(comic({ pages: undefined }), cfg)
     expect(p.extras).toBe(4)
@@ -231,16 +250,34 @@ describe('billed pages — the accounting basis', () => {
     expect(p.total).toBe(52)
   })
 
+  it('…but even an explicit figure cannot under-bill produced extras', () => {
+    const cfg = { ...CFG, extraPages: { 'biographies__a-book': 4 } }
+    const p = billedPagesFor(
+      comic({ activities: { pages: Array.from({ length: 6 }, (_, i) => ({ key: `a${i}` })) } } as Partial<Comic>),
+      cfg,
+    )
+    expect(p.extras).toBe(6)
+    expect(p.extrasSource).toBe('produced')
+  })
+
   it('falls back to actuals when no target is recorded — never bills zero interior', () => {
     const p = billedPagesFor(comic({ target_length_pages: 0 }), CFG)
     expect(p.interior).toBe(24)
-    expect(p.interiorSource).toBe('actual')
+    expect(p.interiorSource).toBe('produced')
   })
 
   it('the studio can move the standard allotment centrally', () => {
     const p = billedPagesFor(comic({ pages: undefined }), { ...CFG, standardExtraPages: 6 })
     expect(p.extras).toBe(6)
     expect(p.total).toBe(54)
+  })
+
+  it('reports the generated pages alongside — the value-of-work-done basis', () => {
+    const p = billedPagesFor(
+      comic({ backCover: { image: { key: 'bc' } } } as Partial<Comic>),
+      CFG,
+    )
+    expect(p.generated).toBe(25) // 24 interior drawn + the back cover
   })
 })
 
@@ -269,6 +306,16 @@ describe('GST and TDS', () => {
     expect(b.totalValue).toBe(14_000)
     expect(b.gst).toBe(2_520)
     expect(b.netOfTds).toBe(16_240)
+    // Nothing produced yet → the generated value starts at zero and grows.
+    expect(b.generatedPages).toBe(0)
+    expect(b.generatedValue).toBe(0)
+  })
+
+  it('the generated value moves with production while the invoice value holds', () => {
+    const b = billingFor(comic(), CFG) // 24 of 48 drawn, no extras yet
+    expect(b.totalValue).toBe(14_000)
+    expect(b.generatedPages).toBe(24)
+    expect(b.generatedValue).toBe(6_000)
   })
 
   it('rounds to paise so a fractional rate cannot leak a long float', () => {

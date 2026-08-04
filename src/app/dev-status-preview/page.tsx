@@ -12,6 +12,7 @@
 import { useState } from 'react'
 import { ProductionDashboard } from '@/components/ProductionDashboard'
 import { StatusTable } from '@/components/StatusTable'
+import { InvoiceTable } from '@/components/InvoiceTable'
 import type { Comic, Line, Program } from '@/types/content'
 
 const fake = (i: number, over: Partial<Comic>): Comic =>
@@ -44,6 +45,13 @@ const COMICS: Comic[] = [
   ...Array.from({ length: 9 }, (_, i) => fake(i + 1, { program_slug: i % 2 ? 'first-series' : 'second-series' })),
   ...Array.from({ length: 5 }, (_, i) => fake(i + 10, { line: 'beta', program_slug: null })),
   ...Array.from({ length: 3 }, (_, i) => fake(i + 15, { line: 'gamma', program_slug: null, target_length_pages: 64 })),
+  // The overwrite case: scripted at 48, grew to 52 → bills 52 + 8 = 60.
+  fake(18, {
+    line: 'gamma',
+    program_slug: null,
+    target_length_pages: 48,
+    pages: { hasPages: true, count: 52, coverKey: 'cover.jpg' },
+  }),
 ]
 
 const LINES = [
@@ -72,7 +80,7 @@ const PRICING = {
 }
 
 export default function DevStatusPreview() {
-  const [view, setView] = useState<'table' | 'overview'>('table')
+  const [view, setView] = useState<'table' | 'invoices' | 'overview'>('table')
   if (process.env.NODE_ENV === 'production') {
     return <main className="p-10 font-sans text-sm">Not available.</main>
   }
@@ -81,6 +89,7 @@ export default function DevStatusPreview() {
       {(
         [
           ['table', 'Table'],
+          ['invoices', 'Approved for invoice'],
           ['overview', 'Overview'],
         ] as const
       ).map(([key, label]) => (
@@ -106,6 +115,17 @@ export default function DevStatusPreview() {
       email="preview@dpb.in"
       canModerate={false}
       canAdmin
+      viewSwitcher={switcher}
+    />
+  ) : view === 'invoices' ? (
+    <InvoiceTable
+      comics={COMICS}
+      figures={FIGURES}
+      lines={LINES}
+      programs={PROGRAMS}
+      pricing={PRICING}
+      email="preview@dpb.in"
+      canModerate={false}
       viewSwitcher={switcher}
     />
   ) : (

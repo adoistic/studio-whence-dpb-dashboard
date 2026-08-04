@@ -1,44 +1,102 @@
 'use client'
 
 /**
- * The status table — one row per comic, every deliverable its own column, and
- * every deliverable carrying its OWN approve button right there in the cell.
+ * The status table — one row per comic, and the whole financial story on one
+ * screen (Adnan, 2026-08-04: "I should not have to switch tabs to understand
+ * it").
  *
- * There is deliberately no single overall "approve this book" control: nobody
- * signs off a whole book in one act, and a lone button at the end of the row
- * meant Diamond had to decide what it even covered. Approving the illustration
- * happens in the Illustration column, the covers in the Covers column, and so
- * on — each one attributed and dated on its own.
+ * Reading order, left to right:
+ *   the book → its pages (script · extras · total · generated) → its money
+ *   (rate · invoice value · with GST · net after TDS) → the per-deliverable
+ *   sign-offs → the invoice trail.
  *
- * Everything except those approvals is derived from delivered content, so a
- * stage with nothing in it simply has no button: you cannot sign off an empty
- * cell, and you cannot mark a delivered thing "not received".
+ * A summary strip above the table carries the same totals at a glance —
+ * script pages, generated pages, extras, invoice value, GST, with-GST, net —
+ * for exactly the rows currently in view.
+ *
+ * Approvals: each deliverable is signed off in its own column. Marketing
+ * remains an internal sign-off and NEVER gates invoicing; the invoice has its
+ * own explicit two-step trail (approve for invoice → invoice generated, the
+ * second step on the Approved-for-invoice tab).
  */
 
 import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { Comic, Figure, Line, Program } from '@/types/content'
 import {
+  approveForInvoice,
   approveStage,
   canApprove,
   useApprovals,
+  withdrawInvoiceMark,
   withdrawStage,
   STAGE_LABEL,
-  type ComicApprovals,
   type Stage,
 } from '@/lib/approvals'
-import { buildStatusTable, statusTableCsvRows, statusTableTotals, type StageCell, type StatusTableRow } from '@/lib/statusTable'
-import { formatMoney, type PricingConfig } from '@/lib/pricing'
+import {
+  buildStatusTable,
+  statusTableCsvRows,
+  statusTableTotals,
+  type StageCell,
+  type StatusTableRow,
+  type StatusTableTotals,
+} from '@/lib/statusTable'
+import { formatMoney, formatMoneyShort, type PricingConfig } from '@/lib/pricing'
 
 const n = (v: number) => Math.round(v).toLocaleString('en-IN')
 
 const TH =
-  'sticky top-0 z-10 whitespace-nowrap border-b border-brand-pale-dusk bg-white px-3 py-2.5 text-left font-sans text-[0.6rem] font-normal uppercase tracking-label text-brand-slate'
+  'sticky top-6 z-10 whitespace-nowrap border-b border-brand-pale-dusk bg-white px-3 py-2.5 text-left font-sans text-[0.6rem] font-normal uppercase tracking-label text-brand-slate'
+const GROUP_TH =
+  'sticky top-0 z-20 h-6 whitespace-nowrap border-b border-brand-pale-dusk/60 bg-white px-3 text-left align-middle font-sans text-[0.56rem] font-semibold uppercase tracking-label text-brand-gold'
 const TD =
   'whitespace-nowrap border-b border-brand-pale-dusk/50 px-3 py-2 align-middle font-sans text-[0.78rem] text-brand-indigo'
+/** Left rule marking the start of a column group, on header and body alike. */
+const GROUP_L = 'border-l border-brand-pale-dusk/60'
 
 /** The stage columns, left to right, in the order work actually happens. */
 const STAGE_COLUMNS: Stage[] = ['script', 'dossier', 'illustration', 'covers', 'insideCovers', 'activities', 'marketing']
+
+// ── Summary strip ─────────────────────────────────────────────────────────────
+
+function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="rounded-xl border border-brand-pale-dusk bg-white px-4 py-3">
+      <div className="font-sans text-[0.58rem] uppercase tracking-label text-brand-slate">{label}</div>
+      <div className="mt-1 font-serif text-[1.35rem] font-light leading-none text-brand-umber tabular-nums">
+        {value}
+      </div>
+      {sub ? <div className="mt-1.5 font-sans text-[0.66rem] leading-snug text-brand-slate/90">{sub}</div> : null}
+    </div>
+  )
+}
+
+/** The bird's-eye row: pages on the left, the invoice chain on the right. */
+function SummaryStrip({ t, currency }: { t: StatusTableTotals; currency: string }) {
+  return (
+    <div className="mt-6 grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-7">
+      <Tile label="Script pages" value={n(t.scriptPages)} sub="billed from the script, day one" />
+      <Tile label="Extras" value={n(t.billedExtras)} sub="covers, inside covers & activities" />
+      <Tile
+        label="Generated pages"
+        value={n(t.generatedPages)}
+        sub={`of ${n(t.totalPages)} total · ${formatMoneyShort(t.generatedValue, currency)} of work done`}
+      />
+      {/* Exact rupees, not the compact form — ₹3,21,432 and ₹3,15,984 must not
+          both read "₹3.2 L" when the whole point is telling them apart. */}
+      <Tile label="Invoice value" value={formatMoney(t.totalValue, currency)} sub={`${n(t.totalPages)} pages × rate`} />
+      <Tile label="GST 18%" value={formatMoney(t.gst, currency)} sub="on the invoice value" />
+      <Tile label="With GST" value={formatMoney(t.totalWithGst, currency)} sub="invoice value + GST" />
+      <Tile
+        label="Net after TDS"
+        value={formatMoney(t.netOfTds, currency)}
+        sub={`client deducts ${formatMoney(t.tds, currency)} (2% of base)`}
+      />
+    </div>
+  )
+}
+
+// ── Cells ─────────────────────────────────────────────────────────────────────
 
 /**
  * One deliverable's cell: what exists, and the approve control for THAT thing.
@@ -105,6 +163,70 @@ function StageCellView({
   )
 }
 
+/**
+ * The invoice trail cell. Marketing does not gate this — the tooltip counts
+ * PRODUCTION sign-offs only, and the button is a human decision either way.
+ */
+function InvoiceCellView({
+  row, canAct, busy, onApprove, onWithdraw,
+}: {
+  row: StatusTableRow
+  canAct: boolean
+  busy: boolean
+  onApprove: () => void
+  onWithdraw: () => void
+}) {
+  if (row.invoice.generated) {
+    return (
+      <span
+        className="rounded-full bg-brand-indigo px-2 py-0.5 font-sans text-[0.64rem] font-semibold text-white"
+        title={`Invoice generated by ${row.invoice.generated.by} on ${row.invoice.generated.at.slice(0, 10)}`}
+      >
+        Invoiced {row.invoice.generated.at.slice(0, 10)}
+      </span>
+    )
+  }
+  if (row.invoice.approved) {
+    return (
+      <span className="inline-flex items-center gap-1">
+        <span
+          className="rounded-full bg-brand-gold/25 px-2 py-0.5 font-sans text-[0.64rem] font-semibold text-brand-indigo"
+          title={`Approved for invoice by ${row.invoice.approved.by} on ${row.invoice.approved.at.slice(0, 10)} — mark it generated on the Approved-for-invoice tab`}
+        >
+          ✓ For invoice {row.invoice.approved.at.slice(0, 10)}
+        </span>
+        {canAct ? (
+          <button
+            type="button"
+            aria-label={`Withdraw invoice approval for ${row.title}`}
+            disabled={busy}
+            onClick={onWithdraw}
+            title="Withdraw the invoice approval"
+            className="rounded-full px-1 font-sans text-[0.72rem] text-brand-slate transition hover:text-brand-indigo disabled:opacity-40"
+          >
+            ×
+          </button>
+        ) : null}
+      </span>
+    )
+  }
+  if (!canAct) return <span className="font-sans text-[0.72rem] text-brand-slate/50">—</span>
+  return (
+    <button
+      type="button"
+      aria-label={`Approve ${row.title} for invoice`}
+      disabled={busy}
+      onClick={onApprove}
+      title={`${row.prodApproved} of ${row.prodReady} production sign-offs done (marketing is internal and not required)`}
+      className="rounded-full border border-brand-gold bg-brand-gold/10 px-2 py-0.5 font-sans text-[0.6rem] uppercase tracking-label text-brand-indigo transition hover:bg-brand-gold/30 disabled:opacity-40"
+    >
+      Approve for invoice
+    </button>
+  )
+}
+
+// ── The table ─────────────────────────────────────────────────────────────────
+
 export function StatusTable({
   comics,
   figures,
@@ -138,7 +260,11 @@ export function StatusTable({
   const canAct = canApprove(email, canModerate)
 
   const allRows = useMemo(
-    () => buildStatusTable(comics, figures, lines, programs, pricing, approvals.data),
+    () =>
+      buildStatusTable(
+        comics, figures, lines, programs, pricing,
+        approvals.data?.stages ?? null, approvals.data?.invoices ?? null,
+      ),
     [comics, figures, lines, programs, pricing, approvals.data],
   )
 
@@ -194,13 +320,8 @@ export function StatusTable({
     URL.revokeObjectURL(url)
   }
 
-  const approvalsOf = (key: string): ComicApprovals => approvals.data?.[key] ?? {}
-
-  // Group separators: a heavier border whenever the classification changes.
-  let prevClassification = ''
-
   return (
-    <main className="mx-auto max-w-[1700px] px-6 pb-24 pt-10 md:pt-14">
+    <main className="mx-auto max-w-[1780px] px-6 pb-24 pt-10 md:pt-14">
       <header className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
         <div>
           <span className="flex items-center gap-3">
@@ -211,9 +332,8 @@ export function StatusTable({
             Production status
           </h1>
           <p className="mt-2 max-w-2xl font-serif text-brand-umber/70 leading-relaxed">
-            One row per comic, one column per deliverable. Approve each thing where you see it —
-            the illustration in its column, the covers in theirs. Everything else reads straight
-            off what has been delivered.
+            One row per comic: its pages, its value, its sign-offs, its invoice. The strip above the
+            table totals whatever is in view.
           </p>
         </div>
         <div className="flex items-center gap-2 pb-1">
@@ -235,6 +355,8 @@ export function StatusTable({
           ) : null}
         </div>
       </header>
+
+      <SummaryStrip t={totals} currency={currency} />
 
       <div className="mt-7 flex flex-wrap items-end gap-x-4 gap-y-3">
         <label className="flex flex-col gap-1">
@@ -276,40 +398,50 @@ export function StatusTable({
       </div>
 
       <div className="mt-5 overflow-x-auto rounded-xl border border-brand-pale-dusk bg-white">
-        <table className="w-full min-w-[2140px] border-collapse">
+        <table className="w-full min-w-[2260px] border-collapse">
           <thead>
+            {/* Group row: the four stories the columns tell. */}
+            <tr>
+              <th className={GROUP_TH} colSpan={3} />
+              <th className={`${GROUP_TH} ${GROUP_L}`} colSpan={4}>Pages</th>
+              <th className={`${GROUP_TH} ${GROUP_L}`} colSpan={4}>Value ({currency})</th>
+              <th className={`${GROUP_TH} ${GROUP_L}`} colSpan={STAGE_COLUMNS.length}>Sign-offs</th>
+              <th className={`${GROUP_TH} ${GROUP_L}`}>Invoice</th>
+            </tr>
             <tr>
               <th className={TH}>Classification</th>
               <th className={TH}>Sub-classification</th>
               <th className={TH}>Comic</th>
-              <th className={`${TH} text-right`}>Total pages</th>
-              <th className={`${TH} text-right`}>Rate</th>
-              <th className={`${TH} text-right`}>Total value</th>
-              <th className={`${TH} text-right`}>GST 18%</th>
-              <th className={`${TH} text-right`}>Total value with GST</th>
-              <th className={`${TH} text-right`}>TDS 2%</th>
-              <th className={`${TH} text-right`}>Net of TDS</th>
-              {STAGE_COLUMNS.map((s) => (
-                <th key={s} className={TH}>{STAGE_LABEL[s]}</th>
+              <th className={`${TH} ${GROUP_L} text-right`}>Script</th>
+              <th className={`${TH} text-right`}>Extras</th>
+              <th className={`${TH} text-right`}>Total</th>
+              <th className={`${TH} text-right`}>Generated</th>
+              <th className={`${TH} ${GROUP_L} text-right`}>Rate</th>
+              <th className={`${TH} text-right`}>Invoice value</th>
+              <th className={`${TH} text-right`}>With GST</th>
+              <th className={`${TH} text-right`}>Net after TDS</th>
+              {STAGE_COLUMNS.map((s, i) => (
+                <th key={s} className={`${TH} ${i === 0 ? GROUP_L : ''}`}>{STAGE_LABEL[s]}</th>
               ))}
+              <th className={`${TH} ${GROUP_L}`}>Status</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r) => {
-              const groupStart = r.classification !== prevClassification
-              prevClassification = r.classification
-              const b = r.breakdown
-              const extrasNote =
-                r.billed.extrasSource === 'override'
-                  ? 'set for this book'
-                  : r.billed.extrasSource === 'standard'
-                    ? `standard allotment; ${b.extras} produced so far`
-                    : 'on actuals'
-              const totalTitle =
-                `Billed: ${r.billed.interior} interior ` +
-                `(${r.billed.interiorSource === 'target' ? 'contracted' : 'no target recorded — on actuals'})` +
-                ` + ${r.billed.extras} cover & activity pages (${extrasNote}).\n` +
-                `Produced so far: ${b.interior} interior · cover ${b.cover} · back cover ${b.backCover} · IFC ${b.insideFront} · IBC ${b.insideBack} · activity pages ${b.activities}`
+            {rows.map((r, i) => {
+              const groupStart = i === 0 || r.classification !== rows[i - 1].classification
+              const pagesTitle =
+                `Script pages: ${r.billed.interior}` +
+                (r.billed.interiorSource === 'produced'
+                  ? ` (actually produced — overrides the scripted ${r.target || '—'})`
+                  : ' (from the script)') +
+                `\nExtras billed: ${r.billed.extras} (${
+                  r.billed.extrasSource === 'override'
+                    ? 'set for this book'
+                    : r.billed.extrasSource === 'produced'
+                      ? 'actually produced'
+                      : 'standard allotment'
+                }; ${r.billed.actualExtras} made so far)` +
+                `\nGenerated so far: ${r.generatedPages} pages = ${formatMoney(r.generatedValue, currency)}`
               return (
                 <tr
                   key={r.key}
@@ -325,10 +457,20 @@ export function StatusTable({
                       {r.title}
                     </Link>
                   </td>
-                  <td className={`${TD} text-right font-semibold tabular-nums`} title={totalTitle}>
+                  <td className={`${TD} ${GROUP_L} text-right tabular-nums`} title={pagesTitle}>
+                    {n(r.billed.interior)}
+                  </td>
+                  <td className={`${TD} text-right tabular-nums`} title={pagesTitle}>
+                    {n(r.billed.extras)}
+                  </td>
+                  <td className={`${TD} text-right font-semibold tabular-nums`} title={pagesTitle}>
                     {n(r.totalPages)}
                   </td>
-                  <td className={`${TD} text-right tabular-nums`}>
+                  <td className={`${TD} text-right tabular-nums text-brand-slate`} title={pagesTitle}>
+                    {n(r.generatedPages)}
+                    <span className="text-brand-slate/50"> / {n(r.totalPages)}</span>
+                  </td>
+                  <td className={`${TD} ${GROUP_L} text-right tabular-nums`}>
                     {formatMoney(r.rate, currency)}
                     {r.rateSource === 'comic' ? (
                       <span
@@ -342,22 +484,22 @@ export function StatusTable({
                   <td className={`${TD} text-right font-semibold tabular-nums`}>
                     {formatMoney(r.totalValue, currency)}
                   </td>
-                  <td className={`${TD} text-right tabular-nums text-brand-slate`}>
-                    {formatMoney(r.gst, currency)}
-                  </td>
-                  <td className={`${TD} text-right tabular-nums`}>
+                  <td
+                    className={`${TD} text-right tabular-nums`}
+                    title={`GST 18% = ${formatMoney(r.gst, currency)}`}
+                  >
                     {formatMoney(r.totalWithGst, currency)}
                   </td>
-                  <td className={`${TD} text-right tabular-nums text-brand-slate`}>
-                    −{formatMoney(r.tds, currency)}
-                  </td>
-                  <td className={`${TD} text-right font-semibold tabular-nums`}>
+                  <td
+                    className={`${TD} text-right font-semibold tabular-nums`}
+                    title={`TDS 2% of the invoice value = ${formatMoney(r.tds, currency)}, deducted by the client at payment`}
+                  >
                     {formatMoney(r.netOfTds, currency)}
                   </td>
-                  {STAGE_COLUMNS.map((s) => {
+                  {STAGE_COLUMNS.map((s, si) => {
                     const busyId = `${r.key}::${s}`
                     return (
-                      <td key={s} className={TD}>
+                      <td key={s} className={`${TD} ${si === 0 ? GROUP_L : ''}`}>
                         <StageCellView
                           cell={r.stages[s]}
                           title={r.title}
@@ -373,7 +515,7 @@ export function StatusTable({
                           onWithdraw={() =>
                             void act(
                               busyId,
-                              () => withdrawStage(r.key, s, approvalsOf(r.key), email ?? ''),
+                              () => withdrawStage(r.key, s, email ?? ''),
                               `${STAGE_LABEL[s]} approval withdrawn for ${r.title}.`,
                             )
                           }
@@ -381,6 +523,27 @@ export function StatusTable({
                       </td>
                     )
                   })}
+                  <td className={`${TD} ${GROUP_L}`}>
+                    <InvoiceCellView
+                      row={r}
+                      canAct={canAct}
+                      busy={busyKey === `${r.key}::invoice`}
+                      onApprove={() =>
+                        void act(
+                          `${r.key}::invoice`,
+                          () => approveForInvoice(r.key, email ?? ''),
+                          `${r.title} approved for invoice — it is now on the Approved-for-invoice tab.`,
+                        )
+                      }
+                      onWithdraw={() =>
+                        void act(
+                          `${r.key}::invoice`,
+                          () => withdrawInvoiceMark(r.key, 'approved', email ?? ''),
+                          `Invoice approval withdrawn for ${r.title}.`,
+                        )
+                      }
+                    />
+                  </td>
                 </tr>
               )
             })}
@@ -390,30 +553,25 @@ export function StatusTable({
               <td className={`${TD} font-semibold`} colSpan={3}>
                 Total · {n(totals.comics)} comics
               </td>
-              <td className={`${TD} text-right font-semibold tabular-nums`} title={
-                `Billed: ${n(totals.billedInterior)} interior + ${n(totals.billedExtras)} cover & activity pages.\n` +
-                `Produced so far: ${n(totals.interior)} interior · ${n(totals.covers)} covers · ${n(totals.insideCovers)} IFC/IBC · ${n(totals.activities)} activity pages`
-              }>
-                {n(totals.totalPages)}
-              </td>
-              <td className={TD} />
+              <td className={`${TD} ${GROUP_L} text-right font-semibold tabular-nums`}>{n(totals.scriptPages)}</td>
+              <td className={`${TD} text-right font-semibold tabular-nums`}>{n(totals.billedExtras)}</td>
+              <td className={`${TD} text-right font-semibold tabular-nums`}>{n(totals.totalPages)}</td>
+              <td className={`${TD} text-right font-semibold tabular-nums`}>{n(totals.generatedPages)}</td>
+              <td className={`${TD} ${GROUP_L}`} />
               <td className={`${TD} text-right font-semibold tabular-nums`}>
                 {formatMoney(totals.totalValue, currency)}
               </td>
-              <td className={`${TD} text-right font-semibold tabular-nums`}>
-                {formatMoney(totals.gst, currency)}
-              </td>
-              <td className={`${TD} text-right font-semibold tabular-nums`}>
+              <td className={`${TD} text-right font-semibold tabular-nums`} title={`GST 18% = ${formatMoney(totals.gst, currency)}`}>
                 {formatMoney(totals.totalWithGst, currency)}
               </td>
-              <td className={`${TD} text-right font-semibold tabular-nums`}>
-                −{formatMoney(totals.tds, currency)}
-              </td>
-              <td className={`${TD} text-right font-semibold tabular-nums`}>
+              <td className={`${TD} text-right font-semibold tabular-nums`} title={`TDS 2% = ${formatMoney(totals.tds, currency)}`}>
                 {formatMoney(totals.netOfTds, currency)}
               </td>
-              <td className={`${TD} font-semibold`} colSpan={STAGE_COLUMNS.length}>
+              <td className={`${TD} ${GROUP_L} font-semibold`} colSpan={STAGE_COLUMNS.length}>
                 {n(totals.approvedStages)} of {n(totals.readyStages)} delivered stages approved
+              </td>
+              <td className={`${TD} ${GROUP_L} font-semibold`}>
+                {n(totals.approvedForInvoice)} approved · {n(totals.invoicesGenerated)} invoiced
               </td>
             </tr>
           </tfoot>
@@ -427,25 +585,26 @@ export function StatusTable({
       ) : null}
 
       <p className="mt-6 max-w-3xl font-sans text-[0.72rem] leading-relaxed text-brand-slate">
-        <strong className="font-semibold text-brand-indigo">Counting.</strong> Interior pages bill at the{' '}
-        <strong className="font-semibold text-brand-indigo">contracted</strong> count, not at what has been drawn — a
-        book reading 0 / 48 bills 48. Cover and activity pages are a standard{' '}
-        <strong className="font-semibold text-brand-indigo">eight</strong> (front cover, back cover, IFC, IBC and four
-        activity pages) unless a book has produced more or has a figure set for it. So 0 / 48 with nothing else
-        recorded bills 48 + 8 = 56 pages. The three cover options count as one cover page; the IFC and IBC are
-        separate pages, one each. Hover a page count to see the split.
+        <strong className="font-semibold text-brand-indigo">Pages.</strong> A book bills its{' '}
+        <strong className="font-semibold text-brand-indigo">script</strong> pages from the day the script exists,
+        plus a standard <strong className="font-semibold text-brand-indigo">eight extras</strong> (front cover, back
+        cover, the inside covers and four activity pages). The moment production goes past the plan, the{' '}
+        <strong className="font-semibold text-brand-indigo">produced count takes over</strong> — a book scripted at
+        48 that grows to 52 bills 52 + 8 = 60, automatically. Generated counts the pages that actually exist today;
+        hover any page number for the split.
       </p>
       <p className="mt-3 max-w-3xl font-sans text-[0.72rem] leading-relaxed text-brand-slate">
-        <strong className="font-semibold text-brand-indigo">Money.</strong> Total value = total pages × the rate
-        (per-comic override → line rate → studio default). GST is 18% of the total value; total value with GST adds
-        the two. TDS is 2%, taken on the total value{' '}
-        <strong className="font-semibold text-brand-indigo">net of GST</strong>, and is deducted by the party at
-        payment. Net of TDS = total value + GST − TDS.
+        <strong className="font-semibold text-brand-indigo">Money.</strong> Invoice value = total pages × the rate
+        (per-comic override → line rate → studio default). GST is 18% on the invoice value (the amount is in the
+        strip above, and on hover). TDS is 2% <strong className="font-semibold text-brand-indigo">of the invoice
+        value only</strong>, never of the GST-inclusive figure: ₹100 base → ₹18 GST → ₹118 invoice → ₹2 TDS → ₹116
+        net receivable.
       </p>
       <p className="mt-3 max-w-3xl font-sans text-[0.72rem] leading-relaxed text-brand-slate">
-        <strong className="font-semibold text-brand-indigo">Approvals.</strong> A stage with nothing delivered has no
-        Approve button — you cannot sign off an empty cell. The approval ledger was reset on 2026-08-04; every
-        approval is explicit, attributed and dated.
+        <strong className="font-semibold text-brand-indigo">Invoicing.</strong> Approve a book for invoice in the
+        last column — marketing review is internal and never gates it. The book then appears on the{' '}
+        <strong className="font-semibold text-brand-indigo">Approved for invoice</strong> tab, where the raised
+        invoice is marked as generated. Every mark is attributed and dated.
       </p>
     </main>
   )

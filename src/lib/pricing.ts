@@ -131,16 +131,22 @@ export function valueOf(comic: Comic, cfg: PricingConfig | null): ComicValue {
 //
 // The invoice chain the accounting team set out (2026-08-04):
 //
-//   total pages   = contracted interior + cover/activity pages (statusRows.billedPages)
-//   total value   = total pages × rate
-//   GST 18%       = total value × 0.18
-//   with GST      = total value + GST
-//   TDS 2%        = total value × 0.02      ← on the value NET of GST
-//   net of TDS    = total value + GST − TDS
+//   total pages   = script interior (actuals overwrite) + extras (statusRows.billedPages)
+//   invoice value = total pages × rate      ← the SCRIPT value: it exists the
+//                                             moment the script does
+//   GST 18%       = invoice value × 0.18
+//   with GST      = invoice value + GST
+//   TDS 2%        = invoice value × 0.02    ← on the base, NET of GST
+//   net of TDS    = invoice value + GST − TDS
 //
-// Worked example: a book at 0/48 with nothing else recorded, at ₹250/page —
-// (48 + 8) × 250 = ₹14,000 · GST ₹2,520 · with GST ₹16,520 · TDS ₹280 ·
-// net of TDS ₹16,240.
+// Worked example (Adnan's): base ₹100 → GST ₹18 → invoice total ₹118 → TDS ₹2
+// → net receivable ₹116. At book scale: 56 pages × ₹250 = ₹14,000 · GST ₹2,520
+// · with GST ₹16,520 · TDS ₹280 · net ₹16,240.
+//
+// Beside the invoice value runs the GENERATED value — pages actually produced
+// so far × the same rate. It moves as work lands and meets the invoice value
+// when the book is complete. Two numbers, two questions: what the book is
+// worth, and how much of that worth exists today.
 
 /** Money to paise. Rates of 18% and 2% on whole rupees never need more. */
 const round2 = (n: number) => Math.round(n * 100) / 100
@@ -201,13 +207,24 @@ export interface ComicBilling extends TaxBreakdown {
   rate: number
   rateSource: RateSource
   pages: BilledPages
+  /** Pages actually produced so far — interior drawn + extras made. */
+  generatedPages: number
+  /** generatedPages × rate — the value of the work completed to date. */
+  generatedValue: number
 }
 
 /** Everything one invoice line needs: pages billed, rate, value, GST, TDS, net. */
 export function billingFor(comic: Comic, cfg: PricingConfig | null): ComicBilling {
   const { rate, source } = rateFor(comic, cfg)
   const pages = billedPagesFor(comic, cfg)
-  return { rate, rateSource: source, pages, ...taxesOn(rate * pages.total) }
+  return {
+    rate,
+    rateSource: source,
+    pages,
+    generatedPages: pages.generated,
+    generatedValue: rate * pages.generated,
+    ...taxesOn(rate * pages.total),
+  }
 }
 
 const FMT = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 })

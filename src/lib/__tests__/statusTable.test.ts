@@ -131,6 +131,20 @@ describe('buildStatusTable', () => {
     expect(r.billed.extras).toBe(8)
     expect(r.totalPages).toBe(56)
     expect(r.totalValue).toBe(14_000)
+    expect(r.generatedPages).toBe(0)
+    expect(r.generatedValue).toBe(0)
+  })
+
+  it('a book that grew past its script bills the produced count — 52 drawn on a 48 plan = 60', () => {
+    const rows = buildStatusTable(
+      [comic({ target_length_pages: 48, pages: { hasPages: true, count: 52, coverKey: null } } as Partial<Comic>)],
+      null, LINES, PROGRAMS, PRICING, {},
+    )
+    expect(rows[0].billed.interior).toBe(52)
+    expect(rows[0].totalPages).toBe(60)
+    expect(rows[0].totalValue).toBe(60 * 250)
+    expect(rows[0].generatedPages).toBe(52)
+    expect(rows[0].generatedValue).toBe(52 * 250)
   })
 
   it('carries GST, TDS and the net through to the row', () => {
@@ -230,7 +244,7 @@ describe('totals + CSV', () => {
     } as Partial<Comic>),
   ]
 
-  it('totals sum what the rows show, with IFC/IBC and activities counted apart', () => {
+  it('totals sum what the rows show, produced and billed kept apart', () => {
     const rows = buildStatusTable(comics, FIGURES, LINES, null, PRICING, {
       biographies__b: { covers: { by: 'x', at: '2026-08-04' } },
     })
@@ -240,11 +254,14 @@ describe('totals + CSV', () => {
     expect(t.covers).toBe(1)
     expect(t.insideCovers).toBe(1)
     expect(t.activities).toBe(0)
-    // Billed: two books at 48 contracted interior + the standard 8 each.
-    expect(t.billedInterior).toBe(96)
+    // Billed: two books at 48 script interior + the standard 8 each.
+    expect(t.scriptPages).toBe(96)
     expect(t.billedExtras).toBe(16)
     expect(t.totalPages).toBe(112)
     expect(t.totalValue).toBe(112 * 250)
+    // Generated: 24 + (24 + back cover + IFC) = 50 pages of real work.
+    expect(t.generatedPages).toBe(50)
+    expect(t.generatedValue).toBe(50 * 250)
     expect(t.approvedStages).toBe(1)
   })
 
@@ -258,31 +275,45 @@ describe('totals + CSV', () => {
     expect(t.netOfTds).toBe(32_480)
   })
 
-  it('the CSV carries IFC and IBC as separate columns and one approval per stage', () => {
-    const rows = buildStatusTable(comics, FIGURES, LINES, null, PRICING, {
-      'biographies__a-book': { script: { by: 'e@dpb.in', at: '2026-08-04T00:00:00Z' } },
+  it('counts the invoice states into the totals', () => {
+    const rows = buildStatusTable(comics, FIGURES, LINES, null, PRICING, {}, {
+      'biographies__a-book': { approved: { by: 'e', at: '2026-08-04T00:00:00Z' } },
+      biographies__b: {
+        approved: { by: 'e', at: '2026-08-04T00:00:00Z' },
+        generated: { by: 'e', at: '2026-08-05T00:00:00Z' },
+      },
     })
+    const t = statusTableTotals(rows)
+    expect(t.approvedForInvoice).toBe(2)
+    expect(t.invoicesGenerated).toBe(1)
+    expect(rows.find((r) => r.key === 'biographies__b')!.invoice.generated?.at).toBe('2026-08-05T00:00:00Z')
+  })
+
+  it('the CSV keeps one approval per stage and the invoice trail', () => {
+    const rows = buildStatusTable(
+      comics, FIGURES, LINES, null, PRICING,
+      { 'biographies__a-book': { script: { by: 'e@dpb.in', at: '2026-08-04T00:00:00Z' } } },
+      { biographies__b: { approved: { by: 'e', at: '2026-08-04T00:00:00Z' } } },
+    )
     const csv = statusTableCsvRows(rows)
-    expect(csv[0]['IFC']).toBe(0)
-    expect(csv[0]['IBC']).toBe(0)
     expect(csv[0]['Script approval']).toBe('Approved 2026-08-04')
     expect(csv[0]['Covers approval']).toBe('Not delivered')
-    expect(csv[1]['IFC']).toBe(1)
-    expect(csv[1]['IBC']).toBe(0)
+    expect(csv[0]['Invoice']).toBe('Not approved')
     expect(csv[1]['Covers approval']).toBe('Awaiting approval')
+    expect(csv[1]['Invoice']).toBe('Approved for invoice 2026-08-04')
   })
 
   it('the CSV shows the billed basis and the full tax chain', () => {
     const csv = statusTableCsvRows(buildStatusTable(comics, FIGURES, LINES, null, PRICING, {}))
-    expect(csv[0]['Interior pages billed']).toBe(48)
-    expect(csv[0]['Cover & activity pages billed']).toBe(8)
+    expect(csv[0]['Script pages']).toBe(48)
+    expect(csv[0]['Extras']).toBe(8)
     expect(csv[0]['Total pages']).toBe(56)
-    expect(csv[0]['Total value (INR)']).toBe(14_000)
+    expect(csv[0]['Generated pages']).toBe(24)
+    expect(csv[0]['Invoice value (INR)']).toBe(14_000)
     expect(csv[0]['GST 18% (INR)']).toBe(2_520)
-    expect(csv[0]['Total value with GST (INR)']).toBe(16_520)
+    expect(csv[0]['Invoice value with GST (INR)']).toBe(16_520)
     expect(csv[0]['TDS 2% (INR)']).toBe(280)
-    expect(csv[0]['Net of TDS (INR)']).toBe(16_240)
-    // The delivered actuals stay alongside, so progress is still readable.
-    expect(csv[0]['Interior pages']).toBe(24)
+    expect(csv[0]['Net receivable after TDS (INR)']).toBe(16_240)
+    expect(csv[0]['Generated value (INR)']).toBe(6_000)
   })
 })

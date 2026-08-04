@@ -7,15 +7,20 @@ import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { usePricing } from '@/lib/pricing'
 import { ProductionDashboard } from '@/components/ProductionDashboard'
 import { StatusTable } from '@/components/StatusTable'
+import { InvoiceTable } from '@/components/InvoiceTable'
 import { LoadingState, ErrorState } from '@/components/QuietStates'
 
 /**
- * /status — the production status page, two renderings of the same data:
+ * /status — the production status page, three renderings of the same data:
  *
- *   Table (default) — one row per comic, every deliverable a column, plus the
- *   Diamond approval ledger. The spreadsheet view Adnan asked for.
+ *   Table (default) — one row per comic with the financial summary strip on
+ *   top, every deliverable a column, plus the Diamond approval ledger and the
+ *   invoice trail. Self-sufficient: the bird's-eye view lives here too.
  *
- *   Overview — the rolled-up dashboard (headline → line → series → comic).
+ *   Approved for invoice — only books explicitly approved for invoicing;
+ *   the place where a raised invoice is marked generated.
+ *
+ *   Overview — the rolled-up drill-down (headline → line → series → comic).
  *
  * Access follows the rest of the site: the route sits inside (authed) and
  * `useVisibleComics` narrows the catalog to what this person may see, so a
@@ -27,7 +32,7 @@ export default function StatusPage() {
   const canMod = canModerate(status)
   const email = user?.email ?? null
 
-  const [view, setView] = useState<'table' | 'overview'>('table')
+  const [view, setView] = useState<'table' | 'invoices' | 'overview'>('table')
 
   const { data: comics, loading: comicsLoading, error } = useVisibleComics(canMod, email)
   const { data: figures } = useVisibleFigures(canMod, email)
@@ -43,6 +48,7 @@ export default function StatusPage() {
       {(
         [
           ['table', 'Table'],
+          ['invoices', 'Approved for invoice'],
           ['overview', 'Overview'],
         ] as const
       ).map(([key, label]) => (
@@ -71,6 +77,17 @@ export default function StatusPage() {
       email={email}
       canModerate={canMod}
       canAdmin={canMod}
+      viewSwitcher={switcher}
+    />
+  ) : view === 'invoices' ? (
+    <InvoiceTable
+      comics={comics ?? []}
+      figures={figures}
+      lines={lines}
+      programs={programs}
+      pricing={pricing}
+      email={email}
+      canModerate={canMod}
       viewSwitcher={switcher}
     />
   ) : (

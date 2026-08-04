@@ -4,22 +4,28 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 vi.mock('@/lib/firebase', () => ({ db: {}, auth: {} }))
 
 // Approvals store mocked; the pure derivation fns stay real via importOriginal.
-const { approveSpy, withdrawSpy } = vi.hoisted(() => ({
+const { approveSpy, withdrawSpy, invoiceApproveSpy, invoiceGeneratedSpy, invoiceWithdrawSpy } = vi.hoisted(() => ({
   approveSpy: vi.fn<(id: string, stage: string, by: string) => Promise<void>>(() => Promise.resolve()),
-  withdrawSpy: vi.fn<(id: string, stage: string, current: unknown, by: string) => Promise<void>>(
-    () => Promise.resolve(),
-  ),
+  withdrawSpy: vi.fn<(id: string, stage: string, by: string) => Promise<void>>(() => Promise.resolve()),
+  invoiceApproveSpy: vi.fn<(id: string, by: string) => Promise<void>>(() => Promise.resolve()),
+  invoiceGeneratedSpy: vi.fn<(id: string, by: string) => Promise<void>>(() => Promise.resolve()),
+  invoiceWithdrawSpy: vi.fn<(id: string, which: string, by: string) => Promise<void>>(() => Promise.resolve()),
 }))
-let approvalsData: Record<string, Record<string, { by: string; at: string }>> = {}
+let stagesData: Record<string, Record<string, { by: string; at: string }>> = {}
+let invoicesData: Record<string, { approved?: { by: string; at: string }; generated?: { by: string; at: string } }> = {}
 
 vi.mock('@/lib/approvals', async (orig) => ({
   ...(await orig<typeof import('@/lib/approvals')>()),
-  useApprovals: () => ({ data: approvalsData, loading: false }),
+  useApprovals: () => ({ data: { stages: stagesData, invoices: invoicesData }, loading: false }),
   approveStage: approveSpy,
   withdrawStage: withdrawSpy,
+  approveForInvoice: invoiceApproveSpy,
+  markInvoiceGenerated: invoiceGeneratedSpy,
+  withdrawInvoiceMark: invoiceWithdrawSpy,
 }))
 
 import { StatusTable } from '@/components/StatusTable'
+import { InvoiceTable } from '@/components/InvoiceTable'
 import type { Comic, Line, Program } from '@/types/content'
 
 function comic(over: Partial<Comic> = {}): Comic {
@@ -69,22 +75,60 @@ function setup(over: Partial<Parameters<typeof StatusTable>[0]> = {}) {
   )
 }
 
+function setupInvoices(over: Partial<Parameters<typeof InvoiceTable>[0]> = {}) {
+  return render(
+    <InvoiceTable
+      comics={COMICS}
+      figures={null}
+      lines={LINES}
+      programs={PROGRAMS}
+      pricing={null}
+      email="editor@dpb.in"
+      canModerate={false}
+      {...over}
+    />,
+  )
+}
+
 beforeEach(() => {
   approveSpy.mockClear()
   withdrawSpy.mockClear()
-  approvalsData = {}
+  invoiceApproveSpy.mockClear()
+  invoiceGeneratedSpy.mockClear()
+  invoiceWithdrawSpy.mockClear()
+  stagesData = {}
+  invoicesData = {}
 })
 
 describe('StatusTable', () => {
-  it('gives every deliverable its own column', () => {
+  it('tells the four stories in grouped columns', () => {
     setup()
-    for (const col of [
-      'Classification', 'Sub-classification', 'Comic', 'Total pages', 'Rate', 'Total value',
-      'GST 18%', 'Total value with GST', 'TDS 2%', 'Net of TDS',
-      'Script', 'Dossier', 'Illustration', 'Covers', 'IFC / IBC', 'Activity pages', 'Marketing',
-    ]) {
-      expect(screen.getByText(col)).toBeInTheDocument()
+    // Group headers…
+    for (const g of ['Pages', 'Value (INR)', 'Sign-offs']) {
+      expect(screen.getByText(g)).toBeInTheDocument()
     }
+    // …and the column labels beneath them.
+    for (const col of [
+      'Classification', 'Sub-classification', 'Comic', 'Extras', 'Total', 'Generated', 'Rate',
+      'Invoice value', 'With GST', 'Net after TDS',
+      'Dossier', 'Illustration', 'Covers', 'IFC / IBC', 'Activity pages', 'Marketing', 'Status',
+    ]) {
+      expect(screen.getAllByText(col).length).toBeGreaterThan(0)
+    }
+    // "Script" is both a pages column and a stage column.
+    expect(screen.getAllByText('Script').length).toBe(2)
+  })
+
+  it('shows the financial summary strip on the table itself — no tab switch needed', () => {
+    setup()
+    for (const label of [
+      'Script pages', 'Generated pages', 'Invoice value', 'GST 18%', 'With GST', 'Net after TDS',
+    ]) {
+      expect(screen.getAllByText(label).length).toBeGreaterThan(0)
+    }
+    // Two books at 48+8 = 112 total pages; ₹250 default rate → ₹28,000 base,
+    // shown in the strip AND again in the table footer.
+    expect(screen.getAllByText('₹28,000').length).toBeGreaterThanOrEqual(2)
   })
 
   it('shows an Approve button per stage — no single overall approve control', () => {
@@ -117,7 +161,7 @@ describe('StatusTable', () => {
   })
 
   it('shows an approved stage as a dated tick, withdrawable on its own', async () => {
-    approvalsData = { biographies__jobs: { covers: { by: 'e@dpb.in', at: '2026-08-04T09:00:00Z' } } }
+    stagesData = { biographies__jobs: { covers: { by: 'e@dpb.in', at: '2026-08-04T09:00:00Z' } } }
     setup()
     expect(screen.getByText('✓ 2026-08-04')).toBeInTheDocument()
     fireEvent.click(screen.getByLabelText('Withdraw Covers approval for Think Different'))
@@ -130,25 +174,15 @@ describe('StatusTable', () => {
     expect(screen.getByText('IFC only')).toBeInTheDocument()
   })
 
-  it('keeps activity pages separate from the inside covers', () => {
-    setup()
-    expect(screen.getByText('2 pages')).toBeInTheDocument()
-  })
-
   it('hides every approve control from a plain member but still shows the state', () => {
     setup({ email: 'member@thothica.com' })
     expect(screen.queryByLabelText(/^Approve /)).not.toBeInTheDocument()
     expect(screen.getByText('IFC only')).toBeInTheDocument()
   })
 
-  it('totals count stage approvals against delivered stages', () => {
-    setup()
-    expect(screen.getByText(/0 of \d+ delivered stages approved/)).toBeInTheDocument()
-  })
-
   it('filters to rows with something still awaiting approval', () => {
     // Every delivered stage of The Little Master signed off → it drops out.
-    approvalsData = {
+    stagesData = {
       biographies__sachin: {
         script: { by: 'e@dpb.in', at: '2026-08-04' },
         illustration: { by: 'e@dpb.in', at: '2026-08-04' },
@@ -160,8 +194,78 @@ describe('StatusTable', () => {
     expect(screen.getByText('Think Different')).toBeInTheDocument()
   })
 
-  it('states the counting rule, including IFC and IBC as separate pages', () => {
+  it('states the counting rule: produced pages overwrite the plan', () => {
     setup()
-    expect(screen.getByText(/separate pages, one each/)).toBeInTheDocument()
+    expect(screen.getByText(/produced count takes over/)).toBeInTheDocument()
+  })
+
+  // ── The invoice trail ──────────────────────────────────────────────────────
+
+  it('lets an approver approve a book for invoice', async () => {
+    setup()
+    fireEvent.click(screen.getByLabelText('Approve Think Different for invoice'))
+    await waitFor(() =>
+      expect(invoiceApproveSpy).toHaveBeenCalledWith('biographies__jobs', 'editor@dpb.in'),
+    )
+  })
+
+  it('shows the invoice approval as a dated mark, withdrawable', async () => {
+    invoicesData = { biographies__jobs: { approved: { by: 'e@dpb.in', at: '2026-08-04T10:00:00Z' } } }
+    setup()
+    expect(screen.getByText('✓ For invoice 2026-08-04')).toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText('Withdraw invoice approval for Think Different'))
+    await waitFor(() =>
+      expect(invoiceWithdrawSpy).toHaveBeenCalledWith('biographies__jobs', 'approved', 'editor@dpb.in'),
+    )
+  })
+
+  it('shows a generated invoice as final — no withdraw here', () => {
+    invoicesData = {
+      biographies__jobs: {
+        approved: { by: 'e', at: '2026-08-04T10:00:00Z' },
+        generated: { by: 'e', at: '2026-08-05T10:00:00Z' },
+      },
+    }
+    setup()
+    expect(screen.getByText('Invoiced 2026-08-05')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Withdraw invoice approval for Think Different')).not.toBeInTheDocument()
+  })
+})
+
+describe('InvoiceTable — the Approved-for-invoice tab', () => {
+  it('shows ONLY invoice-approved books', () => {
+    invoicesData = { biographies__jobs: { approved: { by: 'e', at: '2026-08-04T10:00:00Z' } } }
+    setupInvoices()
+    expect(screen.getByText('Think Different')).toBeInTheDocument()
+    expect(screen.queryByText('The Little Master')).not.toBeInTheDocument()
+  })
+
+  it('marks an awaiting book as invoice generated', async () => {
+    invoicesData = { biographies__jobs: { approved: { by: 'e', at: '2026-08-04T10:00:00Z' } } }
+    setupInvoices()
+    fireEvent.click(screen.getByLabelText('Mark invoice generated for Think Different'))
+    await waitFor(() =>
+      expect(invoiceGeneratedSpy).toHaveBeenCalledWith('biographies__jobs', 'editor@dpb.in'),
+    )
+  })
+
+  it('splits generated invoices into their own section, with an undo', async () => {
+    invoicesData = {
+      biographies__jobs: {
+        approved: { by: 'e', at: '2026-08-04T10:00:00Z' },
+        generated: { by: 'e', at: '2026-08-05T10:00:00Z' },
+      },
+    }
+    setupInvoices()
+    expect(screen.getByText('Invoiced 2026-08-05')).toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText('Undo invoice generated for Think Different'))
+    await waitFor(() =>
+      expect(invoiceWithdrawSpy).toHaveBeenCalledWith('biographies__jobs', 'generated', 'editor@dpb.in'),
+    )
+  })
+
+  it('is honest when nothing is approved yet', () => {
+    setupInvoices()
+    expect(screen.getByText(/Nothing is approved for invoice yet/)).toBeInTheDocument()
   })
 })
