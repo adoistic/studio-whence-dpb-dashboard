@@ -13,12 +13,16 @@
  *     amount: 33494, tdsDeducted: true }
  *
  * `amount` is always the money RECEIVED. When the payer deducted 2% TDS at
- * source (`tdsDeducted`), the received amount is 98% of the gross advance, so
- * the gross and the TDS credit are derived, never hand-typed:
+ * source (`tdsDeducted`), what they paid is the GST-inclusive value net of TDS
+ * on the base — the ₹116 of the standard chain (₹100 base + ₹18 GST − ₹2 TDS).
+ * So the base, the TDS credit and the gross are derived, never hand-typed
+ * (accounts team, 2026-08-04: "advance ÷ 1.16 × 2%"):
  *
- *   tds   = amount × 2⁄98      (2% of the gross they computed it on)
- *   gross = amount + tds
+ *   base  = amount ÷ 1.16      (1 + GST 18% − TDS 2%)
+ *   tds   = base × 2%
+ *   gross = amount + tds       (= base × 1.18, the with-GST value before TDS)
  *
+ * Proof it fits: ₹34,800 received ÷ 1.16 = ₹30,000 base exactly → ₹600 TDS.
  * A receipt with no deduction is its own gross. The five seed receipts come
  * from the accounts team (2026-08-04) and are written by the private repo's
  * tools/seed_advances.py — real figures never live in this public repo.
@@ -27,7 +31,7 @@
 import { useEffect, useState } from 'react'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { TDS_RATE } from '@/lib/pricing'
+import { GST_RATE, TDS_RATE } from '@/lib/pricing'
 
 export const ACCOUNTS_COLLECTION = 'accounts'
 export const ADVANCES_DOC = 'advances'
@@ -46,9 +50,15 @@ export interface Advance {
 
 const round2 = (n: number) => Math.round(n * 100) / 100
 
+/**
+ * The net-of-TDS multiplier a deducted receipt was paid at: 1 + GST − TDS
+ * (1.16 at today's rates). Received ÷ this = the base the TDS was 2% of.
+ */
+const NET_FACTOR = 1 + GST_RATE - TDS_RATE
+
 /** The TDS the payer kept back on this receipt (0 when none was deducted). */
 export function advanceTds(a: Pick<Advance, 'amount' | 'tdsDeducted'>): number {
-  return a.tdsDeducted ? round2(a.amount * (TDS_RATE / (1 - TDS_RATE))) : 0
+  return a.tdsDeducted ? round2((a.amount / NET_FACTOR) * TDS_RATE) : 0
 }
 
 /** What the advance was worth before the deduction — received + TDS credit. */

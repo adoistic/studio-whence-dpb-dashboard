@@ -30,13 +30,15 @@ const SEED: Advance[] = [
 ]
 
 describe('advance TDS gross-up', () => {
-  it('a net-of-TDS receipt is 98% of the gross, so TDS = amount × 2⁄98', () => {
-    // ₹33,494 received → they deducted ₹683.55 on a ₹34,177.55 gross.
-    expect(advanceTds(SEED[0])).toBe(683.55)
-    expect(advanceGross(SEED[0])).toBe(34_177.55)
-    // ₹34,800 received → ₹710.20 TDS on ₹35,510.20 gross.
-    expect(advanceTds(SEED[1])).toBe(710.2)
-    expect(advanceGross(SEED[1])).toBe(35_510.2)
+  // The accounts team's formula (2026-08-04): TDS = received ÷ 1.16 × 2%.
+  // A deducted receipt is the GST-inclusive value net of TDS on the base
+  // (₹116 for every ₹100 of base), so received ÷ 1.16 recovers the base.
+  it('TDS = received ÷ 1.16 × 2% — ₹34,800 is exactly a ₹30,000 base, ₹600 TDS', () => {
+    expect(advanceTds(SEED[1])).toBe(600)
+    expect(advanceGross(SEED[1])).toBe(35_400) // base × 1.18, the with-GST value
+    // ₹33,494 received → base ₹28,874.14 → ₹577.48 TDS, ₹34,071.48 gross.
+    expect(advanceTds(SEED[0])).toBe(577.48)
+    expect(advanceGross(SEED[0])).toBe(34_071.48)
   })
 
   it('a receipt with no deduction is its own gross', () => {
@@ -49,8 +51,8 @@ describe('advance TDS gross-up', () => {
     expect(t.receipts).toBe(5)
     expect(t.companies).toEqual(['Diamond Magazines Private Limited', 'Trijal TradeCop Pvt Ltd'])
     expect(t.received).toBe(218_294)
-    expect(t.tds).toBe(1_393.75)
-    expect(t.gross).toBe(219_687.75)
+    expect(t.tds).toBe(1_177.48)
+    expect(t.gross).toBe(219_471.48)
   })
 })
 

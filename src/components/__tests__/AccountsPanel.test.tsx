@@ -92,11 +92,12 @@ describe('AccountsPanel', () => {
     expect(screen.getAllByText('Diamond Magazines Private Limited').length).toBe(4)
   })
 
-  it('grosses up only the receipts where TDS was deducted', () => {
+  it('grosses up only the receipts where TDS was deducted (received ÷ 1.16 × 2%)', () => {
     setup()
-    // ₹33,494 net of 2% → ₹684 TDS shown (rounded to the rupee on screen).
-    expect(screen.getByText('₹684')).toBeInTheDocument()
-    expect(screen.getByText('₹710')).toBeInTheDocument()
+    // ₹33,494 → base ₹28,874 → ₹577 TDS shown (rounded to the rupee on screen);
+    // ₹34,800 → base ₹30,000 exactly → ₹600 TDS.
+    expect(screen.getByText('₹577')).toBeInTheDocument()
+    expect(screen.getByText('₹600')).toBeInTheDocument()
     // The three clean receipts say so plainly.
     expect(screen.getAllByText('None').length).toBe(3)
   })

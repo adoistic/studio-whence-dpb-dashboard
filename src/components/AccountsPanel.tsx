@@ -89,7 +89,7 @@ function AdvancesSection({
     <>
       <SectionHead
         title="Advances received"
-        caption="Every receipt as it arrived at the bank. Where the payer deducted 2% TDS at source, the gross advance and the TDS credit are worked out from the received amount."
+        caption="Every receipt as it arrived at the bank. Where the payer deducted TDS at source, the TDS is 2% of the base recovered from the receipt (received ÷ 1.16), and the gross is the receipt plus that TDS."
       />
       <div className="mt-3 overflow-x-auto rounded-xl border border-brand-pale-dusk bg-white">
         <table className="w-full min-w-[860px] border-collapse">
@@ -509,8 +509,9 @@ export function AccountsPanel({
 
       <p className="mt-6 max-w-3xl font-sans text-[0.72rem] leading-relaxed text-brand-slate">
         Reading this page: <strong className="font-semibold text-brand-indigo">Advances received</strong> is cash at
-        the bank; where the payer deducted TDS at source, the received amount is 98% of the gross, so the gross and
-        the TDS credit are computed from it (rounded to the rupee).{' '}
+        the bank. Where the payer deducted TDS at source, the receipt is the GST-inclusive value net of TDS — ₹116
+        for every ₹100 of base — so the TDS credit is 2% of received ÷ 1.16, and the gross is the receipt plus that
+        TDS (figures rounded to the rupee on screen).{' '}
         <strong className="font-semibold text-brand-indigo">Invoices generated</strong> are books marked invoiced on
         the Approved-for-invoice tab, valued exactly as on the table (pages × rate, GST 18%, TDS 2% of the base).{' '}
         <strong className="font-semibold text-brand-indigo">Work in progress</strong> is every other book — its
