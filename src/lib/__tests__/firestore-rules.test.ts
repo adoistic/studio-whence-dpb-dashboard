@@ -912,3 +912,72 @@ describe('firestore.rules — access gate self-checks', () => {
     await assertFails(getDoc(doc(domainMember(), 'suspended/banned@thothica.com')))
   })
 })
+
+describe('firestore.rules — pricing (what a page is worth)', () => {
+  const member   = () => env.authenticatedContext('pr-m', { email: 'x@thothica.com' }).firestore()
+  const subAdmin = () => env.authenticatedContext('pr-sa', { email: 'sub@dpb.in' }).firestore()
+  const stranger = () => env.authenticatedContext('pr-s', { email: 'nope@gmail.com' }).firestore()
+
+  beforeAll(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), 'pricing/config'), { defaultRatePerPage: 250, lines: {}, comics: {} })
+    })
+  })
+
+  it('an allowlisted member READS the rates (the status table shows value to everyone)', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'pricing/config')))
+  })
+  it('a stranger cannot read the rates', async () => {
+    await assertFails(getDoc(doc(stranger(), 'pricing/config')))
+  })
+  it('a plain member cannot WRITE rates — commercial terms are admin-side only', async () => {
+    await assertFails(setDoc(doc(member(), 'pricing/config'), { defaultRatePerPage: 1 }, { merge: true }))
+  })
+  it('a sub_admin sets rates', async () => {
+    await assertSucceeds(setDoc(doc(subAdmin(), 'pricing/config'), { defaultRatePerPage: 300 }, { merge: true }))
+  })
+})
+
+describe('firestore.rules — diamondApprovals (the sign-off ledger)', () => {
+  // member@dpb.in is domain-allowed with NO allowlist role doc: pure "Diamond".
+  const diamond  = () => env.authenticatedContext('da-d', { email: 'member@dpb.in' }).firestore()
+  const member   = () => env.authenticatedContext('da-m', { email: 'x@thothica.com' }).firestore()
+  const subAdmin = () => env.authenticatedContext('da-sa', { email: 'sub@dpb.in' }).firestore()
+  const stranger = () => env.authenticatedContext('da-s', { email: 'nope@gmail.com' }).firestore()
+  const suspendedDiamond = () => env.authenticatedContext('da-x', { email: 'banned@dpb.in' }).firestore()
+
+  beforeAll(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore()
+      await setDoc(doc(db, 'diamondApprovals/biographies__seeded'), { approved: true, by: 'e@dpb.in', at: '2026-08-04' })
+      await setDoc(doc(db, 'suspended/banned@dpb.in'), {})
+    })
+  })
+
+  it('any allowlisted member READS the ledger (the table shows approval state to all)', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'diamondApprovals/biographies__seeded')))
+    await assertSucceeds(getDocs(collection(member(), 'diamondApprovals')))
+  })
+  it('a stranger cannot read the ledger', async () => {
+    await assertFails(getDoc(doc(stranger(), 'diamondApprovals/biographies__seeded')))
+  })
+  it('Diamond (@dpb.in) APPROVES a comic', async () => {
+    await assertSucceeds(
+      setDoc(doc(diamond(), 'diamondApprovals/biographies__01-x'), { approved: true, by: 'member@dpb.in', at: '2026-08-04' }),
+    )
+  })
+  it('Diamond WITHDRAWS an approval (delete)', async () => {
+    await assertSucceeds(deleteDoc(doc(diamond(), 'diamondApprovals/biographies__seeded')))
+  })
+  it('a sub_admin can also act (fixing a mis-click from our side)', async () => {
+    await assertSucceeds(
+      setDoc(doc(subAdmin(), 'diamondApprovals/biographies__sa'), { approved: true, by: 'sub@dpb.in', at: '2026-08-04' }),
+    )
+  })
+  it('a plain member cannot touch the ledger', async () => {
+    await assertFails(setDoc(doc(member(), 'diamondApprovals/biographies__01-x'), { approved: true, by: 'x', at: 'now' }))
+  })
+  it('a suspended @dpb.in account cannot approve', async () => {
+    await assertFails(setDoc(doc(suspendedDiamond(), 'diamondApprovals/biographies__01-x'), { approved: true, by: 'b', at: 'now' }))
+  })
+})
