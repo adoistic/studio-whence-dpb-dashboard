@@ -18,6 +18,7 @@ import { ComicPdfButton } from '@/components/ComicPdfButton'
 import { ComicPptButton } from '@/components/ComicPptButton'
 import { ComicCmykButton } from '@/components/ComicCmykButton'
 import { ComicDocxButton } from '@/components/ComicDocxButton'
+import { ComicExportButton } from '@/components/ComicExportButton'
 import { AmazonModulesPanel } from '@/components/AmazonModulesPanel'
 import { useGatedText } from '@/lib/useGatedText'
 import { useFigure } from '@/lib/catalog'
@@ -294,6 +295,11 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
                     <ComicPdfButton comic={comic} />
                     <ComicPptButton comic={comic} />
                     <ComicCmykButton comic={comic} />
+                    <ComicExportButton
+                      comic={comic}
+                      threads={fbThreads.filter((t) => visibleTo(t.root, canMod))}
+                      draftHtml={draft.text || null}
+                    />
                   </>
                 )}
               </div>
