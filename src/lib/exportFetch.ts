@@ -3,7 +3,6 @@
 // measure pixel dimensions for docx sizing. Deps are injectable for tests.
 import type { Comic } from '@/types/content'
 import { comicPageKeys, webVariantKey } from '@/lib/comicPageKeys'
-import { resolveUrls } from '@/lib/dataApi'
 import type { FetchedImage, ImageMap, ImageRef } from '@/lib/exportZip'
 
 export interface FetchResult { images: ImageMap; failed: ImageRef[] }
@@ -43,7 +42,9 @@ async function defaultMeasure(bytes: Uint8Array): Promise<{ width: number; heigh
 }
 
 export async function fetchExportImages(comic: Comic, deps?: Partial<FetchDeps>): Promise<FetchResult> {
-  const resolve = deps?.resolve ?? resolveUrls
+  // Lazy import: dataApi initializes Firebase on load, which must not happen
+  // in unit tests (they inject `resolve`) nor before the click that needs it.
+  const resolve = deps?.resolve ?? (await import('@/lib/dataApi')).resolveUrls
   const fetchBytes = deps?.fetchBytes ?? defaultFetchBytes
   const measure = deps?.measure ?? defaultMeasure
 
