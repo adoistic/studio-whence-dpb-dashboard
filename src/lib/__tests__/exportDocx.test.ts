@@ -17,6 +17,9 @@ describe('fitImage', () => {
   it('never scales up', () => {
     expect(fitImage({ width: 300, height: 200 }, 600)).toEqual({ width: 300, height: 200 })
   })
+  it('respects the height cap so tall comic pages stay with their heading', () => {
+    expect(fitImage({ width: 1200, height: 1800 }, 624, 780)).toEqual({ width: 520, height: 780 })
+  })
 })
 
 describe('assembleDocx', () => {
