@@ -234,6 +234,12 @@ export function filterCoverageBySurface(
   if (!surface) return coverage
   const lines = coverage.lines.filter((l) => resolve(l.slug) === surface)
   if (lines.length === coverage.lines.length) return coverage
+  // Filtering everything away is a bug, not a state — a line-slug scheme the
+  // running bundle does not recognise, say, which is what a stale deploy looks
+  // like. Rendering it would tell someone their studio holds zero figures,
+  // zero comics and zero lines. Show the unfiltered roll-up instead: slightly
+  // too much is recoverable, "everything is gone" is not.
+  if (lines.length === 0) return coverage
   const sum = (pick: (l: CoverageLine) => number) => lines.reduce((n, l) => n + pick(l), 0)
   return {
     ...coverage,
