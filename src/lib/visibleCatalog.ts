@@ -5,6 +5,7 @@ import { collection, doc, documentId, getDoc, getDocs, query, where } from 'fire
 import { db } from '@/lib/firebase'
 import { normalizeEmail } from '@/lib/admin'
 import type { Allocation } from '@/lib/allocation'
+import { surfaceOfLineSlug, useActiveSurface } from '@/lib/surface'
 import type { Comic, Figure } from '@/types/content'
 
 // ─── Shared async one-shot (mirrors catalog.ts useAsync) ─────────────────────────
@@ -80,9 +81,15 @@ export function useVisibleComics(
   email: string | null,
   refreshKey = 0,
 ): Async<Comic[]> {
+  // Scoped to the surface being browsed — see the note in catalog.ts. A
+  // moderator's full scan would otherwise pull the whole manga side into every
+  // comics-side listing (status, reviews, admin) and the reverse.
+  const { surface } = useActiveSurface()
+  const scope = (cs: Comic[]) =>
+    surface ? cs.filter((c) => surfaceOfLineSlug(c.line) === surface) : cs
   return useAsync<Comic[]>(async () => {
     if (canModerate) {
-      return listData<Comic>(await getDocs(collection(db, 'comics')))
+      return scope(listData<Comic>(await getDocs(collection(db, 'comics'))))
     }
     if (!email) return []
 
@@ -111,9 +118,9 @@ export function useVisibleComics(
     for (const batch of await Promise.all(runs)) {
       for (const comic of batch) byId.set(`${comic.line}__${comic.slug}`, comic)
     }
-    return Array.from(byId.values())
+    return scope(Array.from(byId.values()))
     // canModerate + email are the only inputs; refreshKey forces a manual reload.
-  }, [canModerate, email, refreshKey])
+  }, [canModerate, email, refreshKey, surface])
 }
 
 // ─── useVisibleFigures ─────────────────────────────────────────────────────────────
@@ -137,9 +144,12 @@ export function useVisibleFigures(
   email: string | null,
   refreshKey = 0,
 ): Async<Figure[]> {
+  const { surface } = useActiveSurface()
+  const scope = (fs: Figure[]) =>
+    surface ? fs.filter((f) => surfaceOfLineSlug(f.line) === surface) : fs
   return useAsync<Figure[]>(async () => {
     if (canModerate) {
-      return listData<Figure>(await getDocs(collection(db, 'figures')))
+      return scope(listData<Figure>(await getDocs(collection(db, 'figures'))))
     }
     if (!email) return []
 
@@ -165,8 +175,8 @@ export function useVisibleFigures(
     for (const batch of await Promise.all(runs)) {
       for (const figure of batch) bySlug.set(figure.slug, figure)
     }
-    return Array.from(bySlug.values())
-  }, [canModerate, email, refreshKey])
+    return scope(Array.from(bySlug.values()))
+  }, [canModerate, email, refreshKey, surface])
 }
 
 // ─── useOpenFigures ─────────────────────────────────────────────────────────────

@@ -686,3 +686,22 @@
 .idea-editor .ProseMirror p {
   margin: 0;
 }
+
+/* ── The manga surface ───────────────────────────────────────────────────────
+   Ink on paper rather than the comics side's warm indigo and gold: a colder
+   off-white stock, near-black ink, and a hard rule instead of a soft one. Used
+   by the manga line/category pages so the two surfaces do not read alike. */
+.surface-manga {
+  --manga-ink: #12121a;
+  --manga-stock: #f4f2ee;
+  background: var(--manga-stock);
+  color: var(--manga-ink);
+}
+.surface-manga .manga-rule {
+  border-top: 2px solid var(--manga-ink);
+}
+.surface-manga .manga-kicker {
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}

@@ -27,8 +27,8 @@ describe('surfaceOfLine', () => {
     expect(surfaceOfLine(line('biographies', { surface: 'manga' }))).toBe('manga')
   })
 
-  it('falls back to the static map when the doc says nothing', () => {
-    expect(surfaceOfLine(line('manga'))).toBe('manga')
+  it('reads the surface off the line-slug prefix', () => {
+    expect(surfaceOfLine(line('manga-indic'))).toBe('manga')
   })
 
   it('defaults every other line to comics, so nothing that exists today moves', () => {
@@ -44,29 +44,29 @@ describe('surfaceOfLine', () => {
 
 describe('surfaceIndex', () => {
   const lines = [
-    line('manga', { programs: [{ slug: 'ramayana-manga', line: 'manga', title: 'Ramayana' }] }),
+    line('manga-indic', { programs: [{ slug: 'manga-indic', line: 'manga-indic', title: 'Indic' }] }),
     line('indic', { programs: [{ slug: 'ramayana', line: 'indic', title: 'Ramayana' }] }),
   ]
 
   it('resolves a line slug', () => {
-    expect(surfaceIndex(lines)('manga')).toBe('manga')
+    expect(surfaceIndex(lines)('manga-indic')).toBe('manga')
     expect(surfaceIndex(lines)('indic')).toBe('comics')
   })
 
   it('resolves a program slug through the line that owns it', () => {
-    expect(surfaceIndex(lines)('ramayana-manga')).toBe('manga')
+    expect(surfaceIndex(lines)('manga-indic')).toBe('manga')
     expect(surfaceIndex(lines)('ramayana')).toBe('comics')
   })
 
   it('falls back for a slug the catalog has never heard of', () => {
     expect(surfaceIndex(lines)('who-knows')).toBe('comics')
-    expect(surfaceIndex(null)('manga')).toBe('manga')
+    expect(surfaceIndex(null)('manga-indic')).toBe('manga')
   })
 })
 
 describe('lineOfComicId', () => {
   it('takes the line from a `{line}__{slug}` document id', () => {
-    expect(lineOfComicId('manga__hanuman-vol-1')).toBe('manga')
+    expect(lineOfComicId('manga-indic__hanuman-vol-1')).toBe('manga-indic')
     expect(lineOfComicId('biographies__the-polyester-dream')).toBe('biographies')
   })
 
@@ -77,7 +77,7 @@ describe('lineOfComicId', () => {
 
 describe('surfacesFromGrants', () => {
   const resolve = surfaceIndex([
-    line('manga', { programs: [{ slug: 'ramayana-manga', line: 'manga', title: 'R' }] }),
+    line('manga-indic', { programs: [{ slug: 'manga-indic', line: 'manga-indic', title: 'Indic' }] }),
     line('indic'),
   ])
 
@@ -90,22 +90,22 @@ describe('surfacesFromGrants', () => {
   })
 
   it('derives the manga surface from a program grant', () => {
-    expect(surfacesFromGrants({ lines: [], programs: ['ramayana-manga'], comics: [] }, resolve))
+    expect(surfacesFromGrants({ lines: [], programs: ['manga-indic'], comics: [] }, resolve))
       .toEqual(['manga'])
   })
 
   it('derives the surface from a comic grant through its document id', () => {
-    expect(surfacesFromGrants({ lines: [], programs: [], comics: ['manga__hanuman'] }, resolve))
+    expect(surfacesFromGrants({ lines: [], programs: [], comics: ['manga-indic__hanuman'] }, resolve))
       .toEqual(['manga'])
   })
 
   it('returns both, in a stable order, when the grants span both', () => {
-    expect(surfacesFromGrants({ lines: ['indic'], programs: ['ramayana-manga'], comics: [] }, resolve))
+    expect(surfacesFromGrants({ lines: ['indic'], programs: ['manga-indic'], comics: [] }, resolve))
       .toEqual(['comics', 'manga'])
   })
 
   it('folds in figure-derived lines', () => {
-    expect(surfacesFromGrants({ lines: [], programs: [], comics: [] }, resolve, ['manga']))
+    expect(surfacesFromGrants({ lines: [], programs: [], comics: [] }, resolve, ['manga-indic']))
       .toEqual(['manga'])
   })
 })
@@ -166,7 +166,7 @@ describe('filterCoverageBySurface', () => {
         comics: { total: 10, draft: 1, in_review: 2, approved: 3, published: 4 },
       },
       {
-        slug: 'manga', title: 'Manga', subtitle: '', figures: 5, programs: [],
+        slug: 'manga-indic', title: 'Indic', subtitle: '', figures: 5, programs: [],
         comics: { total: 2, draft: 1, in_review: 1, approved: 0, published: 0 },
       },
     ],
@@ -179,7 +179,7 @@ describe('filterCoverageBySurface', () => {
 
   it('keeps only the lines of the active surface', () => {
     const out = filterCoverageBySurface(coverage, 'manga', resolve)
-    expect(out.lines.map((l) => l.slug)).toEqual(['manga'])
+    expect(out.lines.map((l) => l.slug)).toEqual(['manga-indic'])
   })
 
   it('recomputes the totals so they agree with the lines shown', () => {

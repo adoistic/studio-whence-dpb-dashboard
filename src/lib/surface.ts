@@ -45,13 +45,22 @@ export function isSurface(v: unknown): v is Surface {
 // pipeline stamps the field, and because a line slug is structure rather than
 // IP — the same reason the line visuals already live in this public repo.
 
-export const SURFACE_BY_LINE: Record<string, Surface> = {
-  manga: 'manga',
-}
+// A category IS a line, and a line belongs to a surface. Manga categories are
+// named `manga-<category>`, so the surface is readable straight off the slug and
+// adding a category tomorrow — manga-biographies, manga-originals — needs no
+// change here at all. Each surface owns its own category namespace, so both can
+// carry an "Indic" without sharing a key, and a category can exist on one
+// surface and not the other.
+export const MANGA_LINE_PREFIX = 'manga-'
 
 export function surfaceOfLineSlug(slug: string | null | undefined): Surface {
   if (!slug) return 'comics'
-  return SURFACE_BY_LINE[slug] ?? 'comics'
+  return slug.startsWith(MANGA_LINE_PREFIX) ? 'manga' : 'comics'
+}
+
+/** The category part of a line slug: `manga-indic` → `indic`. */
+export function categoryOfLineSlug(slug: string): string {
+  return slug.startsWith(MANGA_LINE_PREFIX) ? slug.slice(MANGA_LINE_PREFIX.length) : slug
 }
 
 export function surfaceOfLine(line: Pick<Line, 'slug'> & { surface?: string }): Surface {

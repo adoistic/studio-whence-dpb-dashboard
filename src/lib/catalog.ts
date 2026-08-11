@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { collection, doc, getDoc, getDocs, query, where, type QueryConstraint } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
+import { surfaceOfLineSlug, useActiveSurface } from '@/lib/surface'
 import type { Comic, Coverage, Figure, Headline, Line, Program, ResearchSource } from '@/types/content'
 
 export interface Async<T> { data: T | null; loading: boolean; error?: Error }
@@ -53,7 +54,33 @@ export interface ResearchManifest {
 export const useResearchManifest = (line: string) => useAsync<ResearchManifest | null>(async () =>
   docData<ResearchManifest>(await getDoc(doc(db, 'meta', `research_${line}`))) ?? null, [line])
 
-export const useLines = () => useAsync<Line[]>(async () => listData<Line>(await getDocs(collection(db, 'lines'))), [])
+// ─── Surface scoping ──────────────────────────────────────────────────────────
+//
+// The two surfaces are separate bodies of work, not a view filter on one. Every
+// cross-line LISTING is scoped to the surface being browsed, here at the single
+// choke point, so nothing on the manga side is reachable by normal navigation
+// from the comics side or the reverse — line menus, category cards, status,
+// reviews, admin listings, all of them, including pages written later.
+//
+// Direct links are deliberately NOT blocked: a URL someone was sent should open.
+// Access is still decided entirely by the allocation and the Firestore rules.
+
+function useSurfaceScope(): (lineSlug: string | null | undefined) => boolean {
+  const { surface } = useActiveSurface()
+  return (lineSlug) => !surface || surfaceOfLineSlug(lineSlug) === surface
+}
+
+export const useLines = () => {
+  const inSurface = useSurfaceScope()
+  return useAsync<Line[]>(async () => {
+    const all = listData<Line>(await getDocs(collection(db, 'lines')))
+    return all.filter((l) => inSurface(l.slug))
+  }, [useActiveSurface().surface])
+}
+
+/** Every line regardless of surface — for the few places that must not scope. */
+export const useAllLines = () =>
+  useAsync<Line[]>(async () => listData<Line>(await getDocs(collection(db, 'lines'))), [])
 
 export const useComic = (line: string, slug: string) =>
   useAsync<Comic>(async () => {
@@ -62,16 +89,22 @@ export const useComic = (line: string, slug: string) =>
   }, [line, slug])
 
 export interface ComicFilters { line?: string; series?: string; status?: string; subject_slug?: string; program_slug?: string }
-export const useComics = (f: ComicFilters = {}) =>
-  useAsync<Comic[]>(async () => {
+export const useComics = (f: ComicFilters = {}) => {
+  const inSurface = useSurfaceScope()
+  const { surface } = useActiveSurface()
+  return useAsync<Comic[]>(async () => {
     const cs: QueryConstraint[] = []
     if (f.line) cs.push(where('line', '==', f.line))
     if (f.series) cs.push(where('series', '==', f.series))
     if (f.status) cs.push(where('status', '==', f.status))
     if (f.subject_slug) cs.push(where('subject_slug', '==', f.subject_slug))
     if (f.program_slug) cs.push(where('program_slug', '==', f.program_slug))
-    return listData<Comic>(await getDocs(query(collection(db, 'comics'), ...cs)))
-  }, [f.line, f.series, f.status, f.subject_slug, f.program_slug])
+    const all = listData<Comic>(await getDocs(query(collection(db, 'comics'), ...cs)))
+    // Scoped unless the caller asked for one specific line, in which case the
+    // line itself already decides the surface.
+    return f.line ? all : all.filter((c) => inSurface(c.line))
+  }, [f.line, f.series, f.status, f.subject_slug, f.program_slug, surface])
+}
 
 // Program tier (Line → Program → Subject) — general across all lines.
 // Program docs are navigational metadata (title/blurb/emblem), readable by any
