@@ -32,6 +32,9 @@ export const LINE_VISUALS: Record<string, LineVisual> = {
   toddlers: { image: 'images/comics/toddlers/numbers/cover.jpg', note: 'Diamond Books · early-learning workbooks' },
   tingaland: { image: 'images/toddlers/tingaland/settings/tingaland-landscape-night-digital-art-background.jpg', note: 'Diamond Junior · Tinga Dojo & friends' },
   'did-you-know': { note: 'Little Chanakya · true, surprising facts' },
+  // The manga surface. No image yet — the line locks its own look, and until
+  // those assets exist a note-only entry renders correctly rather than blank.
+  manga: { note: 'India’s stories in manga grammar · in volumes' },
 }
 
 export type NamedImage = { rel: string; name: string }
