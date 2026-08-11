@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { BrandLockup } from '@/components/BrandLockup'
-import { SignOutButton } from '@/components/SignOutButton'
+import { SignOutButton, SwitchAccountButton } from '@/components/SignOutButton'
 import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { useLines } from '@/lib/catalog'
 import { useUnreadIdeaCount } from '@/lib/ideas'
@@ -252,6 +252,7 @@ export function Topbar() {
                   />
                   {user.email}
                 </span>
+                <SwitchAccountButton className="rounded-md px-3 py-2 text-left font-sans text-[0.7rem] uppercase tracking-label text-brand-slate transition-colors hover:bg-brand-indigo/5 hover:text-brand-indigo" />
                 <SignOutButton className="rounded-md px-3 py-2 text-left font-sans text-[0.7rem] uppercase tracking-label text-brand-slate transition-colors hover:bg-brand-indigo/5 hover:text-brand-indigo" />
               </>
             )}

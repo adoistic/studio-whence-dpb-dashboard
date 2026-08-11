@@ -19,3 +19,8 @@ export const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
 export const auth = getAuth(app)
 export const db = getFirestore(app)
 export const googleProvider = new GoogleAuthProvider()
+// Always show Google's account chooser. Without this, Google silently reuses
+// whichever account the browser is already signed into, so a user with two
+// accounts cannot switch: signing out and back in lands them on the same one
+// with no prompt. This is the only way to change accounts from the portal.
+googleProvider.setCustomParameters({ prompt: 'select_account' })
