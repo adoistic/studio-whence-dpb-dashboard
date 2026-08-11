@@ -206,6 +206,11 @@ export interface Line {
   slug: LineSlug
   title: string
   subtitle: string
+  // Which portal surface this line belongs to — 'comics' or 'manga'. Everything
+  // beneath the line inherits it (programs, subjects, comics, research). Absent
+  // means the dashboard falls back to SURFACE_BY_LINE and then to 'comics', so
+  // every line that predates the split keeps working untouched. See lib/surface.ts.
+  surface?: string
   programs?: Program[]
   program_count?: number
   comics: Comic[]

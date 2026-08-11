@@ -33,6 +33,18 @@ let mockAllowStatus: AllowStatus = 'loading'
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: mockReplace }),
+  usePathname: () => '/',
+}))
+
+// The comics/manga fork is exercised in its own tests; here it must resolve to
+// "nothing to choose", so the auth gate matrix is what is actually measured.
+vi.mock('@/lib/catalog', () => ({
+  useLines: () => ({ data: [], loading: false }),
+}))
+
+vi.mock('@/lib/surface', () => ({
+  useAvailableSurfaces: () => ({ data: [], loading: false }),
+  useActiveSurface: () => ({ surface: null, ready: true, setSurface: vi.fn() }),
 }))
 
 // SignOutButton (rendered on the suspended screen) depends on these.

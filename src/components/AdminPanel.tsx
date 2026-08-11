@@ -6,7 +6,7 @@ import { formatRelative } from '@/lib/dates'
 import { toMillis } from '@/lib/feedbackTypes'
 import {
   usePendingRequests, useMembers, useSuspended,
-  approveRequest, denyRequest, addMember, setMemberRole,
+  approveRequest, denyRequest, addMember, setMemberRole, setMemberSurfaces,
   removeMember, suspendEmail, reinstate,
   type AccessRequest, type Member, type SuspendedEntry,
 } from '@/lib/admin'
@@ -15,6 +15,7 @@ import { PricingPanel } from '@/components/admin/PricingPanel'
 import { usePricing } from '@/lib/pricing'
 import { useLines } from '@/lib/catalog'
 import { useVisibleComics } from '@/lib/visibleCatalog'
+import { SURFACE_LABEL, type Surface } from '@/lib/surface'
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -95,6 +96,46 @@ function RoleChip({ role }: { role: 'sub_admin' | 'member' }) {
       ].join(' ')}
     >
       {role === 'sub_admin' ? 'Sub-admin' : 'Member'}
+    </span>
+  )
+}
+
+// Which surfaces a sub-admin moderates. Three states, one of which ("Both") is
+// the absence of the field — so every sub-admin who predates the split reads as
+// Both here without anything having been written to their doc.
+function SurfaceScope({
+  email,
+  surfaces,
+  onSet,
+}: {
+  email: string
+  surfaces?: Surface[]
+  onSet: (next: Surface[] | null) => void
+}) {
+  const current: 'both' | Surface = surfaces?.length === 1 ? surfaces[0] : 'both'
+  const options: { key: 'both' | Surface; label: string; value: Surface[] | null }[] = [
+    { key: 'both', label: 'Both', value: null },
+    { key: 'comics', label: SURFACE_LABEL.comics, value: ['comics'] },
+    { key: 'manga', label: SURFACE_LABEL.manga, value: ['manga'] },
+  ]
+  return (
+    <span role="group" aria-label={`Surfaces ${email} moderates`} className="inline-flex gap-1">
+      {options.map((o) => (
+        <button
+          key={o.key}
+          type="button"
+          aria-pressed={current === o.key}
+          onClick={() => { if (current !== o.key) onSet(o.value) }}
+          className={[
+            'rounded-full border px-2 py-0.5 font-sans text-[0.6rem] uppercase tracking-label transition-colors',
+            current === o.key
+              ? 'border-brand-indigo bg-brand-indigo/10 text-brand-indigo'
+              : 'border-brand-pale-dusk text-brand-slate hover:border-brand-indigo/40 hover:text-brand-indigo',
+          ].join(' ')}
+        >
+          {o.label}
+        </button>
+      ))}
     </span>
   )
 }
@@ -299,6 +340,13 @@ export function AdminPanel() {
                 <Row key={m.email}>
                   <span className="font-serif text-sm text-brand-umber">{m.email}</span>
                   <RoleChip role={m.role} />
+                  {m.role === 'sub_admin' && (
+                    <SurfaceScope
+                      email={m.email}
+                      surfaces={m.surfaces}
+                      onSet={(next) => run(() => setMemberSurfaces(m.email, next, { adminEmail }))}
+                    />
+                  )}
                   <span className="ml-auto inline-flex flex-wrap items-center gap-1">
                     {m.role === 'sub_admin' ? (
                       <Pill

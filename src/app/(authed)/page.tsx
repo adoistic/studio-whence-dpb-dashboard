@@ -8,6 +8,7 @@ import { SampleStrip } from '@/components/SampleStrip'
 import { SectionHead } from '@/components/SectionHead'
 import { StatusWorkbookButton } from '@/components/StatusWorkbookButton'
 import { useCoverage, useHeadline, useLines } from '@/lib/catalog'
+import { filterCoverageBySurface, surfaceIndex, useActiveSurface } from '@/lib/surface'
 import { useResolved } from '@/lib/useResolved'
 import { HERO_BACKDROP, SAMPLE_PAGES } from '@/lib/images'
 import type { ActivityEntry } from '@/types/content'
@@ -18,10 +19,17 @@ const WORDS_ON_FILE = 10_000_000
 
 export default function Home() {
   const { data: meta } = useHeadline()
-  const { data: lines } = useLines()
+  const { data: allLines } = useLines()
   // The studio-status roll-up (meta/coverage) drives the coverage overview and
   // supplies the corrected headline counts (figures, comics, lines).
-  const { data: coverage } = useCoverage()
+  const { data: fullCoverage } = useCoverage()
+
+  // Everything below is scoped to the surface being browsed, counts included —
+  // an unfiltered total beside a filtered line list reads as a miscount.
+  const { surface } = useActiveSurface()
+  const resolveSurface = surfaceIndex(allLines)
+  const lines = allLines?.filter((l) => !surface || resolveSurface(l.slug) === surface) ?? null
+  const coverage = fullCoverage ? filterCoverageBySurface(fullCoverage, surface, resolveSurface) : null
 
   // Resolve the hero backdrop key to a presigned URL; render the <img> only
   // once it's present (degrades cleanly mid-load).
