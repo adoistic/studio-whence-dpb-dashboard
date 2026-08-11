@@ -264,42 +264,82 @@ function writeStoredSurface(surface: Surface): void {
   }
 }
 
+// ── One shared value, not one per component ──────────────────────────────────
+//
+// The active surface is global state, so it lives in a module-level store that
+// every hook instance subscribes to. It must NOT be per-component useState:
+// when the chooser saved a pick, only the chooser's own copy updated, the
+// layout's copy stayed null, and the layout — seeing both surfaces available
+// and no choice made — redirected straight back to the chooser. Every click
+// bounced to /choose for anyone holding both surfaces.
+
+let storeValue: Surface | null = null
+let storeLoaded = false
+const storeListeners = new Set<() => void>()
+
+function notifyStore(): void {
+  for (const listener of storeListeners) listener()
+}
+
+/** Read localStorage once, lazily, on the client. */
+function loadStoreOnce(): void {
+  if (storeLoaded) return
+  storeValue = readStoredSurface()
+  storeLoaded = true
+}
+
+/** Test seam: drop the module state so each test starts clean. */
+export function __resetSurfaceStore(): void {
+  storeValue = null
+  storeLoaded = false
+  storeListeners.clear()
+}
+
 /**
- * The surface currently being browsed. `null` until the first read resolves —
- * on a static export the value only exists client-side, so it is read in an
- * effect and never during render.
+ * The surface currently being browsed, shared across every component that asks.
+ * `null` until the first read resolves — on a static export the value exists
+ * only client-side, so it is read in an effect and never during render.
  */
 export function useActiveSurface(): {
   surface: Surface | null
   ready: boolean
   setSurface: (s: Surface) => void
 } {
-  const [surface, setState] = useState<Surface | null>(null)
+  const [, forceRender] = useState(0)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setState(readStoredSurface())
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setReady(true)
-  }, [])
+    loadStoreOnce()
+    const rerender = () => forceRender((n) => n + 1)
+    storeListeners.add(rerender)
 
-  // Keep two tabs in step.
-  useEffect(() => {
+    // Keep other tabs in step. Same-tab writes go through the store directly,
+    // because the storage event does not fire in the tab that wrote it — which
+    // is precisely why a listener alone could never have fixed this.
     function onStorage(e: StorageEvent) {
       if (e.key !== ACTIVE_SURFACE_KEY) return
-      setState(isSurface(e.newValue) ? e.newValue : null)
+      storeValue = isSurface(e.newValue) ? e.newValue : null
+      storeLoaded = true
+      notifyStore()
     }
     window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setReady(true)
+    return () => {
+      storeListeners.delete(rerender)
+      window.removeEventListener('storage', onStorage)
+    }
   }, [])
 
   const setSurface = useCallback((s: Surface) => {
     writeStoredSurface(s)
-    setState(s)
+    storeValue = s
+    storeLoaded = true
+    notifyStore()
   }, [])
 
-  return { surface, ready, setSurface }
+  return { surface: ready ? storeValue : null, ready, setSurface }
 }
 
 /**

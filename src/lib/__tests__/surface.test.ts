@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { renderHook, act, waitFor } from '@testing-library/react'
 
 // The pure helpers are what matter here; the hooks need Firebase, so stub the
 // SDK handles rather than the module under test.
@@ -12,6 +13,8 @@ import {
   surfaceIndex,
   surfaceOfLine,
   surfacesFromGrants,
+  useActiveSurface,
+  __resetSurfaceStore,
   type Surface,
 } from '@/lib/surface'
 import type { Coverage, Line } from '@/types/content'
@@ -196,5 +199,54 @@ describe('filterCoverageBySurface', () => {
   it('returns the same object when the filter removes nothing', () => {
     const comicsOnly: Coverage = { ...coverage, lines: [coverage.lines[0]] }
     expect(filterCoverageBySurface(comicsOnly, 'comics', resolve)).toBe(comicsOnly)
+  })
+})
+
+// ── The redirect-loop regression ─────────────────────────────────────────────
+//
+// The active surface is shared state. When it was per-component useState, the
+// chooser's write never reached the layout's copy, so the layout kept seeing
+// "both surfaces available, no choice made" and redirected back to /choose on
+// every click. These tests fail against that implementation.
+
+describe('useActiveSurface shares one value across components', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    __resetSurfaceStore()
+  })
+
+  it('a write in one component is visible in another', async () => {
+    const chooser = renderHook(() => useActiveSurface())
+    const layout = renderHook(() => useActiveSurface())
+
+    expect(layout.result.current.surface).toBeNull()
+
+    await act(async () => { chooser.result.current.setSurface('manga') })
+
+    // The layout must see it. This is the assertion that was failing in prod.
+    expect(layout.result.current.surface).toBe('manga')
+    expect(chooser.result.current.surface).toBe('manga')
+  })
+
+  it('persists the choice so the next mount does not ask again', async () => {
+    const first = renderHook(() => useActiveSurface())
+    await act(async () => { first.result.current.setSurface('comics') })
+
+    __resetSurfaceStore()
+    const remounted = renderHook(() => useActiveSurface())
+    await waitFor(() => expect(remounted.result.current.ready).toBe(true))
+    expect(remounted.result.current.surface).toBe('comics')
+  })
+
+  it('the layout would not redirect once a choice is made', async () => {
+    const chooser = renderHook(() => useActiveSurface())
+    const layout = renderHook(() => useActiveSurface())
+    await act(async () => { chooser.result.current.setSurface('manga') })
+
+    // The exact condition the layout guards on.
+    const available: Surface[] = ['comics', 'manga']
+    const owed = !(layout.result.current.surface
+      && available.includes(layout.result.current.surface))
+    expect(owed).toBe(false)
   })
 })
