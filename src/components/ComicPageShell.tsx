@@ -12,6 +12,7 @@ import { CoverOptions } from '@/components/CoverOptions'
 import { InsideCovers } from '@/components/InsideCovers'
 import { BackCover } from '@/components/BackCover'
 import { Activities } from '@/components/Activities'
+import { CharacterGrid } from '@/components/CharacterGrid'
 import { AboutTheBook } from '@/components/AboutTheBook'
 import { ComicReader } from '@/components/ComicReader'
 import { ComicPdfButton } from '@/components/ComicPdfButton'
@@ -111,6 +112,10 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
 
   // ── Draft ⇄ Comments view ────────────────────────────────────────────────
   const [view, setView] = useState<'draft' | 'comments'>('draft')
+  // Which person-tab is showing. 'comics' is everything this page has always
+  // been; 'characters' swaps the body for the cast, so the Characters tab is a
+  // real destination rather than a jump-link to a section far down the page.
+  const [tab, setTab] = useState<'comics' | 'characters'>('comics')
   // When a comment in the Comments view is clicked, switch to the Draft view and
   // remember which beat to scroll to once it's mounted.
   const [pendingJumpRef, setPendingJumpRef] = useState<string | null>(null)
@@ -195,13 +200,26 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
         </div>
       </section>
 
-      {/* ── Person tabs (Research ⇄ Comics) — biographies w/ a figure only ── */}
+      {/* ── Person tabs (Research ⇄ Comics ⇄ Characters) ─────────────── */}
       {hasFigure && (
-        <PersonTabs figureSlug={figureSlug} comics={comics} active="comics" />
+        <PersonTabs
+          figureSlug={figureSlug}
+          comics={comics}
+          active={tab}
+          characterCount={comic.characters?.count}
+          onCharacters={() => setTab('characters')}
+        />
+      )}
+
+      {/* ── Characters tab ─────────────────────────────────────────── */}
+      {tab === 'characters' && (
+        <main className="mx-auto max-w-[1100px] px-6 pb-24">
+          <CharacterGrid comic={comic} />
+        </main>
       )}
 
       {/* ── Body ───────────────────────────────────────────────────── */}
-      <main className="mx-auto max-w-[1100px] px-6">
+      <main className={`mx-auto max-w-[1100px] px-6 ${tab === 'characters' ? 'hidden' : ''}`}>
         {/* Editions band — prominent in the body so it isn't missed (it used to
             be crammed into the tab strip right under the masthead). */}
         <ComicEditions comics={comics} activeSlug={comic.slug} />
