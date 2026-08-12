@@ -46,7 +46,12 @@ run('the published character rosters', () => {
     ? (JSON.parse(readFileSync(DUMP, 'utf8')) as Record<string, RosterDoc>)
     : {}
   const docs = Object.values(raw)
-  const shared = raw[SHARED_LINE]
+  // Indexed by each doc's OWN `line`, never by the dump's key — the builder
+  // keys its output by line NAME (`manga`) and the doc carries the line SLUG
+  // (`manga-indic`), and only the slug is the contract the app reads.
+  const byLine = new Map(docs.map((d) => [d.line, d]))
+  const shared = byLine.get(SHARED_LINE)
+  const manga = byLine.get('manga-indic')
   const lineDocs = docs.filter((d) => d.line !== SHARED_LINE)
   const all: RosterPerson[] = docs.flatMap((d) => d.people ?? [])
 
@@ -86,15 +91,15 @@ run('the published character rosters', () => {
   })
 
   it('4. never selects a person from the other surface', () => {
-    const comics = selectCharacters(docs, 'comics')
-    const manga = selectCharacters(docs, 'manga')
+    const onComics = selectCharacters(docs, 'comics')
+    const onManga = selectCharacters(docs, 'manga')
     const nShared = shared?.count ?? 0
-    expect(comics.every((p) => p.line !== 'manga-indic')).toBe(true)
-    expect(manga.every((p) => p.line === 'manga-indic' || p.line === SHARED_LINE)).toBe(true)
+    expect(onComics.every((p) => p.line !== 'manga-indic')).toBe(true)
+    expect(onManga.every((p) => p.line === 'manga-indic' || p.line === SHARED_LINE)).toBe(true)
     // The two surfaces partition the LINE-owned corpus — nobody lost, nobody
     // counted twice — and the shared cast rides on both, counted once on each.
-    expect(comics.length + manga.length - 2 * nShared).toBe(all.length - nShared)
-    expect(manga.length).toBe(raw['manga-indic'].count + nShared)
+    expect(onComics.length + onManga.length - 2 * nShared).toBe(all.length - nShared)
+    expect(onManga.length).toBe((manga?.count ?? 0) + nShared)
   })
 
   it('5. agrees with the counts the publisher wrote', () => {
@@ -126,12 +131,15 @@ run('the published character rosters', () => {
     }
   })
 
+  // Skipped when the local dump predates the shared doc; `sharedPeople` is then
+  // never reached, which is what keeps it typed without a cast at every use.
   const withShared = shared ? it : it.skip
+  const sharedPeople: RosterPerson[] = shared?.people ?? []
 
   withShared('8a. the shared cast is one entry per person, on both surfaces', () => {
     const comics = selectCharacters(docs, 'comics')
     const manga = selectCharacters(docs, 'manga')
-    for (const p of shared.people) {
+    for (const p of sharedPeople) {
       // once in each listing, never twice, and never a line copy beside it
       expect(comics.filter((x) => x.slug === p.slug && isSharedPerson(x))).toHaveLength(1)
       expect(manga.filter((x) => x.slug === p.slug && isSharedPerson(x))).toHaveLength(1)
@@ -141,14 +149,14 @@ run('the published character rosters', () => {
   withShared('8b. no shared character is left behind in a line doc', () => {
     // The defect: Pihu drawn under Awareness and still-to-draw under MediComics
     // at the same time, because her art sits in the Awareness folder.
-    const sharedSlugs = new Set(shared.people.map((p) => p.slug))
+    const sharedSlugs = new Set(sharedPeople.map((p) => p.slug))
     const stale = lineDocs.flatMap((d) =>
       d.people.filter((p) => sharedSlugs.has(p.slug)).map((p) => characterId(p)))
     expect(stale).toEqual([])
   })
 
   withShared('8c. every shared person names the lines that stage them', () => {
-    for (const p of shared.people) {
+    for (const p of sharedPeople) {
       expect(isSharedPerson(p)).toBe(true)
       expect(personLines(p).length).toBeGreaterThan(0)
       for (const l of personLines(p)) expect(l).not.toBe(SHARED_LINE)

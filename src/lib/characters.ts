@@ -200,7 +200,10 @@ export function characterId(person: Pick<RosterPerson, 'line' | 'slug'>): string
  * A comic slug qualified by the line that publishes it, so two lines' books
  * never collapse into one count or one link. The shared doc already writes its
  * person-level slugs qualified; its VERSION-level ones are bare, and are
- * resolved against the qualified list.
+ * resolved against the qualified list. A version entry carries no line of its
+ * own, so if two lines ever published the same comic slug the first qualified
+ * match wins — no comic slug is shared across lines today, and the alternative
+ * to guessing is no link at all.
  */
 export function qualifyComic(person: RosterPerson, slug: string): string | null {
   if (slug.includes('/')) return slug
