@@ -18,13 +18,19 @@
  *      that surface's roster docs are ever READ.
  *   3. `selectCharacters` drops any person whose own line resolves elsewhere.
  *
+ * The one doc read on BOTH surfaces is `meta/characters_shared`: Little Chanakya
+ * and the Little Chanakya & Friends cast are studio/Diamond IP with a single
+ * locked design, so they are published once and belong to every surface. That
+ * is an explicit third value (`surface: 'both'`), not a hole in the split — no
+ * `manga-*` line can produce it.
+ *
  * Access itself is untouched by any of this — it stays with the allocation and
  * the Firestore rules, exactly as `surface.ts` says.
  */
 
 import { useMemo } from 'react'
 import { useLines } from '@/lib/catalog'
-import { rosterLineSlugs, useCharacterRosters } from '@/lib/characters'
+import { rosterLineSlugs, SHARED_LINE, useCharacterRosters } from '@/lib/characters'
 import { SURFACE_LABEL, useActiveSurface } from '@/lib/surface'
 import { CharacterRoster } from '@/components/CharacterRoster'
 import { SectionHead } from '@/components/SectionHead'
@@ -38,7 +44,9 @@ export default function CharactersPage() {
   const { data: rosters, loading, error } = useCharacterRosters(slugs)
 
   const lineTitles = useMemo(() => {
-    const map: Record<string, string> = {}
+    // `shared` is a filing location, not a browsable line, so it never comes
+    // from the catalog and is titled here for the badges that mention it.
+    const map: Record<string, string> = { [SHARED_LINE]: 'Shared cast' }
     for (const l of lines ?? []) map[l.slug] = l.title
     return map
   }, [lines])

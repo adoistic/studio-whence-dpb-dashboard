@@ -25,6 +25,12 @@ beforeAll(async () => {
       line: 'manga-indic', surface: 'manga', count: 74, drawn: 0, owed: 74,
       versions: 74, versionsDrawn: 0, comics: 3, people: [],
     })
+    // …plus the sixth doc: shared IP (Little Chanakya and the Little Chanakya &
+    // Friends cast), `surface: 'both'`, read on either surface.
+    await setDoc(doc(db, 'meta/characters_shared'), {
+      line: 'shared', surface: 'both', count: 7, drawn: 7, owed: 0,
+      versions: 9, versionsDrawn: 9, comics: 30, people: [],
+    })
     await setDoc(doc(db, 'comics/biographies__01-x'), { line: 'biographies', status: 'draft' })
     await setDoc(doc(db, 'people/jrd-tata'), { line: 'biographies', stage: 'draft' })
     await setDoc(doc(db, 'figures/jrd-tata'), { slug: 'jrd-tata' })
@@ -309,6 +315,9 @@ describe('firestore.rules — catalog', () => {
     const db = env.authenticatedContext('u1', { email: 'x@thothica.com' }).firestore()
     await assertSucceeds(getDoc(doc(db, 'meta/characters_biographies')))
     await assertSucceeds(getDoc(doc(db, 'meta/characters_manga-indic')))
+    // The shared-IP doc rides the same wildcard: it is not a line, and it needs
+    // no rule of its own.
+    await assertSucceeds(getDoc(doc(db, 'meta/characters_shared')))
   })
   it('non-allowlisted user is denied', async () => {
     const db = env.authenticatedContext('u2', { email: 'stranger@gmail.com' }).firestore()

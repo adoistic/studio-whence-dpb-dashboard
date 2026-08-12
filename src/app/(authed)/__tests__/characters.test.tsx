@@ -7,10 +7,15 @@
  *      docs, so `manga-indic`'s cast can never appear on the comics surface and
  *      the comics cast can never appear on the manga surface. Asserted from the
  *      Firestore reads the page actually issues, not just from the render.
- *   2. PLACEHOLDERS — an undrawn version renders as a labelled card naming the
+ *   2. SHARED IP — `meta/characters_shared` carries `surface: 'both'`, so it is
+ *      read and rendered on BOTH surfaces, badged, listing every line that
+ *      stages the character, and appearing exactly ONCE. Keyed per line, Pihu
+ *      read as drawn under Awareness and still-to-draw under MediComics at the
+ *      same time; that is the defect this doc exists to end.
+ *   3. PLACEHOLDERS — an undrawn version renders as a labelled card naming the
  *      comics and page count waiting on it. 681 of the 1,168 characters have no
  *      art; hiding them would make the roster read as finished.
- *   3. Filters (line / drawn / owed / search) and the headline counts.
+ *   4. Filters (line / kind / drawn / owed / search) and the headline counts.
  *
  * Mocks follow the house idiom: reassignable module-level `let mockUseX`
  * forwarded through an arrow, so hoisting is safe and each test can vary them.
@@ -83,7 +88,7 @@ const ALL_LINES = [line('indic', 'Indic'), line('awareness', 'Awareness'), line(
 
 DOCS['characters_indic'] = {
   line: 'indic', surface: 'comics',
-  count: 2, drawn: 1, owed: 1, versions: 3, versionsDrawn: 1, comics: 1,
+  count: 3, drawn: 1, owed: 2, versions: 4, versionsDrawn: 1, comics: 1,
   people: [
     {
       slug: 'ram', name: 'Ram', line: 'indic', drawn: true, pages: 40, comics: ['01-ramayana'],
@@ -107,6 +112,18 @@ DOCS['characters_indic'] = {
         },
       ],
     },
+    // An unnamed walk-on, titled with the one book it belongs to. Roles now
+    // outnumber names in the biographies list, which is why `kind` is filterable.
+    {
+      slug: 'father--01-ramayana', name: 'Father · Ramayana', line: 'indic', kind: 'role',
+      drawn: false, pages: 2, comics: ['01-ramayana'],
+      versions: [
+        {
+          stage: '—', drawn: false, key: null,
+          comics: [{ slug: '01-ramayana', title: 'Ramayana', pages: [] }], pages: 2,
+        },
+      ],
+    },
   ],
 }
 
@@ -120,6 +137,32 @@ DOCS['characters_awareness'] = {
         {
           stage: 'teen', drawn: true, key: 'artifacts/characters/awareness/nila/teen.png',
           comics: [{ slug: '01-future-shock', title: 'Future Shock', pages: [2] }], pages: 9,
+        },
+      ],
+    },
+  ],
+}
+
+// The sixth doc. `surface: 'both'`, so it is read on the comics surface AND the
+// manga surface — one locked design for a character several lines stage. Keyed
+// per line he was four entries, drawn under one line and owed under another.
+DOCS['characters_shared'] = {
+  line: 'shared', surface: 'both',
+  count: 1, drawn: 1, owed: 0, versions: 1, versionsDrawn: 1, comics: 2,
+  people: [
+    {
+      slug: 'little-chanakya', name: 'Little Chanakya', line: 'shared', kind: 'shared',
+      lines: ['indic', 'awareness'], drawn: true, pages: 30,
+      comics: ['indic/01-ramayana', 'awareness/01-future-shock'],
+      versions: [
+        {
+          stage: 'host', drawn: true,
+          key: 'artifacts/characters/shared/little-chanakya/host.png',
+          comics: [
+            { slug: '01-ramayana', title: 'Ramayana', pages: [1] },
+            { slug: '01-future-shock', title: 'Future Shock', pages: [3] },
+          ],
+          pages: 30,
         },
       ],
     },
@@ -169,7 +212,8 @@ describe('/characters — surface separation', () => {
     render(<CharactersPage />)
     expect(await screen.findByText('Ramayana Volume One')).toBeInTheDocument()
 
-    expect(readDocIds).toEqual(['characters_manga-indic'])
+    // The manga roster and the shared doc — and no comics line's roster.
+    expect([...readDocIds].sort()).toEqual(['characters_manga-indic', 'characters_shared'])
     expect(screen.queryByRole('heading', { name: 'Sita' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Nila' })).not.toBeInTheDocument()
   })
@@ -192,9 +236,9 @@ describe('/characters — undrawn work is visible, not hidden', () => {
   test('an undrawn version renders a labelled placeholder card', async () => {
     render(<CharactersPage />)
     await screen.findByRole('heading', { name: 'Ram' })
-    // Ram's exile version + Sita's only version are both still to draw.
-    expect(screen.getAllByText('Not drawn yet')).toHaveLength(2)
-    expect(screen.getAllByText('placeholder')).toHaveLength(2)
+    // Ram's exile version, Sita's only version, and the walk-on father.
+    expect(screen.getAllByText('Not drawn yet')).toHaveLength(3)
+    expect(screen.getAllByText('placeholder')).toHaveLength(3)
   })
 
   test('a placeholder names the comic and the pages waiting on it', async () => {
@@ -215,10 +259,102 @@ describe('/characters — undrawn work is visible, not hidden', () => {
   test('the header counts drawn versus owed for the whole surface', async () => {
     render(<CharactersPage />)
     await screen.findByRole('heading', { name: 'Ram' })
-    // 3 characters (Ram, Sita, Nila) · 2 of 4 versions drawn · 1 with no art.
-    expect(screen.getByText(/3 characters/)).toBeInTheDocument()
-    expect(screen.getByText(/2 of 4 versions drawn/)).toBeInTheDocument()
-    expect(screen.getByText(/1 with no art yet/)).toBeInTheDocument()
+    // 5 entries (Ram, Sita, the walk-on father, Nila, Little Chanakya) · 3 of 6
+    // versions drawn · 2 with no art at all.
+    expect(screen.getByText(/5 characters/)).toBeInTheDocument()
+    expect(screen.getByText(/3 of 6 versions drawn/)).toBeInTheDocument()
+    expect(screen.getByText(/2 with no art yet/)).toBeInTheDocument()
+  })
+})
+
+// ─── Shared IP ───────────────────────────────────────────────────────────────
+
+describe('/characters — the shared cast', () => {
+  test('the comics surface reads the shared doc and lists him', async () => {
+    render(<CharactersPage />)
+    expect(await screen.findByRole('heading', { name: 'Little Chanakya' })).toBeInTheDocument()
+    expect(readDocIds).toContain('characters_shared')
+  })
+
+  test('the manga surface reads the same doc and lists the same man', async () => {
+    mockSurface = () => 'manga'
+    render(<CharactersPage />)
+    expect(await screen.findByRole('heading', { name: 'Little Chanakya' })).toBeInTheDocument()
+    expect(readDocIds).toContain('characters_shared')
+  })
+
+  test('he appears exactly once, badged, naming every line that stages him', async () => {
+    render(<CharactersPage />)
+    const heading = await screen.findByRole('heading', { name: 'Little Chanakya' })
+    expect(screen.getAllByRole('heading', { name: 'Little Chanakya' })).toHaveLength(1)
+    const card = heading.closest('article')!
+    expect(within(card).getByText('Shared cast')).toBeInTheDocument()
+    // Not "shared" — the lines a reader can actually go and look at.
+    expect(within(card).getByText('Indic · Awareness')).toBeInTheDocument()
+    expect(within(card).getByText('one design, 2 lines')).toBeInTheDocument()
+  })
+
+  test('his books link to the line that publishes them, not to /shared/…', async () => {
+    render(<CharactersPage />)
+    const heading = await screen.findByRole('heading', { name: 'Little Chanakya' })
+    const card = heading.closest('article')!
+    expect(within(card).getByRole('link', { name: 'Future Shock' }))
+      .toHaveAttribute('href', '/awareness/01-future-shock')
+    expect(within(card).getByRole('link', { name: 'Ramayana' }))
+      .toHaveAttribute('href', '/indic/01-ramayana')
+  })
+
+  test('a line filter finds him under every line that stages him', async () => {
+    render(<CharactersPage />)
+    await screen.findByRole('heading', { name: 'Little Chanakya' })
+    fireEvent.click(screen.getByRole('button', { name: 'Awareness' }))
+    expect(screen.getByRole('heading', { name: 'Little Chanakya' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Indic' }))
+    expect(screen.getByRole('heading', { name: 'Little Chanakya' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Nila' })).not.toBeInTheDocument()
+  })
+})
+
+// ─── Kind ────────────────────────────────────────────────────────────────────
+
+describe('/characters — kind filter', () => {
+  test('the shared cast can be listed on its own', async () => {
+    render(<CharactersPage />)
+    await screen.findByRole('heading', { name: 'Ram' })
+    fireEvent.click(screen.getByRole('button', { name: 'Shared cast' }))
+    expect(screen.getByRole('heading', { name: 'Little Chanakya' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Ram' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Nila' })).not.toBeInTheDocument()
+  })
+
+  test('named characters keep the people and drop the walk-ons', async () => {
+    render(<CharactersPage />)
+    await screen.findByRole('heading', { name: 'Ram' })
+    fireEvent.click(screen.getByRole('button', { name: 'Named characters' }))
+    expect(screen.getByRole('heading', { name: 'Ram' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Little Chanakya' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /Father · / })).not.toBeInTheDocument()
+  })
+
+  test('offers a pill only for a kind that is actually on this surface', async () => {
+    // The manga roster is line characters plus the shared cast — no walk-ons —
+    // so there is nothing for a roles pill to filter.
+    mockSurface = () => 'manga'
+    render(<CharactersPage />)
+    await screen.findByRole('heading', { name: 'Ram' })
+    expect(screen.getByRole('button', { name: 'Shared cast' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Unnamed roles' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Named characters' })).not.toBeInTheDocument()
+  })
+
+  test('"Unnamed roles" is the walk-on list, and it is scoped to one book', async () => {
+    render(<CharactersPage />)
+    await screen.findByRole('heading', { name: 'Ram' })
+    fireEvent.click(screen.getByRole('button', { name: 'Unnamed roles' }))
+    // Only the role entry survives — the named cast is gone.
+    expect(screen.getByRole('heading', { name: 'Father · Ramayana' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Ram' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Little Chanakya' })).not.toBeInTheDocument()
   })
 })
 
@@ -278,10 +414,23 @@ describe('/characters — filters', () => {
 // ─── Quiet states ────────────────────────────────────────────────────────────
 
 describe('/characters — quiet states', () => {
-  test('a surface with no roster published says so rather than rendering empty', async () => {
+  test('a surface with nothing published at all says so rather than rendering empty', async () => {
+    const shared = DOCS['characters_shared']
+    delete DOCS['characters_shared']
+    try {
+      mockUseLines = () => ({ data: [line('toddlers', 'Toddlers')], loading: false })
+      render(<CharactersPage />)
+      expect(await screen.findByText('No roster published yet')).toBeInTheDocument()
+    } finally {
+      DOCS['characters_shared'] = shared
+    }
+  })
+
+  test('a line with no roster of its own still shows the shared cast', async () => {
+    // The shared doc belongs to every surface, so it is never the missing one.
     mockUseLines = () => ({ data: [line('toddlers', 'Toddlers')], loading: false })
     render(<CharactersPage />)
-    expect(await screen.findByText('No roster published yet')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Little Chanakya' })).toBeInTheDocument()
   })
 
   test('exports are offered once there is a roster', async () => {

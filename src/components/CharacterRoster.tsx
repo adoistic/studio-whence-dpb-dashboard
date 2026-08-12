@@ -13,6 +13,13 @@
  * in the grid. A roster that quietly drops what is missing reads as finished,
  * which is the opposite of what it is opened for.
  *
+ * Three kinds of entry share the list and are told apart on sight: a LINE
+ * character wears its line, an unnamed ROLE is titled with the one book it
+ * belongs to, and SHARED IP — Little Chanakya and the Little Chanakya & Friends
+ * cast — wears a badge and lists every line that stages it. The shared badge is
+ * the fix for a real defect: keyed per line, Pihu read as drawn under Awareness
+ * and still-to-draw under MediComics at the same time.
+ *
  * No artwork ships in this public repo: every sheet is an R2 key resolved to a
  * short-lived presigned URL at render time, through the same gated channel as
  * the rest of the app.
@@ -24,11 +31,16 @@ import { useResolved } from '@/lib/useResolved'
 import { resolveUrls } from '@/lib/dataApi'
 import {
   characterId,
+  comicHref,
+  isSharedPerson,
+  personKind,
+  personLines,
   rosterTotals,
   selectCharacters,
   versionKeys,
   type CharacterFilters,
   type DrawnFilter,
+  type KindFilter,
   type RosterDoc,
   type RosterPerson,
   type RosterVersion,
@@ -43,6 +55,16 @@ const DRAWN_FILTERS: { key: DrawnFilter; label: string }[] = [
   { key: 'all', label: 'Everyone' },
   { key: 'drawn', label: 'Drawn' },
   { key: 'owed', label: 'Still to draw' },
+]
+
+/** Named people, the unnamed walk-ons, and the studio's own shared cast. The
+ *  roles outnumber the names in the biographies list, so this is what makes it
+ *  readable rather than a wall of `Father · …` and `Student · …`. */
+const KIND_FILTERS: { key: KindFilter; label: string }[] = [
+  { key: 'all', label: 'Everything' },
+  { key: 'named', label: 'Named characters' },
+  { key: 'role', label: 'Unnamed roles' },
+  { key: 'shared', label: 'Shared cast' },
 ]
 
 function prettyStage(stage: string): string {
@@ -84,25 +106,42 @@ export function CharacterRoster({
 }) {
   const [line, setLine] = useState('all')
   const [drawn, setDrawn] = useState<DrawnFilter>('all')
+  const [kind, setKind] = useState<KindFilter>('all')
   const [query, setQuery] = useState('')
   const [limit, setLimit] = useState(PAGE_SIZE)
 
-  const filters: CharacterFilters = { line, drawn, q: query }
+  const filters: CharacterFilters = { line, drawn, kind, q: query }
   const people = useMemo(
     () => selectCharacters(rosters, surface, filters),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rosters, surface, line, drawn, query],
+    [rosters, surface, line, drawn, kind, query],
   )
   const totals = useMemo(() => rosterTotals(people), [people])
 
   // Only the lines actually present on THIS surface get a filter pill — the
-  // manga rosters are never even read here, so they can never offer one.
+  // manga rosters are never even read here, so they can never offer one. A
+  // shared character contributes every line that stages them, so Pihu keeps
+  // both Awareness and MediComics reachable without `shared` itself, which is
+  // a filing location rather than a line anyone browses, becoming a pill.
   const lines = useMemo(() => {
     const seen: string[] = []
     for (const p of selectCharacters(rosters, surface)) {
-      if (!seen.includes(p.line)) seen.push(p.line)
+      for (const slug of personLines(p)) {
+        if (!seen.includes(slug)) seen.push(slug)
+      }
     }
     return seen
+  }, [rosters, surface])
+
+  // Offer a kind pill only for a kind that is actually here, and only when
+  // there is more than one to tell apart — a surface whose whole cast is
+  // line-owned characters has nothing to separate.
+  const kinds = useMemo(() => {
+    const present = new Set(selectCharacters(rosters, surface).map(personKind))
+    if (present.size < 2) return []
+    return KIND_FILTERS.filter((f) =>
+      f.key === 'all' ||
+      (f.key === 'named' ? present.has('role') : present.has(f.key)))
   }, [rosters, surface])
 
   const shown = people.slice(0, limit)
@@ -164,6 +203,21 @@ export function CharacterRoster({
             ))}
           </div>
         )}
+        {kinds.length > 1 && (
+          <div role="group" aria-label="Filter by kind" className="flex flex-wrap items-center gap-2">
+            {kinds.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                aria-pressed={kind === f.key}
+                onClick={() => change(() => setKind(f.key))}
+                className={`${PILL} ${kind === f.key ? on : off}`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-2">
           <div role="group" aria-label="Filter by art status" className="flex flex-wrap gap-2">
             {DRAWN_FILTERS.map((f) => (
@@ -195,7 +249,7 @@ export function CharacterRoster({
             key={characterId(person)}
             person={person}
             urls={urls}
-            lineTitle={lineTitles[person.line] ?? person.line}
+            lineTitles={lineTitles}
           />
         ))}
         {people.length === 0 && (
@@ -219,22 +273,40 @@ export function CharacterRoster({
 function PersonRow({
   person,
   urls,
-  lineTitle,
+  lineTitles,
 }: {
   person: RosterPerson
   urls: Record<string, string>
-  lineTitle: string
+  lineTitles: Record<string, string>
 }) {
   const owed = person.versions.filter((v) => !v.drawn).length
+  const shared = isSharedPerson(person)
+  const lines = personLines(person).map((slug) => lineTitles[slug] ?? slug)
   return (
     <article className="border-t border-brand-pale-dusk pt-6">
       <header className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <h2 className="font-serif text-xl text-brand-indigo">{person.name}</h2>
-        {/* The line is part of the character's identity, not decoration: the
-            manga Ram and the Indic Ram are two different characters. */}
-        <span className="font-sans text-[0.68rem] uppercase tracking-label text-brand-gold">
-          {lineTitle}
-        </span>
+        {/* SHARED IP wears its own badge and lists every line that stages it —
+            one locked design used in several books, said plainly, because the
+            bug this replaces was the same person appearing once per line with
+            contradictory art status. Everyone else wears their single line: it
+            is part of their identity, not decoration, since the manga Ram and
+            the Indic Ram are two different characters. */}
+        {shared && (
+          <span className="rounded-full border border-brand-gold px-2 py-0.5 font-sans text-[0.62rem] uppercase tracking-label text-brand-gold">
+            Shared cast
+          </span>
+        )}
+        {lines.length > 0 && (
+          <span className="font-sans text-[0.68rem] uppercase tracking-label text-brand-gold">
+            {lines.join(' · ')}
+          </span>
+        )}
+        {shared && lines.length > 1 && (
+          <span className="font-serif text-sm text-brand-slate">
+            one design, {lines.length} lines
+          </span>
+        )}
         <span className="font-serif text-sm text-brand-slate">
           {person.versions.length} {plural(person.versions.length, 'version')}
           {owed > 0 && ` · ${owed} still to draw`}
@@ -318,17 +390,30 @@ function VersionCard({
       )}
       {(version.comics ?? []).length > 0 && (
         <ul className="flex flex-col gap-0.5">
-          {version.comics.map((c) => (
-            <li key={c.slug} className="font-serif text-xs text-brand-slate">
-              <Link
-                href={`/${person.line}/${c.slug}`}
-                className="underline decoration-brand-pale-dusk underline-offset-4 hover:text-brand-indigo"
-              >
-                {c.title || c.slug}
-              </Link>
-              {pageList(c.pages) && <span> — {pageList(c.pages)}</span>}
-            </li>
-          ))}
+          {version.comics.map((c) => {
+            // A shared character's doc is filed under `shared`, which is not a
+            // line and has no page to link to — the comic's real line is read
+            // back off the person's line-qualified comic list. When it cannot
+            // be resolved the book is named without a link rather than pointed
+            // at a URL that 404s.
+            const href = comicHref(person, c.slug)
+            const label = c.title || c.slug
+            return (
+              <li key={c.slug} className="font-serif text-xs text-brand-slate">
+                {href ? (
+                  <Link
+                    href={href}
+                    className="underline decoration-brand-pale-dusk underline-offset-4 hover:text-brand-indigo"
+                  >
+                    {label}
+                  </Link>
+                ) : (
+                  <span>{label}</span>
+                )}
+                {pageList(c.pages) && <span> — {pageList(c.pages)}</span>}
+              </li>
+            )
+          })}
         </ul>
       )}
     </figure>
@@ -379,9 +464,15 @@ function RosterExports({
         'two lines is two different characters. A version listed with no file is',
         'one a book needs and nobody has drawn yet.',
         '',
+        'The `shared/` folder is the exception, and deliberately so: Little',
+        'Chanakya and the Little Chanakya & Friends cast are one locked design',
+        'used by several lines, so they hold one folder and list every line that',
+        'stages them.',
+        '',
       ]
       for (const p of people) {
-        md.push(`## ${p.name} — ${p.line}`)
+        const where = isSharedPerson(p) ? personLines(p).join(', ') || 'shared' : p.line
+        md.push(`## ${p.name} — ${where}${isSharedPerson(p) ? ' (shared cast)' : ''}`)
         md.push('')
         if (p.pages) md.push(`- ${p.pages} pages across ${p.comics.length} comics`)
         for (const v of p.versions) {
@@ -431,7 +522,7 @@ function RosterExports({
             color: rgb(0.45, 0.45, 0.5),
           })
           const meta = [
-            p.line,
+            isSharedPerson(p) ? `shared cast · ${personLines(p).join(' · ')}` : p.line,
             v.pages ? `${v.pages} pages` : '',
             (v.comics ?? []).map((c) => c.title || c.slug).join(', '),
           ]
