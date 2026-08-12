@@ -18,6 +18,7 @@ import {
 const HOME_LINK = { label: 'Home', href: '/' }
 const STATUS_LINK = { label: 'Production status', href: '/status' }
 const METHODOLOGY_LINK = { label: 'Methodology', href: '/methodology' }
+const CHARACTERS_LINK = { label: 'Characters', href: '/characters' }
 const REVIEWS_LINK = { label: 'Reviews', href: '/reviews' }
 const IDEAS_LINK = { label: 'Ideas', href: '/ideas' }
 const ADMIN_LINK = { label: 'Admin', href: '/admin' }
@@ -171,6 +172,15 @@ export function Topbar() {
               label={STATUS_LINK.label}
               href={STATUS_LINK.href}
               active={isActive(STATUS_LINK.href, pathname)}
+              onNavigate={closeMenu}
+            />
+            {/* Characters — the studio-wide cast, drawn and still to draw. The
+                page scopes itself to the active surface, so it is ungated like
+                Production status: whoever can open it sees only their own. */}
+            <MenuItem
+              label={CHARACTERS_LINK.label}
+              href={CHARACTERS_LINK.href}
+              active={isActive(CHARACTERS_LINK.href, pathname)}
               onNavigate={closeMenu}
             />
             {/* Methodology — the pipeline playbook; visible to any authed user. */}

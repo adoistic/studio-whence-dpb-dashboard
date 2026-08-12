@@ -100,6 +100,12 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
   // for it — biographies figures and Practical Indic subjects (e.g. swami-ramdev)
   // alike. The indic epics have no figure doc, so fig.data stays falsy for them.
   const hasFigure = !!figureSlug && !!fig.data
+  // The CAST tab must not depend on a figure doc. It used to: the tab strip
+  // only rendered when `hasFigure` was true, so a comic with a published cast
+  // but no `figures/{slug}` doc — every Indic epic, for one — could never show
+  // its characters at all. The cast is a property of the comic, so the strip
+  // now appears for either reason.
+  const hasCast = (comic.characters?.people?.length ?? 0) > 0
 
   // ── Comic PDF ⇄ A+ Modules view ──────────────────────────────────────────
   // The "Read the comic" section toggles between the page reader (PDF) and the
@@ -201,12 +207,12 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
       </section>
 
       {/* ── Person tabs (Research ⇄ Comics ⇄ Characters) ─────────────── */}
-      {hasFigure && (
+      {(hasFigure || hasCast) && (
         <PersonTabs
-          figureSlug={figureSlug}
+          figureSlug={hasFigure ? figureSlug : null}
           comics={comics}
           active={tab}
-          characterCount={comic.characters?.count}
+          characterCount={hasCast ? comic.characters!.count || comic.characters!.people.length : undefined}
           onCharacters={() => setTab('characters')}
         />
       )}

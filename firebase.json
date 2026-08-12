@@ -32,6 +32,10 @@
         "destination": "/status.html"
       },
       {
+        "source": "/characters",
+        "destination": "/characters.html"
+      },
+      {
         "source": "/figures/*",
         "destination": "/figure.html"
       },

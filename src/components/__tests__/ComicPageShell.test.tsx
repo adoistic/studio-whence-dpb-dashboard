@@ -183,6 +183,36 @@ describe('ComicPageShell', () => {
     expect(screen.queryByRole('navigation', { name: /person sections/i })).not.toBeInTheDocument()
   })
 
+  test('a comic with a published CAST shows the Characters tab even with no figure doc', () => {
+    // The tab used to hang off `hasFigure`, so an Indic epic — which has a cast
+    // but no figures/{slug} doc — could never reach its own characters.
+    const castComic: Comic = {
+      ...comic,
+      line: 'indic',
+      subject_slug: 'rama',
+      characters: {
+        count: 1, drawn: 1, owed: 0,
+        people: [{
+          slug: 'ram', name: 'Ram', tag: 'RAM', tier: 'LEAD', lines: 12, pages: [1],
+          versions: [{ stage: 'prince', pages: [1], key: null, drawn: false }],
+        }],
+      },
+    }
+    mockFigure = () => ({ data: null, loading: false })
+    mockComics = () => ({ data: [], loading: false })
+    render(<ComicPageShell comic={castComic} />)
+
+    expect(screen.getByRole('navigation', { name: /person sections/i })).toBeInTheDocument()
+    const tab = screen.getByRole('button', { name: /characters/i })
+    expect(tab).toBeInTheDocument()
+    // With no figure doc the Research tab is inert text, not a broken link.
+    expect(screen.queryByRole('link', { name: /research/i })).not.toBeInTheDocument()
+
+    fireEvent.click(tab)
+    expect(screen.getByRole('heading', { name: 'Ram' })).toBeInTheDocument()
+    expect(screen.getByText('Not drawn yet')).toBeInTheDocument()
+  })
+
   test('mounts the comment gutter with the comic id, line and version', async () => {
     mockDraft = () => ({ text: '<h2>Page 1</h2><p>Open on a runway.</p>', loading: false })
     render(<ComicPageShell comic={comic} />)
