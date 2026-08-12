@@ -272,6 +272,10 @@ function VersionCard({
     <figure className="flex flex-col gap-2">
       <div className="relative flex aspect-[16/9] items-center justify-center overflow-hidden rounded-md border border-brand-pale-dusk bg-white">
         {url ? (
+          // Presigned R2 URLs expire and are per-request, so next/image cannot
+          // optimise them and this is a static export with no image server.
+          // Same call as ComicReader and VariationGallery.
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={url}
             alt={`${person.name} — ${prettyStage(version.stage)}`}
