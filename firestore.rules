@@ -196,6 +196,14 @@ service cloud.firestore {
 
     // ── B2.7 catalog (read-only for allowlisted clients; written only by the
     //    publish Action's Admin SDK, which bypasses rules) ──
+    // meta/* is the navigational roll-up layer — meta/catalog, meta/coverage,
+    // meta/methodology, meta/research_{line}, and meta/characters_{line} (the
+    // studio-wide character roster behind /characters). All of it is counts,
+    // titles and R2 KEYS, never gated bytes: an image key is useless without a
+    // presign, and the Function re-checks auth before it issues one. So the
+    // whole collection is readable by any allowlisted member, and a roster doc
+    // needs no rule of its own — it is covered by this wildcard, and the rules
+    // test pins that both ways round.
     match /meta/{d}      { allow read: if isAllowlisted(); allow write: if false; }
     match /lines/{d}     { allow read: if isAllowlisted(); allow write: if false; }
     // Program tier (Line → Program → Subject): navigational metadata (title/blurb/

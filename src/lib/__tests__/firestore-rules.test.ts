@@ -15,6 +15,16 @@ beforeAll(async () => {
   await env.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore()
     await setDoc(doc(db, 'meta/catalog'), { headline: { lines_active: 4 } })
+    // The studio-wide character roster behind /characters — one doc per line.
+    // Counts + R2 keys only, so it rides the same meta/* rule as the catalog.
+    await setDoc(doc(db, 'meta/characters_biographies'), {
+      line: 'biographies', surface: 'comics', count: 795, drawn: 300, owed: 495,
+      versions: 900, versionsDrawn: 320, comics: 40, people: [],
+    })
+    await setDoc(doc(db, 'meta/characters_manga-indic'), {
+      line: 'manga-indic', surface: 'manga', count: 74, drawn: 0, owed: 74,
+      versions: 74, versionsDrawn: 0, comics: 3, people: [],
+    })
     await setDoc(doc(db, 'comics/biographies__01-x'), { line: 'biographies', status: 'draft' })
     await setDoc(doc(db, 'people/jrd-tata'), { line: 'biographies', stage: 'draft' })
     await setDoc(doc(db, 'figures/jrd-tata'), { slug: 'jrd-tata' })
@@ -292,9 +302,18 @@ describe('firestore.rules — catalog', () => {
     await assertSucceeds(getDocs(collection(db, 'comics')))
     await assertSucceeds(getDocs(collection(db, 'figures/jrd-tata/sources')))
   })
+  it('allowlisted user can read the character rosters (meta/characters_{line})', async () => {
+    // /characters reads one roster doc per line. Both surfaces' docs are
+    // readable — the SURFACE split is a browsing filter, never a permission,
+    // and the artwork itself stays gated behind the presign either way.
+    const db = env.authenticatedContext('u1', { email: 'x@thothica.com' }).firestore()
+    await assertSucceeds(getDoc(doc(db, 'meta/characters_biographies')))
+    await assertSucceeds(getDoc(doc(db, 'meta/characters_manga-indic')))
+  })
   it('non-allowlisted user is denied', async () => {
     const db = env.authenticatedContext('u2', { email: 'stranger@gmail.com' }).firestore()
     await assertFails(getDoc(doc(db, 'meta/catalog')))
+    await assertFails(getDoc(doc(db, 'meta/characters_biographies')))
   })
   it('clients cannot write the catalog', async () => {
     const db = env.authenticatedContext('u1', { email: 'x@thothica.com' }).firestore()

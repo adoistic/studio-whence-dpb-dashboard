@@ -12,6 +12,7 @@ import { CoverOptions } from '@/components/CoverOptions'
 import { InsideCovers } from '@/components/InsideCovers'
 import { BackCover } from '@/components/BackCover'
 import { Activities } from '@/components/Activities'
+import { CharacterGrid } from '@/components/CharacterGrid'
 import { AboutTheBook } from '@/components/AboutTheBook'
 import { ComicReader } from '@/components/ComicReader'
 import { ComicPdfButton } from '@/components/ComicPdfButton'
@@ -99,6 +100,12 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
   // for it — biographies figures and Practical Indic subjects (e.g. swami-ramdev)
   // alike. The indic epics have no figure doc, so fig.data stays falsy for them.
   const hasFigure = !!figureSlug && !!fig.data
+  // The CAST tab must not depend on a figure doc. It used to: the tab strip
+  // only rendered when `hasFigure` was true, so a comic with a published cast
+  // but no `figures/{slug}` doc — every Indic epic, for one — could never show
+  // its characters at all. The cast is a property of the comic, so the strip
+  // now appears for either reason.
+  const hasCast = (comic.characters?.people?.length ?? 0) > 0
 
   // ── Comic PDF ⇄ A+ Modules view ──────────────────────────────────────────
   // The "Read the comic" section toggles between the page reader (PDF) and the
@@ -111,6 +118,10 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
 
   // ── Draft ⇄ Comments view ────────────────────────────────────────────────
   const [view, setView] = useState<'draft' | 'comments'>('draft')
+  // Which person-tab is showing. 'comics' is everything this page has always
+  // been; 'characters' swaps the body for the cast, so the Characters tab is a
+  // real destination rather than a jump-link to a section far down the page.
+  const [tab, setTab] = useState<'comics' | 'characters'>('comics')
   // When a comment in the Comments view is clicked, switch to the Draft view and
   // remember which beat to scroll to once it's mounted.
   const [pendingJumpRef, setPendingJumpRef] = useState<string | null>(null)
@@ -195,13 +206,26 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
         </div>
       </section>
 
-      {/* ── Person tabs (Research ⇄ Comics) — biographies w/ a figure only ── */}
-      {hasFigure && (
-        <PersonTabs figureSlug={figureSlug} comics={comics} active="comics" />
+      {/* ── Person tabs (Research ⇄ Comics ⇄ Characters) ─────────────── */}
+      {(hasFigure || hasCast) && (
+        <PersonTabs
+          figureSlug={hasFigure ? figureSlug : null}
+          comics={comics}
+          active={tab}
+          characterCount={hasCast ? comic.characters!.count || comic.characters!.people.length : undefined}
+          onCharacters={() => setTab('characters')}
+        />
+      )}
+
+      {/* ── Characters tab ─────────────────────────────────────────── */}
+      {tab === 'characters' && (
+        <main className="mx-auto max-w-[1100px] px-6 pb-24">
+          <CharacterGrid comic={comic} />
+        </main>
       )}
 
       {/* ── Body ───────────────────────────────────────────────────── */}
-      <main className="mx-auto max-w-[1100px] px-6">
+      <main className={`mx-auto max-w-[1100px] px-6 ${tab === 'characters' ? 'hidden' : ''}`}>
         {/* Editions band — prominent in the body so it isn't missed (it used to
             be crammed into the tab strip right under the masthead). */}
         <ComicEditions comics={comics} activeSlug={comic.slug} />

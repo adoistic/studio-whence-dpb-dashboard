@@ -134,6 +134,27 @@ export interface Comic {
     language: string
     image: { key: string; label: string }
   }
+  // The comic's full cast — every character it stages, named and unnamed, with
+  // every version of them. A version with `drawn: false` and no key is one the
+  // book NEEDS and nobody has drawn yet; it renders as a placeholder rather than
+  // being omitted, because a cast sheet that silently drops what is missing reads
+  // as complete. Written by tools/publish_character_catalog.py; sheets live under
+  // artifacts/comics/…/characters/<figure>/<stage>.png and resolve gated.
+  characters?: {
+    count: number
+    drawn: number
+    owed: number
+    people: {
+      slug: string
+      name: string
+      tag: string
+      tier: string
+      lines: number
+      pages: number[]
+      desc?: string | null
+      versions: { stage: string; pages: number[]; key?: string | null; drawn: boolean }[]
+    }[]
+  }
 }
 
 /** The official cover chosen for a comic from `coverChoices/{line}__{slug}`. */
@@ -206,6 +227,11 @@ export interface Line {
   slug: LineSlug
   title: string
   subtitle: string
+  // Which portal surface this line belongs to — 'comics' or 'manga'. Everything
+  // beneath the line inherits it (programs, subjects, comics, research). Absent
+  // means the dashboard falls back to SURFACE_BY_LINE and then to 'comics', so
+  // every line that predates the split keeps working untouched. See lib/surface.ts.
+  surface?: string
   programs?: Program[]
   program_count?: number
   comics: Comic[]

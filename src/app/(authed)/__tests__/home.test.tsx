@@ -28,6 +28,10 @@ vi.mock('@/lib/catalog', () => ({
   useCoverage: () => mockUseCoverage(),
 }))
 vi.mock('@/lib/useResolved', () => ({ useResolved: () => ({}) }))
+// Home now scopes itself to the active surface. Stub the SDK handles so the real
+// surface module loads (its filtering is what the coverage assertions exercise)
+// without Firebase initialising.
+vi.mock('@/lib/firebase', () => ({ app: {}, auth: {}, db: {}, googleProvider: {} }))
 vi.mock('@/lib/images', () => ({ HERO_BACKDROP: null, SAMPLE_PAGES: [] }))
 
 // Stub the heavy visual children. CoverageOverview emits a marker + the line

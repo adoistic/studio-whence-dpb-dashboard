@@ -2,10 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import {
-  collection, doc, getDocs, setDoc, updateDoc, deleteDoc, serverTimestamp,
+  collection, deleteField, doc, getDocs, setDoc, updateDoc, deleteDoc, serverTimestamp,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { toMillis } from '@/lib/feedbackTypes'
+// Type-only, so this does not create a cycle with surface.ts (which imports
+// normalizeEmail from here).
+import type { Surface } from '@/lib/surface'
 
 // ─── Shared async one-shot (mirrors catalog.ts useAsync) ─────────────────────────
 
@@ -40,6 +43,13 @@ export interface AccessRequest {
 export interface Member {
   email: string
   role: 'sub_admin' | 'member'
+  /**
+   * Optional per-surface scope for a sub_admin. ABSENT MEANS BOTH — every
+   * sub-admin who predates the comics/manga split has no such field and keeps
+   * moderating both, with no migration. The field only ever appears when
+   * someone is deliberately scoped to one.
+   */
+  surfaces?: Surface[]
   added_by?: string
   added_at?: unknown
 }
@@ -74,11 +84,15 @@ export function useMembers(refreshKey: number): Async<Member[]> {
     const snap = await getDocs(collection(db, 'allowlist'))
     return snap.docs
       .map((d) => {
-        const data = d.data() as { role?: unknown }
+        const data = d.data() as { role?: unknown; surfaces?: unknown }
+        const raw: unknown[] = Array.isArray(data.surfaces) ? data.surfaces : []
+        const surfaces = (['comics', 'manga'] as const).filter((s) => raw.includes(s))
         return {
           email: d.id,
           ...(data as object),
           role: data.role === 'sub_admin' ? 'sub_admin' : 'member',
+          // An empty or missing list means "both" — never store [] as a scope.
+          surfaces: surfaces.length > 0 ? surfaces : undefined,
         } as Member
       })
       // Sub-admins first, then alphabetical by email.
@@ -146,6 +160,26 @@ export async function setMemberRole(
 ): Promise<void> {
   void _ctx
   await updateDoc(doc(db, 'allowlist', normalizeEmail(email)), { role })
+}
+
+/**
+ * Scope a sub-admin to one surface, or hand them both back.
+ *
+ * `null` DELETES the field rather than writing `['comics','manga']`, so "both"
+ * has exactly one representation on disk — the absent one every existing
+ * sub-admin already has. Two ways to say the same thing is how a migration
+ * ends up needed later.
+ */
+export async function setMemberSurfaces(
+  email: string,
+  surfaces: Surface[] | null,
+  _ctx: AdminCtx,
+): Promise<void> {
+  void _ctx
+  const scoped = surfaces && surfaces.length === 1 ? surfaces : null
+  await updateDoc(doc(db, 'allowlist', normalizeEmail(email)), {
+    surfaces: scoped ?? deleteField(),
+  })
 }
 
 export async function removeMember(email: string): Promise<void> {

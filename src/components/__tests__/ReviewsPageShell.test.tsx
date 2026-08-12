@@ -42,7 +42,13 @@ vi.mock('@/lib/catalog', () => ({
     data: [{ line: 'biographies', slug: '01-x', title: 'Comic X' }],
     loading: false,
   }),
+  useLines: () => ({ data: [], loading: false }),
 }))
+
+// The queue is scoped to the surface being browsed. Stub the SDK handles so the
+// real surface module loads; with no active surface it filters nothing, which
+// is what these assertions measure.
+vi.mock('@/lib/firebase', () => ({ app: {}, auth: {}, db: {}, googleProvider: {} }))
 
 // `canModerate` mirrors the real predicate so the gated-read arg is genuinely derived.
 let allowStatus = 'admin'

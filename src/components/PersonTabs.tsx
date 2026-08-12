@@ -8,11 +8,15 @@ const ACTIVE = 'text-brand-indigo border-b-2 border-brand-gold'
 const INACTIVE = 'text-brand-slate hover:text-brand-indigo border-b-2 border-transparent'
 
 export function PersonTabs({
-  figureSlug, comics, active,
+  figureSlug, comics, active, characterCount, onCharacters,
 }: {
   figureSlug: string | null
   comics: PersonComic[]
-  active: 'research' | 'comics'
+  active: 'research' | 'comics' | 'characters'
+  /** How many characters this comic stages. Absent = no catalog published yet,
+   *  and the tab stays hidden rather than opening onto an empty page. */
+  characterCount?: number
+  onCharacters?: () => void
 }) {
   const top = furthestComic(comics)
   return (
@@ -39,6 +43,20 @@ export function PersonTabs({
         ) : (
           <span className={`${TAB} py-3 text-brand-pale-dusk/70`}>No comic yet</span>
         )}
+
+        {/* Characters tab — the comic's whole cast, every version, placeholders
+            for the ones still to draw. Only offered where a catalog exists. */}
+        {characterCount ? (
+          active === 'characters' ? (
+            <span className={`${TAB} ${ACTIVE} py-3`} aria-current="page">
+              Characters <span className="text-brand-slate">{characterCount}</span>
+            </span>
+          ) : (
+            <button type="button" onClick={onCharacters} className={`${TAB} ${INACTIVE} py-3`}>
+              Characters <span className="text-brand-slate">{characterCount}</span>
+            </button>
+          )
+        ) : null}
       </nav>
     </div>
   )

@@ -3,13 +3,13 @@
  *
  * The top bar is hamburger-only at ALL widths. The bar itself shows only the
  * brand lockup (left) and a hamburger button (right). Everything else — Home,
- * Methodology, Reviews (moderators), the content lines, Admin (admins), the
- * signed-in email, and Sign out — lives inside a menu panel that opens when the
- * hamburger is clicked.
+ * Production status, Characters, Methodology, Reviews (moderators), Ideas, the
+ * content lines, Admin (admins), the signed-in email, and Sign out — lives
+ * inside a menu panel that opens when the hamburger is clicked.
  *
  * Coverage:
  *   1. Bar renders the brand + a hamburger button; nav links are hidden until opened
- *   2. Clicking the hamburger opens the menu (Home/Methodology + lines + email/Sign out)
+ *   2. Clicking the hamburger opens the menu (Home/Characters/Methodology + lines + email/Sign out)
  *   3. Reviews appears only for moderators; Admin only for admins
  *   4. Active link highlights when usePathname() matches
  *   5. aria-expanded toggles; Escape closes; outside click closes
@@ -142,6 +142,23 @@ describe('Topbar — open menu contents', () => {
 
     expect(screen.getByRole('link', { name: 'Home' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Methodology' })).toBeInTheDocument()
+  })
+
+  test('Characters is in the menu for any authed user, pointing at /characters', () => {
+    // The studio-wide cast. Ungated like Production status: the page scopes
+    // itself to the surface being browsed, so everyone sees only their own.
+    render(<Topbar />)
+    openMenu()
+    const characters = screen.getByRole('link', { name: 'Characters' })
+    expect(characters).toBeInTheDocument()
+    expect(characters.getAttribute('href')).toBe('/characters')
+  })
+
+  test('the Characters link highlights on /characters', () => {
+    mockPathname = () => '/characters'
+    render(<Topbar />)
+    openMenu()
+    expect(screen.getByRole('link', { name: 'Characters' }).getAttribute('aria-current')).toBe('page')
   })
 
   test('Production status is in the menu for ANYONE with access — plain members included', () => {

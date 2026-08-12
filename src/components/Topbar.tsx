@@ -4,14 +4,21 @@ import { useEffect, useId, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { BrandLockup } from '@/components/BrandLockup'
-import { SignOutButton } from '@/components/SignOutButton'
+import { SignOutButton, SwitchAccountButton } from '@/components/SignOutButton'
 import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { useLines } from '@/lib/catalog'
 import { useUnreadIdeaCount } from '@/lib/ideas'
+import {
+  SURFACE_LABEL,
+  surfaceOfLine,
+  useActiveSurface,
+  useAvailableSurfaces,
+} from '@/lib/surface'
 
 const HOME_LINK = { label: 'Home', href: '/' }
 const STATUS_LINK = { label: 'Production status', href: '/status' }
 const METHODOLOGY_LINK = { label: 'Methodology', href: '/methodology' }
+const CHARACTERS_LINK = { label: 'Characters', href: '/characters' }
 const REVIEWS_LINK = { label: 'Reviews', href: '/reviews' }
 const IDEAS_LINK = { label: 'Ideas', href: '/ideas' }
 const ADMIN_LINK = { label: 'Admin', href: '/admin' }
@@ -72,6 +79,15 @@ export function Topbar() {
   const { data: lines } = useLines()
   const email = (user?.email ?? '').trim().toLowerCase()
   const unreadIdeas = useUnreadIdeaCount(allowStatus, email)
+
+  // The line menu shows only the active surface's lines; the switcher appears
+  // for anyone who holds both.
+  const { data: availableSurfaces } = useAvailableSurfaces(allowStatus, user?.email ?? null, lines ?? null)
+  const { surface: activeSurface, setSurface } = useActiveSurface()
+  const surfaceLines = (lines ?? []).filter(
+    (line) => !activeSurface || surfaceOfLine(line) === activeSurface,
+  )
+  const canSwitchSurface = (availableSurfaces ?? []).length > 1
 
   const [open, setOpen] = useState(false)
   const menuId = useId()
@@ -158,6 +174,15 @@ export function Topbar() {
               active={isActive(STATUS_LINK.href, pathname)}
               onNavigate={closeMenu}
             />
+            {/* Characters — the studio-wide cast, drawn and still to draw. The
+                page scopes itself to the active surface, so it is ungated like
+                Production status: whoever can open it sees only their own. */}
+            <MenuItem
+              label={CHARACTERS_LINK.label}
+              href={CHARACTERS_LINK.href}
+              active={isActive(CHARACTERS_LINK.href, pathname)}
+              onNavigate={closeMenu}
+            />
             {/* Methodology — the pipeline playbook; visible to any authed user. */}
             <MenuItem
               label={METHODOLOGY_LINK.label}
@@ -183,7 +208,7 @@ export function Topbar() {
               onNavigate={closeMenu}
               badge={unreadIdeas}
             />
-            {(lines ?? []).map((line) => (
+            {surfaceLines.map((line) => (
               <MenuItem
                 key={line.slug}
                 label={line.title}
@@ -192,6 +217,32 @@ export function Topbar() {
                 onNavigate={closeMenu}
               />
             ))}
+            {canSwitchSurface && (
+              <>
+                <div className="my-1 h-px bg-brand-pale-dusk" aria-hidden="true" />
+                <div
+                  role="group"
+                  aria-label="Switch between comics and manga"
+                  className="flex gap-1 px-1 py-1"
+                >
+                  {(availableSurfaces ?? []).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      aria-pressed={activeSurface === s}
+                      onClick={() => { setSurface(s); closeMenu() }}
+                      className={`flex-1 rounded-md px-3 py-2 font-sans text-[0.7rem] uppercase tracking-label transition-colors duration-200 ${
+                        activeSurface === s
+                          ? 'bg-brand-indigo/10 text-brand-indigo'
+                          : 'text-brand-slate hover:bg-brand-indigo/5 hover:text-brand-indigo'
+                      }`}
+                    >
+                      {SURFACE_LABEL[s]}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
             {allowStatus === 'admin' && (
               <MenuItem
                 label={ADMIN_LINK.label}
@@ -211,6 +262,7 @@ export function Topbar() {
                   />
                   {user.email}
                 </span>
+                <SwitchAccountButton className="rounded-md px-3 py-2 text-left font-sans text-[0.7rem] uppercase tracking-label text-brand-slate transition-colors hover:bg-brand-indigo/5 hover:text-brand-indigo" />
                 <SignOutButton className="rounded-md px-3 py-2 text-left font-sans text-[0.7rem] uppercase tracking-label text-brand-slate transition-colors hover:bg-brand-indigo/5 hover:text-brand-indigo" />
               </>
             )}

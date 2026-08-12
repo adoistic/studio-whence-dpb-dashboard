@@ -12,11 +12,12 @@ const comic = {
 
 const model = buildExportModel({ comic, threads: [], draftPages: [{ number: '1', panels: [] }], options: OPTS })
 const px = new Uint8Array([0xff, 0xd8, 0xff, 0x00])
-const images: ImageMap = new Map([
-  ['cover', { bytes: px, width: 10, height: 15 }],
-  [1, { bytes: px, width: 10, height: 15 }],
-  [2, { bytes: px, width: 10, height: 15 }],
-])
+// Built by set() rather than from an array literal: the literal's element type
+// widens to a union of tuples, which no Map overload accepts.
+const images: ImageMap = new Map()
+images.set('cover', { bytes: px, width: 10, height: 15 })
+images.set(1, { bytes: px, width: 10, height: 15 })
+images.set(2, { bytes: px, width: 10, height: 15 })
 
 describe('buildComicJson', () => {
   it('is schema-versioned and mirrors the model', () => {

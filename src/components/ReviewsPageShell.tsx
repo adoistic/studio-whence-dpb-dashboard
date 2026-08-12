@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useState } from 'react'
 import { useAllRoots, setPublished } from '@/lib/feedback'
-import { useComics } from '@/lib/catalog'
+import { useComics, useLines } from '@/lib/catalog'
+import { lineOfComicId, surfaceIndex, useActiveSurface } from '@/lib/surface'
 import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { visibleTo, anchorLabel, isDraft, type Anchor, type Status } from '@/lib/feedbackTypes'
 import { CommentIcon, PinIcon } from '@/components/feedback/icons'
@@ -114,6 +115,8 @@ export function ReviewsPageShell() {
   // Data
   const { data: roots, loading } = useAllRoots(canMod)
   const { data: comics } = useComics()
+  const { data: lines } = useLines()
+  const { surface: activeSurface } = useActiveSurface()
 
   // Build comic title map: `${line}__${slug}` → title
   const titleByComicId = new Map(comics?.map((c) => [`${c.line}__${c.slug}`, c.title]) ?? [])
@@ -123,8 +126,16 @@ export function ReviewsPageShell() {
   const [mine, setMine] = useState(false)
   const [anchoredOnly, setAnchoredOnly] = useState(false)
 
+  // The moderation queue is scoped to the surface being browsed. For a sub-admin
+  // scoped to one surface this is the whole point: they never see the other
+  // side's feedback. For an unscoped moderator it is a filter they can flip.
+  const resolveSurface = surfaceIndex(lines ?? null)
+  const inSurface = (comicId: string) =>
+    !activeSurface || resolveSurface(lineOfComicId(comicId)) === activeSurface
+
   // Apply filters
   const filtered = (roots ?? [])
+    .filter((r) => inSurface(r.comicId))
     .filter((r) => visibleTo(r, canMod))
     .filter((r) => statusFilter === 'all' || r.status === statusFilter)
     .filter((r) => !mine || r.authorEmail === currentEmail)
@@ -134,7 +145,7 @@ export function ReviewsPageShell() {
   // we still gate the whole panel behind canMod so it never renders for them.
   // The realtime onSnapshot list re-emits after setPublished, so an approved
   // root drops out of `pending` automatically (no manual refresh).
-  const pending = canMod ? (roots ?? []).filter((r) => isDraft(r)) : []
+  const pending = canMod ? (roots ?? []).filter((r) => inSurface(r.comicId) && isDraft(r)) : []
 
   // ── Authorization gate ──────────────────────────────────────────────────────
   // The cross-comic reviews list is editorial-only: a member's mixed-comic
