@@ -19,6 +19,7 @@ const HOME_LINK = { label: 'Home', href: '/' }
 const STATUS_LINK = { label: 'Production status', href: '/status' }
 const METHODOLOGY_LINK = { label: 'Methodology', href: '/methodology' }
 const CHARACTERS_LINK = { label: 'Characters', href: '/characters' }
+const KIT_LINK = { label: 'Brand kit', href: '/kit' }
 const REVIEWS_LINK = { label: 'Reviews', href: '/reviews' }
 const IDEAS_LINK = { label: 'Ideas', href: '/ideas' }
 const ADMIN_LINK = { label: 'Admin', href: '/admin' }
@@ -181,6 +182,15 @@ export function Topbar() {
               label={CHARACTERS_LINK.label}
               href={CHARACTERS_LINK.href}
               active={isActive(CHARACTERS_LINK.href, pathname)}
+              onNavigate={closeMenu}
+            />
+            {/* Brand kit — the locked marks, sibling of Characters. Ungated for
+                the same reason: it publishes our own design sheets, and the
+                art behind them resolves through the same gate as everything. */}
+            <MenuItem
+              label={KIT_LINK.label}
+              href={KIT_LINK.href}
+              active={isActive(KIT_LINK.href, pathname)}
               onNavigate={closeMenu}
             />
             {/* Methodology — the pipeline playbook; visible to any authed user. */}
