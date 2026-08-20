@@ -62,8 +62,10 @@ vi.mock('firebase/auth', () => ({
 
 const mockRouterReplace = vi.fn()
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ replace: mockRouterReplace }),
+  useRouter: () => ({ replace: mockRouterReplace, push: vi.fn() }),
   usePathname: () => mockPathname(),
+  // The bar now carries SearchBox, which seeds its input from the URL query.
+  useSearchParams: () => new URLSearchParams(''),
 }))
 
 // BrandLockup renders the wordmark; we keep it real (no mock needed).

@@ -3,9 +3,13 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { SearchBox } from '@/components/SearchBox'
 
 const push = vi.fn()
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }))
+const params = { value: new URLSearchParams('') }
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push }),
+  useSearchParams: () => params.value,
+}))
 
-beforeEach(() => { push.mockClear() })
+beforeEach(() => { push.mockClear(); params.value = new URLSearchParams('') })
 
 describe('SearchBox', () => {
   test('submitting navigates to the results page with the query encoded', () => {
@@ -49,5 +53,20 @@ describe('SearchBox', () => {
     render(<SearchBox />)
     fireEvent.click(screen.getByRole('button', { name: /^search$/i }))
     expect(screen.getByRole('dialog', { name: /search/i })).toBeInTheDocument()
+  })
+
+  test('pre-fills with the current query so the term can be EDITED, not retyped', () => {
+    params.value = new URLSearchParams('q=yoga')
+    render(<SearchBox />)
+    expect(screen.getAllByRole('searchbox')[0]).toHaveValue('yoga')
+  })
+
+  test('editing a pre-filled term searches the new one', () => {
+    params.value = new URLSearchParams('q=yoga')
+    render(<SearchBox />)
+    const input = screen.getAllByRole('searchbox')[0]
+    fireEvent.change(input, { target: { value: 'pranayama' } })
+    fireEvent.submit(input)
+    expect(push).toHaveBeenCalledWith('/search?q=pranayama')
   })
 })

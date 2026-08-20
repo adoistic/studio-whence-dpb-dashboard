@@ -1,23 +1,26 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { SearchResults } from '@/components/SearchResults'
 import { SectionHead } from '@/components/SectionHead'
 
 /**
- * The results page. The query is read from `window.location.search` rather than
- * `useSearchParams` because this app is a STATIC EXPORT — the same reason
- * /comic reads its segments from the path.
+ * The results page.
+ *
+ * The query comes from `useSearchParams`, NOT from `window.location.search`.
+ * That distinction is the whole bug this file once had: searching a new term
+ * while already on /search is a `router.push`, and pushState does not fire
+ * `popstate` — so a window-based reader updated the URL and kept rendering the
+ * previous results. `useSearchParams` is reactive to router navigation, so the
+ * results follow the URL.
+ *
+ * The Suspense boundary is required because the app is a STATIC EXPORT: params
+ * are unknown at prerender and resolve on the client.
  */
-export default function SearchPage() {
-  const [q, setQ] = useState('')
-
-  useEffect(() => {
-    const read = () => setQ(new URLSearchParams(window.location.search).get('q') ?? '')
-    read()
-    window.addEventListener('popstate', read)
-    return () => window.removeEventListener('popstate', read)
-  }, [])
+function SearchPageBody() {
+  const params = useSearchParams()
+  const q = params.get('q') ?? ''
 
   return (
     <main className="mx-auto max-w-[1100px] px-6 py-16">
@@ -26,5 +29,19 @@ export default function SearchPage() {
         <SearchResults q={q} />
       </div>
     </main>
+  )
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="mx-auto max-w-[1100px] px-6 py-16">
+          <SectionHead kicker="Search" title="Search the scripts" />
+        </main>
+      }
+    >
+      <SearchPageBody />
+    </Suspense>
   )
 }

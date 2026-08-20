@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { SearchRules } from '@/components/SearchRules'
 
 /**
@@ -13,10 +13,19 @@ import { SearchRules } from '@/components/SearchRules'
  */
 export function SearchBox() {
   const router = useRouter()
-  const [q, setQ] = useState('')
+  // The live query from the URL. Seeding the box from it is what makes the term
+  // EDITABLE rather than something you retype: land on /search?q=yoga and the
+  // box already says "yoga".
+  const urlQuery = useSearchParams().get('q') ?? ''
+  const [q, setQ] = useState(urlQuery)
   const [sheetOpen, setSheetOpen] = useState(false)
   const [rulesOpen, setRulesOpen] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Follow the URL when it changes underneath us — a fresh load of a /search
+  // link, or back/forward through past searches. Typing is unaffected: this
+  // only fires when the URL's own query changes.
+  useEffect(() => { setQ(urlQuery) }, [urlQuery])
 
   // `/` focuses search — unless the reader is already typing somewhere.
   useEffect(() => {
