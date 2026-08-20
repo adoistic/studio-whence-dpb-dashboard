@@ -30,13 +30,18 @@ export const STATUS_COLOR: Record<Status, { hex: string; label: string }> = {
   wont_fix:    { hex: '#c2603a', label: "Won't fix" },   // muted red/clay
 }
 
-export type AnchorKind = 'page' | 'panel' | 'beat'
+export type AnchorKind = 'page' | 'panel' | 'beat' | 'box'
 
 export interface Anchor {
   kind: AnchorKind
-  ref: string // page: "p13" · panel: "p13.pl1" · beat: "p13.pl1.b2" | "p13.pl1.art"
+  // page: "p13" · panel: "p13.pl1" · beat: "p13.pl1.b2" | "p13.pl1.art" · box: "p13.b3"
+  ref: string
   page: number
-  panel?: number // absent for page anchors
+  panel?: number // absent for page and box anchors
+  /** Present only for box anchors — one balloon/caption in a TRANSLATED script.
+   *  Kept distinct from a beat because translation boxes do not map onto
+   *  script.md beats (they disagree on ~12% of pages). */
+  box?: number
   snapshot: string // the unit's text (or a label like "Page 13" / "Panel 1")
 }
 
@@ -44,6 +49,7 @@ export interface Anchor {
 export function anchorLabel(a: Anchor): string {
   if (a.kind === 'page') return `Page ${a.page}`
   if (a.kind === 'panel') return `Panel ${a.panel} · p${a.page}`
+  if (a.kind === 'box') return `Box ${a.box} · p${a.page}`
   return `P${a.page}·${a.panel}`
 }
 

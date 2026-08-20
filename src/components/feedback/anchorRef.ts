@@ -12,6 +12,7 @@ export interface ParsedRef {
   kind: AnchorKind
   page: number
   panel?: number
+  box?: number
 }
 
 /**
@@ -28,6 +29,12 @@ export function parseAnchorRef(ref: string): ParsedRef | null {
   const panel = /^p(\d+)\.pl(\d+)$/.exec(ref)
   if (panel) return { kind: 'panel', page: parseInt(panel[1], 10), panel: parseInt(panel[2], 10) }
 
+  // Box — a single balloon/caption in a TRANSLATED script (box grammar).
+  // Deliberately distinct from a beat: translation boxes do not map onto
+  // script.md beats, so the kinds stay apart rather than being conflated.
+  const box = /^p(\d+)\.b(\d+)$/.exec(ref)
+  if (box) return { kind: 'box', page: parseInt(box[1], 10), box: parseInt(box[2], 10) }
+
   const beat = /^p(\d+)\.pl(\d+)\.(?:b\d+|art)$/.exec(ref)
   if (beat) return { kind: 'beat', page: parseInt(beat[1], 10), panel: parseInt(beat[2], 10) }
 
@@ -41,7 +48,7 @@ export function parseAnchorRef(ref: string): ParsedRef | null {
  */
 export function indexUnits(el: HTMLElement): Map<string, HTMLElement> {
   const m = new Map<string, HTMLElement>()
-  for (const attr of ['data-page-ref', 'data-panel-ref', 'data-beat-ref'] as const) {
+  for (const attr of ['data-page-ref', 'data-panel-ref', 'data-beat-ref', 'data-box-ref'] as const) {
     el.querySelectorAll<HTMLElement>(`[${attr}]`).forEach((node) => {
       const ref = node.getAttribute(attr)
       if (ref && !m.has(ref)) m.set(ref, node)
@@ -83,6 +90,8 @@ export function anchorFromUnit(ref: string, el: HTMLElement): Anchor | null {
     snapshot = `Page ${parsed.page}`
   } else if (parsed.kind === 'panel') {
     snapshot = `Panel ${parsed.panel}`
+  } else if (parsed.kind === 'box') {
+    snapshot = clip(beatText(el)) || `P${parsed.page}·b${parsed.box}`
   } else {
     snapshot = clip(beatText(el)) || `P${parsed.page}·${parsed.panel}`
   }
@@ -92,6 +101,7 @@ export function anchorFromUnit(ref: string, el: HTMLElement): Anchor | null {
     ref,
     page: parsed.page,
     ...(parsed.panel !== undefined ? { panel: parsed.panel } : {}),
+    ...(parsed.box !== undefined ? { box: parsed.box } : {}),
     snapshot,
   }
 }
