@@ -6,6 +6,8 @@ import { useComicFeedback, addReply, setStatus, setPublished, editComment, hideC
 import { useComicVersions } from '@/lib/useComicVersions'
 import {
   visibleTo,
+  nodeLang,
+  appliesToLanguage,
   changedSince,
   anchorLabel,
   STATUS_COLOR,
@@ -15,6 +17,8 @@ import {
   type Status,
   type Thread,
 } from '@/lib/feedbackTypes'
+import type { ComicLanguage } from '@/lib/comicLanguages'
+import { LanguageFilterNote } from '@/components/feedback/LanguageFilterNote'
 import { assignBadges } from '@/components/feedback/badges'
 import { CommentThread } from '@/components/feedback/CommentThread'
 
@@ -24,6 +28,13 @@ export interface CommentsViewProps {
   comicVersion: number
   draftText: string | null
   onJumpInDraft: (ref: string) => void
+  /** The language currently being read. Comments are scoped to it. Optional so
+   *  a component rendered without language context behaves exactly as before. */
+  lang?: string
+  /** The comic's authored language — how a pre-language comment is attributed. */
+  originalLanguage?: string
+  /** Every language this comic is published in (drives the composer control). */
+  languages?: ComicLanguage[]
 }
 
 // Status filter chips, in display order. Default = "unaddressed" (open +
@@ -44,6 +55,9 @@ export function CommentsView({
   comicVersion,
   draftText,
   onJumpInDraft,
+  lang,
+  originalLanguage,
+  languages,
 }: CommentsViewProps) {
   // ── Auth ──────────────────────────────────────────────────────────────────
   const { user, loading: authLoading } = useUser()
@@ -64,6 +78,17 @@ export function CommentsView({
 
   // ── Visibility + badge numbering (over the full visible set) ───────────────
   const visible = threads.filter((t) => visibleTo(t.root, canMod))
+
+  // ── Language filter ───────────────────────────────────────────────────────
+  // Comments are scoped to the language they were written for. Default: only
+  // what applies to the language being read. `showAllLanguages` folds the rest
+  // back in, so decoupling never reads as data loss.
+  const activeLang = lang ?? originalLanguage ?? 'en'
+  const origLang = originalLanguage ?? 'en'
+  const [showAllLanguages, setShowAllLanguages] = useState(false)
+  const inLanguage = visible.filter((t) => appliesToLanguage(t.root, activeLang, origLang))
+  const otherLanguageCount = visible.length - inLanguage.length
+  const languageScoped = showAllLanguages ? visible : inLanguage
   const badges = assignBadges(visible)
 
   // ── Draft-derived parsing (all in useMemo — no ref reads during render) ─────
@@ -90,6 +115,10 @@ export function CommentsView({
         /data-beat-ref="([^"]+)"/g,
         /data-panel-ref="([^"]+)"/g,
         /data-page-ref="([^"]+)"/g,
+        // Box anchors live in TRANSLATED scripts; without this every box
+        // anchor would render as orphaned the moment the reader switches
+        // language.
+        /data-box-ref="([^"]+)"/g,
       ])
         for (const m of draftText.matchAll(re)) s.add(m[1])
     return s
@@ -122,7 +151,7 @@ export function CommentsView({
   // position of their first anchor; general threads after, in createdAt order
   // (groupThreads already sorts roots newest-first, which carries through).
   const ordered = useMemo(() => {
-    const matched = visible.filter(
+    const matched = languageScoped.filter(
       (t) =>
         statusFilter.has(t.root.status ?? 'open') &&
         categoryFilter.has(t.root.category ?? 'other'),
@@ -142,7 +171,7 @@ export function CommentsView({
     return [...anchored, ...general]
     // `visible` is derived fresh each render; key the memo on the stable inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [threads, canMod, statusFilter, categoryFilter, refOrder])
+  }, [threads, canMod, statusFilter, categoryFilter, showAllLanguages, activeLang, origLang, refOrder])
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -206,6 +235,13 @@ export function CommentsView({
         </div>
       </div>
 
+      <LanguageFilterNote
+        activeLabel={languages?.find((l) => l.code === activeLang)?.label ?? activeLang}
+        otherCount={otherLanguageCount}
+        showingAll={showAllLanguages}
+        onToggle={() => setShowAllLanguages((v) => !v)}
+      />
+
       {/* ── Thread list ─────────────────────────────────────────────────── */}
       {ordered.length > 0 ? (
         <div className="flex flex-col gap-6">
@@ -246,6 +282,8 @@ export function CommentsView({
 
                 {/* The thread itself — reuse the gutter's thread component. */}
                 <CommentThread
+                    lang={activeLang}
+                    originalLanguage={origLang}
                   thread={t}
                   badge={badges.get(t.root.id)}
                   canModerate={canMod}
@@ -258,7 +296,10 @@ export function CommentsView({
                     // becomes visible immediately). A moderator's explicit
                     // publish-toggle overrides the inheritance.
                     await addReply(
-                      { comicId, line, parentId: t.root.id, body, comicVersion, published: published ?? t.root.published === true },
+                      { comicId, line, parentId: t.root.id, body, comicVersion,
+                          published: published ?? t.root.published === true,
+                          lang: nodeLang(t.root, origLang),
+                          langScope: t.root.langScope ?? nodeLang(t.root, origLang) },
                       author,
                     )
                   }}
@@ -277,7 +318,7 @@ export function CommentsView({
         </div>
       ) : (
         <p className="rounded-lg border border-dashed border-brand-pale-dusk bg-brand-threshold/40 px-4 py-8 text-center font-sans text-[0.8rem] text-brand-slate">
-          {visible.length > 0
+          {languageScoped.length > 0
             ? 'No comments match the current filters.'
             : 'No comments yet. Add one from the Draft view.'}
         </p>

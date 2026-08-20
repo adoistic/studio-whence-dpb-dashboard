@@ -4,12 +4,14 @@ import { useState, useMemo, useEffect, useRef, type RefObject } from 'react'
 import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { useComicFeedback, addComment, addReply, setStatus, setPublished, editComment, hideComment, deleteComment } from '@/lib/feedback'
 import { useComicVersions } from '@/lib/useComicVersions'
-import { visibleTo, changedSince, STATUS_COLOR, type Anchor, type Category, type Status } from '@/lib/feedbackTypes'
+import { visibleTo, appliesToLanguage, changedSince, STATUS_COLOR, nodeLang, type Anchor, type Category, type Status } from '@/lib/feedbackTypes'
+import type { ComicLanguage } from '@/lib/comicLanguages'
 import { assignBadges } from '@/components/feedback/badges'
 import { useCommentTargets } from '@/components/feedback/useCommentTargets'
 import { indexUnits } from '@/components/feedback/anchorRef'
 import { CommentComposer } from '@/components/feedback/CommentComposer'
 import { CommentThread } from '@/components/feedback/CommentThread'
+import { LanguageFilterNote } from '@/components/feedback/LanguageFilterNote'
 
 export interface CommentGutterProps {
   comicId: string
@@ -17,6 +19,13 @@ export interface CommentGutterProps {
   comicVersion: number
   scriptRef: RefObject<HTMLElement | null>
   draftText: string | null
+  /** The language currently being read. Comments are scoped to it. Optional so
+   *  a component rendered without language context behaves exactly as before. */
+  lang?: string
+  /** The comic's authored language — how a pre-language comment is attributed. */
+  originalLanguage?: string
+  /** Every language this comic is published in (drives the composer control). */
+  languages?: ComicLanguage[]
 }
 
 // Status filter chips, in display order. "Unaddressed" (open + in_progress) is
@@ -36,6 +45,9 @@ export function CommentGutter({
   comicVersion,
   scriptRef,
   draftText,
+  lang,
+  originalLanguage,
+  languages,
 }: CommentGutterProps) {
   // ── Auth ──────────────────────────────────────────────────────────────────
   const { user, loading: authLoading } = useUser()
@@ -57,6 +69,17 @@ export function CommentGutter({
 
   // ── Visibility filter ─────────────────────────────────────────────────────
   const visible = threads.filter((t) => visibleTo(t.root, canMod))
+
+  // ── Language filter ───────────────────────────────────────────────────────
+  // Comments are scoped to the language they were written for. Default: only
+  // what applies to the language being read. `showAllLanguages` folds the rest
+  // back in, so decoupling never reads as data loss.
+  const activeLang = lang ?? originalLanguage ?? 'en'
+  const origLang = originalLanguage ?? 'en'
+  const [showAllLanguages, setShowAllLanguages] = useState(false)
+  const inLanguage = visible.filter((t) => appliesToLanguage(t.root, activeLang, origLang))
+  const otherLanguageCount = visible.length - inLanguage.length
+  const languageScoped = showAllLanguages ? visible : inLanguage
   const badges = assignBadges(visible)
 
   // ── Status filter ──────────────────────────────────────────────────────────
@@ -67,10 +90,10 @@ export function CommentGutter({
   // revealed by a toggle.
   const [statusFilter, setStatusFilter] = useState<Set<Status>>(() => new Set(DEFAULT_STATUSES))
   const filtered = useMemo(
-    () => visible.filter((t) => statusFilter.has(t.root.status ?? 'open')),
+    () => languageScoped.filter((t) => statusFilter.has(t.root.status ?? 'open')),
     // `visible` is derived fresh each render; key on the stable inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [threads, canMod, statusFilter],
+    [threads, canMod, statusFilter, showAllLanguages, activeLang, origLang],
   )
   function toggleStatus(s: Status) {
     setStatusFilter((prev) => {
@@ -95,7 +118,7 @@ export function CommentGutter({
   const gutterRef = useRef<HTMLDivElement>(null)
 
   // ── Marker + select affordances on the rendered draft ─────────────────────
-  useCommentTargets(scriptRef, visible, draftText, {
+  useCommentTargets(scriptRef, languageScoped, draftText, {
     selectedRefs,
     onToggleSelect(anchor) {
       setSelection((prev) =>
@@ -118,14 +141,18 @@ export function CommentGutter({
   const knownRefs = useMemo(() => {
     const s = new Set<string>()
     if (draftText)
-      for (const re of [/data-beat-ref="([^"]+)"/g, /data-panel-ref="([^"]+)"/g, /data-page-ref="([^"]+)"/g])
+      for (const re of [/data-beat-ref="([^"]+)"/g, /data-panel-ref="([^"]+)"/g, /data-page-ref="([^"]+)"/g, /data-box-ref="([^"]+)"/g])
         for (const m of draftText.matchAll(re)) s.add(m[1])
     return s
   }, [draftText])
 
   // ── Handlers ─────────────────────────────────────────────────────────────
-  async function handleCreate(body: string, category?: Category, published?: boolean) {
-    await addComment({ comicId, line, anchors: composerAnchors, body, comicVersion, category, published }, author)
+  async function handleCreate(body: string, category?: Category, published?: boolean, langScope?: string) {
+    await addComment(
+      { comicId, line, anchors: composerAnchors, body, comicVersion, category, published,
+        lang: activeLang, langScope: langScope ?? activeLang },
+      author,
+    )
     setComposing(false)
     setGeneralComment(false)
     setSelection([])
@@ -334,6 +361,8 @@ export function CommentGutter({
         {/* Composer */}
         {composing && (
           <CommentComposer
+              languages={languages}
+              activeLang={activeLang}
             mode="comment"
             anchors={composerAnchors}
             onAddAnchor={() => {}}
@@ -345,6 +374,12 @@ export function CommentGutter({
           />
         )}
 
+        <LanguageFilterNote
+          activeLabel={languages?.find((l) => l.code === activeLang)?.label ?? activeLang}
+          otherCount={otherLanguageCount}
+          showingAll={showAllLanguages}
+          onToggle={() => setShowAllLanguages((v) => !v)}
+        />
         {/* Thread list (status-filtered; badges keyed off the full visible set) */}
         {filtered.length > 0 ? (
           <div className="flex flex-col gap-3">
@@ -378,6 +413,8 @@ export function CommentGutter({
                   }
                 >
                   <CommentThread
+                    lang={activeLang}
+                    originalLanguage={origLang}
                     thread={t}
                     badge={badges.get(t.root.id)}
                     canModerate={canMod}
@@ -390,7 +427,10 @@ export function CommentGutter({
                       // their reply becomes visible immediately). A moderator's
                       // explicit publish-toggle overrides the inheritance.
                       await addReply(
-                        { comicId, line, parentId: t.root.id, body, comicVersion, published: published ?? t.root.published === true },
+                        { comicId, line, parentId: t.root.id, body, comicVersion,
+                          published: published ?? t.root.published === true,
+                          lang: nodeLang(t.root, origLang),
+                          langScope: t.root.langScope ?? nodeLang(t.root, origLang) },
                         author,
                       )
                     }}
@@ -410,7 +450,7 @@ export function CommentGutter({
         ) : (
           !composing && (
             <p className="font-sans text-[0.75rem] text-brand-slate/60">
-              {visible.length > 0
+              {languageScoped.length > 0
                 ? 'No comments match the current status filter.'
                 : 'No comments yet.'}
             </p>

@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import type { Thread, FeedbackNode, Status, Category } from '@/lib/feedbackTypes'
-import { toMillis, anchorLabel, isDraft, STATUS_COLOR, CATEGORY_LABELS } from '@/lib/feedbackTypes'
+import { languageLabel } from '@/lib/comicLanguages'
+import { toMillis, anchorLabel, isDraft, STATUS_COLOR, CATEGORY_LABELS, displayAnchors, isForeign, nodeLang } from '@/lib/feedbackTypes'
 import type { Badge } from '@/components/feedback/badges'
 import { CommentComposer } from '@/components/feedback/CommentComposer'
 import { PinIcon } from '@/components/feedback/icons'
@@ -49,6 +50,11 @@ export interface CommentThreadProps {
   onApprove: () => void
   /** Edit the root comment body — moderator or the comment's author. */
   onEdit: (body: string) => Promise<void>
+  /** The language being read. Optional: without it the thread renders exactly
+   *  as it always has, with its stored anchors and no origin tag. */
+  lang?: string
+  /** The comic's authored language — how a pre-language comment is attributed. */
+  originalLanguage?: string
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -107,12 +113,18 @@ export function CommentThread({
   onJumpToBeat,
   onApprove,
   onEdit,
+  lang,
+  originalLanguage,
 }: CommentThreadProps) {
   const [replying, setReplying] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editText, setEditText] = useState('')
   const [savingEdit, setSavingEdit] = useState(false)
   const { root, replies } = thread
+  const origLang = originalLanguage ?? 'en'
+  const activeLang = lang ?? origLang
+  const shownAnchors = displayAnchors(root, activeLang, origLang)
+  const foreign = isForeign(root, activeLang, origLang)
 
   // Status drives the comment colour everywhere (badge bg, card accent, pill).
   const statusColour = STATUS_COLOR[root.status ?? 'open'].hex
@@ -190,10 +202,17 @@ export function CommentThread({
           )}
         </div>
 
-        {/* Anchors */}
-        {root.anchors.length > 0 && (
+        {/* Anchors — shown as THIS language should see them. A comment shared
+            across languages keeps its precise pin at home and appears on its
+            page elsewhere; the stored anchors are never mutated. */}
+        {shownAnchors.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
-            {root.anchors.map((anchor) => {
+            {foreign && (
+              <span className="inline-flex items-center rounded-full border border-brand-lavender/30 px-2 py-0.5 font-sans text-[0.6rem] uppercase tracking-label text-brand-slate">
+                from the {languageLabel(nodeLang(root, origLang))} edition
+              </span>
+            )}
+            {shownAnchors.map((anchor) => {
               const label = anchorLabel(anchor)
               const alive = knownRefs.has(anchor.ref)
               if (alive) {

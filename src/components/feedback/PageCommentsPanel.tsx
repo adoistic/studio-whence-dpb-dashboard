@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import {
@@ -16,11 +16,15 @@ import {
 import { useComicVersions } from '@/lib/useComicVersions'
 import {
   visibleTo,
+  nodeLang,
+  appliesToLanguage,
   changedSince,
   anchorLabel,
   STATUS_COLOR,
   type Category,
 } from '@/lib/feedbackTypes'
+import type { ComicLanguage } from '@/lib/comicLanguages'
+import { LanguageFilterNote } from '@/components/feedback/LanguageFilterNote'
 import { pageAnchor, threadsForPage } from '@/lib/readerPages'
 import { assignBadges } from '@/components/feedback/badges'
 import { CommentThread } from '@/components/feedback/CommentThread'
@@ -37,6 +41,13 @@ export interface PageCommentsPanelProps {
   /** Jump to a beat in the Draft view (the shell switches view + scrolls). */
   onJumpInDraft: (ref: string) => void
   onClose: () => void
+  /** The language currently being read. Comments are scoped to it. Optional so
+   *  a component rendered without language context behaves exactly as before. */
+  lang?: string
+  /** The comic's authored language — how a pre-language comment is attributed. */
+  originalLanguage?: string
+  /** Every language this comic is published in (drives the composer control). */
+  languages?: ComicLanguage[]
 }
 
 /**
@@ -55,6 +66,9 @@ export function PageCommentsPanel({
   draftText,
   onJumpInDraft,
   onClose,
+  lang,
+  originalLanguage,
+  languages,
 }: PageCommentsPanelProps) {
   // ── Auth (mirrors CommentsView) ──────────────────────────────────────────
   const { user, loading: authLoading } = useUser()
@@ -73,8 +87,19 @@ export function PageCommentsPanel({
   const { data: versions } = useComicVersions(comicId)
 
   const visible = threads.filter((t) => visibleTo(t.root, canMod))
+
+  // ── Language filter ───────────────────────────────────────────────────────
+  // Comments are scoped to the language they were written for. Default: only
+  // what applies to the language being read. `showAllLanguages` folds the rest
+  // back in, so decoupling never reads as data loss.
+  const activeLang = lang ?? originalLanguage ?? 'en'
+  const origLang = originalLanguage ?? 'en'
+  const [showAllLanguages, setShowAllLanguages] = useState(false)
+  const inLanguage = visible.filter((t) => appliesToLanguage(t.root, activeLang, origLang))
+  const otherLanguageCount = visible.length - inLanguage.length
+  const languageScoped = showAllLanguages ? visible : inLanguage
   const badges = assignBadges(visible)
-  const pageThreads = threadsForPage(visible, page)
+  const pageThreads = threadsForPage(languageScoped, page)
 
   const knownRefs = useMemo(() => {
     const s = new Set<string>()
@@ -83,6 +108,10 @@ export function PageCommentsPanel({
         /data-beat-ref="([^"]+)"/g,
         /data-panel-ref="([^"]+)"/g,
         /data-page-ref="([^"]+)"/g,
+        // Box anchors live in TRANSLATED scripts; without this every box
+        // anchor would render as orphaned the moment the reader switches
+        // language.
+        /data-box-ref="([^"]+)"/g,
       ])
         for (const m of draftText.matchAll(re)) s.add(m[1])
     return s
@@ -97,9 +126,12 @@ export function PageCommentsPanel({
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  async function submitComment(body: string, category?: Category, published?: boolean) {
+  async function submitComment(
+    body: string, category?: Category, published?: boolean, langScope?: string,
+  ) {
     await addComment(
-      { comicId, line, anchors: [pageAnchor(page)], body, comicVersion, category, published },
+      { comicId, line, anchors: [pageAnchor(page)], body, comicVersion, category, published,
+        lang: activeLang, langScope: langScope ?? activeLang },
       author,
     )
   }
@@ -146,6 +178,8 @@ export function PageCommentsPanel({
           {currentEmail ? (
             <div className="mb-6">
               <CommentComposer
+              languages={languages}
+              activeLang={activeLang}
                 mode="comment"
                 anchors={[pageAnchor(page)]}
                 onAddAnchor={() => {}}
@@ -202,6 +236,8 @@ export function PageCommentsPanel({
                       ))}
                     </div>
                     <CommentThread
+                    lang={activeLang}
+                    originalLanguage={origLang}
                       thread={t}
                       badge={badges.get(t.root.id)}
                       canModerate={canMod}
@@ -210,7 +246,10 @@ export function PageCommentsPanel({
                       knownRefs={knownRefs}
                       onReply={async (body, published) => {
                         await addReply(
-                          { comicId, line, parentId: t.root.id, body, comicVersion, published: published ?? t.root.published === true },
+                          { comicId, line, parentId: t.root.id, body, comicVersion,
+                          published: published ?? t.root.published === true,
+                          lang: nodeLang(t.root, origLang),
+                          langScope: t.root.langScope ?? nodeLang(t.root, origLang) },
                           author,
                         )
                       }}

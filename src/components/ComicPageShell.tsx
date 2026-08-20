@@ -345,6 +345,9 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
         {/* Page-scoped comments drawer (opened from the reader) */}
         {commentPage != null && (
           <PageCommentsPanel
+                  lang={lang}
+                  originalLanguage={languages[0].code}
+                  languages={languages}
             comicId={comicId}
             line={comic.line}
             comicVersion={comic.version ?? 0}
@@ -426,6 +429,9 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
                   so the gutter's own sticky "Comments" header isn't hidden behind it. */}
               <aside className="lg:sticky lg:top-20 lg:w-[22rem] lg:shrink-0">
                 <CommentGutter
+                  lang={lang}
+                  originalLanguage={languages[0].code}
+                  languages={languages}
                   comicId={`${comic.line}__${comic.slug}`}
                   line={comic.line}
                   comicVersion={comic.version ?? 0}
@@ -436,6 +442,9 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
             </div>
             ) : (
               <CommentsView
+                  lang={lang}
+                  originalLanguage={languages[0].code}
+                  languages={languages}
                 comicId={`${comic.line}__${comic.slug}`}
                 line={comic.line}
                 comicVersion={comic.version ?? 0}

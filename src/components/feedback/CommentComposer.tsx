@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { Anchor, Category } from '@/lib/feedbackTypes'
+import type { ComicLanguage } from '@/lib/comicLanguages'
 import { anchorLabel, CATEGORY_LABELS, CATEGORY_ORDER } from '@/lib/feedbackTypes'
 import { PinIcon } from '@/components/feedback/icons'
 
@@ -10,7 +11,9 @@ export interface CommentComposerProps {
   anchors: Anchor[]
   onAddAnchor: () => void
   onRemoveAnchor: (ref: string) => void
-  onSubmit: (body: string, category?: Category, published?: boolean) => Promise<void>
+  onSubmit: (
+    body: string, category?: Category, published?: boolean, langScope?: string,
+  ) => Promise<void>
   onCancel: () => void
   busy?: boolean
   /** Hide the "+ add another location" button (select-mode picks units in the
@@ -20,6 +23,11 @@ export interface CommentComposerProps {
       When false (members) the publish control is hidden and `published` is left
       undefined, so the data layer defaults the comment to a draft. */
   canPublishDirectly?: boolean
+  /** Every language this comic's script is published in. Fewer than two and the
+   *  language control does not render — there is nothing to choose. */
+  languages?: ComicLanguage[]
+  /** The language currently being read; the default scope for a new comment. */
+  activeLang?: string
 }
 
 export function CommentComposer({
@@ -32,6 +40,8 @@ export function CommentComposer({
   busy = false,
   hideAddAnchor = false,
   canPublishDirectly = false,
+  languages,
+  activeLang,
 }: CommentComposerProps) {
   const [body, setBody] = useState('')
   const [category, setCategory] = useState<Category>('fact')
@@ -39,6 +49,11 @@ export function CommentComposer({
   const [publishDirectly, setPublishDirectly] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Single-language by default: a comment is not an assertion about a language
+  // the author was not reading. Choosing "all languages" is deliberate.
+  const [allLanguages, setAllLanguages] = useState(false)
+  const multilingual = mode === 'comment' && (languages?.length ?? 0) > 1
+  const activeLabel = languages?.find((l) => l.code === activeLang)?.label ?? activeLang
 
   const trimmed = body.trim()
   const isDisabled = !trimmed || submitting || busy
@@ -56,6 +71,7 @@ export function CommentComposer({
         trimmed,
         mode === 'comment' ? category : undefined,
         canPublishDirectly ? publishDirectly : undefined,
+        multilingual && allLanguages ? 'all' : activeLang,
       )
       setBody('')
     } catch {
@@ -167,6 +183,30 @@ export function CommentComposer({
           >
             <span aria-hidden>+</span> add another location
           </button>
+        )}
+
+        {multilingual && (
+          <fieldset className="flex flex-wrap items-center gap-3 border-0 p-0">
+            <legend className="sr-only">Which languages this comment is for</legend>
+            {([
+              { value: false, label: `${activeLabel} only` },
+              { value: true, label: 'All languages' },
+            ] as const).map(({ value, label }) => (
+              <label
+                key={label}
+                className="flex items-center gap-1.5 font-sans text-[0.66rem] uppercase tracking-label text-brand-slate"
+              >
+                <input
+                  type="radio"
+                  name="comment-lang-scope"
+                  checked={allLanguages === value}
+                  onChange={() => setAllLanguages(value)}
+                  className="accent-brand-indigo"
+                />
+                {label}
+              </label>
+            ))}
+          </fieldset>
         )}
 
         <div className="ml-auto flex items-center gap-2">
