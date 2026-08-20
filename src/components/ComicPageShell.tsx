@@ -340,6 +340,8 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
                     <ComicCmykButton comic={comic} />
                     <ComicExportButton
                       comic={comic}
+                      lang={lang}
+                      originalLanguage={languages[0].code}
                       threads={fbThreads.filter((t) => visibleTo(t.root, canMod))}
                       draftHtml={draft.text || null}
                     />
