@@ -132,6 +132,19 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
   // remember which beat to scroll to once it's mounted.
   const [pendingJumpRef, setPendingJumpRef] = useState<string | null>(null)
 
+  // A search result links to /<line>/<slug>?page=N&lang=xx — open that language
+  // and scroll to that page. Runs once on mount; an unknown language or a
+  // non-numeric page is ignored rather than breaking the page.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const wanted = params.get('lang')
+    if (wanted && languages.some((l) => l.code === wanted)) setLang(wanted)
+    const page = parseInt(params.get('page') ?? '', 10)
+    if (Number.isFinite(page)) setPendingJumpRef(`p${page}`)
+    // `languages` is stable per comic; this is a mount-time intent, not a sync.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [languages])
+
   // ── Page-level comments on the READER ─────────────────────────────────────
   // The reader and the script share page numbering, so reader comments anchor
   // to the same `pN` refs the draft view uses. The drawer is scoped to one page.
