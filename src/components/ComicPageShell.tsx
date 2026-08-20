@@ -29,6 +29,8 @@ import { normalizeSubjectSlug } from '@/lib/slugs'
 import { citationMapFromSources } from '@/lib/provenance'
 import { PersonTabs } from '@/components/PersonTabs'
 import { ComicEditions } from '@/components/ComicEditions'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
+import { comicLanguages, draftKeyFor } from '@/lib/comicLanguages'
 import { useProvenanceMarkers } from '@/lib/useProvenanceMarkers'
 import { ProvenanceTooltip } from '@/components/ProvenanceTooltip'
 import { CommentGutter } from '@/components/feedback/CommentGutter'
@@ -76,7 +78,11 @@ function Detail({ label, value }: { label: string; value: string | number }) {
 
 
 export function ComicPageShell({ comic }: { comic: Comic }) {
-  const draft = useGatedText(`drafts/${comic.line}/${comic.slug}.html`)
+  // Every language this comic's script is published in, original first. A comic
+  // with no translation yields one entry and the switcher stays hidden.
+  const languages = useMemo(() => comicLanguages(comic), [comic])
+  const [lang, setLang] = useState(() => languages[0].code)
+  const draft = useGatedText(draftKeyFor(comic, lang))
 
   const scriptRef = useRef<HTMLDivElement>(null)
   const figureSlug = normalizeSubjectSlug(comic.subject_slug)
@@ -361,6 +367,9 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
             {/* Reader header — the copy toolbar + the Draft/Comments view tab
                 read as one bar; the toolbar stays visible in BOTH views. */}
             <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+              {/* Language pills — the script swaps in place, gutter and all */}
+              <LanguageSwitcher languages={languages} active={lang} onChange={setLang} />
               {/* View tab toggle */}
               <div
                 role="tablist"
@@ -389,6 +398,7 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
                     </button>
                   )
                 })}
+              </div>
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 {draft.text && <ComicDocxButton comic={comic} draftHtml={draft.text} />}
