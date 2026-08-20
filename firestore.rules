@@ -323,7 +323,13 @@ service cloud.firestore {
             // `.get(...)` (not `.category`) so a doc with no category field —
             // accessing an absent property throws — compares cleanly: an author
             // may not mutate category, but a category-less doc still edits fine.
-            && request.resource.data.get('category', null) == resource.data.get('category', null));
+            && request.resource.data.get('category', null) == resource.data.get('category', null)
+            // Language scope is immutable after posting. `.get(...)` (not
+            // `.lang`) so the 272 docs predating language support — which have
+            // no such field — still compare cleanly. An author may edit their
+            // words; they may not silently re-scope who the comment is for.
+            && request.resource.data.get('lang', null) == resource.data.get('lang', null)
+            && request.resource.data.get('langScope', null) == resource.data.get('langScope', null));
       allow delete: if isSubAdmin() || (isAllowlisted() && resource.data.authorEmail == userEmail());
     }
 
