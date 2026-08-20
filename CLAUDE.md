@@ -49,6 +49,31 @@ recurs.)
 - Brand: Cormorant Garamond (serif) + Instrument Sans (sans), indigo / gold / pale-dusk
   palette, gold used sparingly as a seasoning. Deep-indigo (`.surface-deep`) for heroes/footer.
 
+## Search Worker (`workers/search/`) — the first step off Firebase
+
+`sw-dpb-search` (https://sw-dpb-search.appsadoistic.workers.dev) answers
+`GET /search?q=&limit=&offset=` from an index at `search/comics/index.json` in
+R2, built by the content repo's `tools/build_search_index.py` and published by
+`tools/publish_search_index.py`.
+
+- **`search/` is NOT in `RESOLVE_PREFIXES` or `READ_PREFIXES`, and must never be.**
+  The index holds the text of every comic in every language; the Worker's
+  allocation filter is the only thing in front of it.
+- **The Worker holds no privileged credential.** It verifies the caller's
+  Firebase ID token against Google's JWKS, then forwards that same token to the
+  Firestore REST API to read only `allowlist/{email}`, `suspended/{email}` and
+  `allocations/{email}` — the three docs the rules already let a user read about
+  themselves. A compromise leaks nothing a signed-in user could not already
+  fetch. **Every later migration stage should follow this pattern.**
+- Results are filtered by allocation BEFORE the response is written.
+- The allocation gate now exists in three places — `firestore.rules`,
+  `functions/src/allocation.ts`, `workers/search/src/allocation.ts`. Collapsing
+  them is the point of migration stage 3; until then, a change to one is a
+  change to all three.
+- Deploy: `cd workers/search && npx wrangler deploy`. Tests: `npx vitest run`.
+- `NEXT_PUBLIC_SEARCH_API_URL` is inlined at BUILD time — a build without it
+  ships a search box that silently fails.
+
 ## Deploy
 `npm run build && firebase deploy --only hosting` (also `firestore:rules` when rules change).
 Firebase **Storage is intentionally not used** — gated assets go through the
