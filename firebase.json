@@ -36,6 +36,10 @@
         "destination": "/characters.html"
       },
       {
+        "source": "/search",
+        "destination": "/search.html"
+      },
+      {
         "source": "/figures/*",
         "destination": "/figure.html"
       },

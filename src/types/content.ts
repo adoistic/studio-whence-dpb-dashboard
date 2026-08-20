@@ -92,6 +92,17 @@ export interface Comic {
   // an optional BLANK-version PDF (clean, text-free pages — used when the source art
   // is Devanagari and cannot be made into an editable translated deck). Drives the
   // per-comic "language section" on the comic page.
+  /** The language the comic was AUTHORED in. Not always English: the legacy
+   *  Yogi books are Hindi originals with English translations. */
+  originalLanguage?: string
+  /** Every language this comic's script is published in, original first. Each
+   *  entry names the R2 draft key the reader fetches for that language. */
+  languages?: {
+    code: string
+    label: string
+    draftKey: string
+    isOriginal: boolean
+  }[]
   translations?: {
     language: string
     script?: { key: string; bytes: number }

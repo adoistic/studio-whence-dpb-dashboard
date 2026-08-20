@@ -4,8 +4,24 @@
     {
       "name": "dashboard-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": [
+        "run",
+        "dev"
+      ],
       "port": 5509
+    },
+    {
+      "name": "hosting-emulator",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "firebase",
+        "emulators:start",
+        "--only",
+        "hosting",
+        "--project",
+        "studio-whence-dpb"
+      ],
+      "port": 5000
     }
   ]
 }

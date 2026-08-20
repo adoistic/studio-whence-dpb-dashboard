@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { BrandLockup } from '@/components/BrandLockup'
+import { SearchBox } from '@/components/SearchBox'
 import { SignOutButton, SwitchAccountButton } from '@/components/SignOutButton'
 import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
 import { useLines } from '@/lib/catalog'
@@ -126,6 +127,13 @@ export function Topbar() {
         <Link href="/" className="flex shrink-0 items-center">
           <BrandLockup size="sm" />
         </Link>
+
+        {/* Search — the way in by keyword rather than by clicking. Desktop
+            renders the input inline; mobile renders a trigger that opens a
+            full-screen sheet. */}
+        <div className="ml-auto mr-3 flex items-center gap-3">
+          <SearchBox />
+        </div>
 
         <button
           type="button"

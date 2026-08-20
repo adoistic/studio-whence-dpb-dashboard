@@ -54,3 +54,7 @@ next-env.d.ts
 
 # local image/data scratch (artifacts/) — data-bearing assets, never commit; repo is public
 /artifacts/
+
+# Search Worker deps + build state
+workers/*/node_modules/
+workers/*/.wrangler/

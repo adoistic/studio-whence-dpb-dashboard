@@ -30,13 +30,18 @@ export const STATUS_COLOR: Record<Status, { hex: string; label: string }> = {
   wont_fix:    { hex: '#c2603a', label: "Won't fix" },   // muted red/clay
 }
 
-export type AnchorKind = 'page' | 'panel' | 'beat'
+export type AnchorKind = 'page' | 'panel' | 'beat' | 'box'
 
 export interface Anchor {
   kind: AnchorKind
-  ref: string // page: "p13" · panel: "p13.pl1" · beat: "p13.pl1.b2" | "p13.pl1.art"
+  // page: "p13" · panel: "p13.pl1" · beat: "p13.pl1.b2" | "p13.pl1.art" · box: "p13.b3"
+  ref: string
   page: number
-  panel?: number // absent for page anchors
+  panel?: number // absent for page and box anchors
+  /** Present only for box anchors — one balloon/caption in a TRANSLATED script.
+   *  Kept distinct from a beat because translation boxes do not map onto
+   *  script.md beats (they disagree on ~12% of pages). */
+  box?: number
   snapshot: string // the unit's text (or a label like "Page 13" / "Panel 1")
 }
 
@@ -44,6 +49,7 @@ export interface Anchor {
 export function anchorLabel(a: Anchor): string {
   if (a.kind === 'page') return `Page ${a.page}`
   if (a.kind === 'panel') return `Panel ${a.panel} · p${a.page}`
+  if (a.kind === 'box') return `Box ${a.box} · p${a.page}`
   return `P${a.page}·${a.panel}`
 }
 
@@ -60,6 +66,14 @@ export interface FeedbackNode {
   status?: Status
   /** Optional — old docs / replies may lack it; treat missing as 'other' for display. */
   category?: Category
+  /** The language this comment was WRITTEN in. Always a concrete code, never
+   *  'all'. Absent on the 272 comments predating language support — those are
+   *  read as the comic's original language. */
+  lang?: string
+  /** Who it is for: the same concrete code (this language only) or 'all'.
+   *  Absent is read as single-language, because a comment written against a
+   *  single-language reader was never an assertion about other languages. */
+  langScope?: string
   comicVersion: number
   hidden: boolean
   /** Approval gate. Missing is treated as a draft for display; seeded/backfilled docs are `true`. */
@@ -157,4 +171,61 @@ export function changedSince(
  */
 export function visibleTo(node: FeedbackNode, isAdmin: boolean): boolean {
   return isAdmin || !node.hidden
+}
+
+
+// ── Language scoping ─────────────────────────────────────────────────────────
+//
+// A comment carries TWO language fields, not one. A single
+// `lang: 'en' | 'hi' | 'all'` would lose which language a SHARED comment was
+// written in — and that is exactly what the display rule depends on: precise in
+// its home language, page-level everywhere else.
+
+/** The concrete language a comment was written in. A doc predating language
+ *  support is attributed to the comic's original language. */
+export function nodeLang(n: FeedbackNode, originalLanguage: string): string {
+  return n.lang ?? originalLanguage
+}
+
+/** Should this comment be shown while reading `code`? */
+export function appliesToLanguage(
+  n: FeedbackNode, code: string, originalLanguage: string,
+): boolean {
+  if (n.langScope === 'all') return true
+  return nodeLang(n, originalLanguage) === code
+}
+
+/** True when a comment applies here but was written in another language. */
+export function isForeign(
+  n: FeedbackNode, code: string, originalLanguage: string,
+): boolean {
+  return appliesToLanguage(n, code, originalLanguage)
+    && nodeLang(n, originalLanguage) !== code
+}
+
+/**
+ * The anchors as `code` should display them.
+ *
+ * At home — the language it was written in — the precise pin is kept. Away, it
+ * is shown on its PAGE, because pages are the only anchor that aligns across
+ * languages: translation boxes and script beats disagree on ~12% of pages, so a
+ * beat ref means nothing in a translated script and a box ref means nothing in
+ * the master.
+ *
+ * The stored anchors are NEVER mutated; this is display only, so switching back
+ * restores full precision.
+ */
+export function displayAnchors(
+  n: FeedbackNode, code: string, originalLanguage: string,
+): Anchor[] {
+  if (!n.anchors.length) return []
+  if (nodeLang(n, originalLanguage) === code) return n.anchors
+  const byPage = new Map<number, Anchor>()
+  for (const a of n.anchors) {
+    if (byPage.has(a.page)) continue
+    byPage.set(a.page, {
+      kind: 'page', ref: `p${a.page}`, page: a.page, snapshot: `Page ${a.page}`,
+    })
+  }
+  return [...byPage.values()]
 }

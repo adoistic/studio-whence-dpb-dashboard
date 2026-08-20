@@ -22,33 +22,33 @@ beforeEach(() => { calls.addDoc = []; calls.updateDoc = [] })
 describe('feedback actions', () => {
   const author = { email: 'a@b.com', name: 'A', role: 'allow' }
   it('addComment writes a root with own author, status open, hidden false', async () => {
-    await addComment({ comicId: 'c', line: 'biographies', anchors: [], body: 'hi', comicVersion: 2 }, author)
+    await addComment({ comicId: 'c', line: 'biographies', anchors: [], body: 'hi', comicVersion: 2, lang: 'en', langScope: 'en' }, author)
     expect(calls.addDoc[0]).toMatchObject({
       comicId: 'c', parentId: null, authorEmail: 'a@b.com', status: 'open', hidden: false, comicVersion: 2,
     })
   })
   it('addComment defaults published to false (a member comment is a draft)', async () => {
-    await addComment({ comicId: 'c', line: 'biographies', anchors: [], body: 'hi', comicVersion: 2 }, author)
+    await addComment({ comicId: 'c', line: 'biographies', anchors: [], body: 'hi', comicVersion: 2, lang: 'en', langScope: 'en' }, author)
     expect(calls.addDoc[0]).toMatchObject({ published: false })
   })
   it('addComment honours an explicit published=true (publish-direct)', async () => {
-    await addComment({ comicId: 'c', line: 'biographies', anchors: [], body: 'hi', comicVersion: 2, published: true }, author)
+    await addComment({ comicId: 'c', line: 'biographies', anchors: [], body: 'hi', comicVersion: 2, published: true, lang: 'en', langScope: 'en' }, author)
     expect(calls.addDoc[0]).toMatchObject({ published: true })
   })
   it('addComment writes the given category (defaults to fact when omitted)', async () => {
-    await addComment({ comicId: 'c', line: 'biographies', anchors: [], body: 'hi', comicVersion: 2, category: 'tone' }, author)
+    await addComment({ comicId: 'c', line: 'biographies', anchors: [], body: 'hi', comicVersion: 2, category: 'tone', lang: 'en', langScope: 'en' }, author)
     expect(calls.addDoc[0]).toMatchObject({ category: 'tone' })
     calls.addDoc = []
-    await addComment({ comicId: 'c', line: 'biographies', anchors: [], body: 'hi', comicVersion: 2 }, author)
+    await addComment({ comicId: 'c', line: 'biographies', anchors: [], body: 'hi', comicVersion: 2, lang: 'en', langScope: 'en' }, author)
     expect(calls.addDoc[0]).toMatchObject({ category: 'fact' })
   })
   it('addReply writes parentId and no status', async () => {
-    await addReply({ comicId: 'c', line: 'biographies', parentId: 'root1', body: 'r', comicVersion: 2 }, author)
+    await addReply({ comicId: 'c', line: 'biographies', parentId: 'root1', body: 'r', comicVersion: 2, lang: 'en', langScope: 'en' }, author)
     expect(calls.addDoc[0]).toMatchObject({ parentId: 'root1' })
     expect(calls.addDoc[0]).not.toHaveProperty('status')
   })
   it('addReply defaults published to false (a member reply is a draft too)', async () => {
-    await addReply({ comicId: 'c', line: 'biographies', parentId: 'root1', body: 'r', comicVersion: 2 }, author)
+    await addReply({ comicId: 'c', line: 'biographies', parentId: 'root1', body: 'r', comicVersion: 2, lang: 'en', langScope: 'en' }, author)
     expect(calls.addDoc[0]).toMatchObject({ published: false })
   })
   it('setStatus updates only status', async () => {

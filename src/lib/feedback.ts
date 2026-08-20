@@ -97,7 +97,14 @@ export function useAllRoots(viewerCanModerate: boolean): Live<FeedbackNode[]> {
 }
 
 export function addComment(
-  input: { comicId: string; line: string; anchors: Anchor[]; body: string; comicVersion: number; category?: Category; published?: boolean },
+  input: {
+    comicId: string; line: string; anchors: Anchor[]; body: string
+    comicVersion: number; category?: Category; published?: boolean
+    /** The language being read when this was written (concrete, never 'all'). */
+    lang: string
+    /** Who it is for: that same code, or 'all'. */
+    langScope: string
+  },
   author: Author,
 ) {
   return addDoc(collection(db, 'feedback'), {
@@ -105,6 +112,10 @@ export function addComment(
     authorEmail: author.email, authorName: author.name, authorRole: author.role,
     body: input.body, status: 'open', category: input.category ?? 'fact',
     comicVersion: input.comicVersion, hidden: false,
+    // The language it was written in, and who it is for. Single-language is the
+    // default at the call site: a comment is not an assertion about a language
+    // the author was not reading.
+    lang: input.lang, langScope: input.langScope,
     // Default draft — a member's new comment awaits moderator approval. A
     // sub-admin choosing publish-direct passes `true` (that UI is a later task).
     published: input.published ?? false,
@@ -113,13 +124,21 @@ export function addComment(
 }
 
 export function addReply(
-  input: { comicId: string; line: string; parentId: string; body: string; comicVersion: number; published?: boolean },
+  input: {
+    comicId: string; line: string; parentId: string; body: string
+    comicVersion: number; published?: boolean
+    /** Inherited from the root — a thread is one conversation and does not
+     *  fragment across languages. */
+    lang: string
+    langScope: string
+  },
   author: Author,
 ) {
   return addDoc(collection(db, 'feedback'), {
     comicId: input.comicId, line: input.line, parentId: input.parentId, anchors: [],
     authorEmail: author.email, authorName: author.name, authorRole: author.role,
     body: input.body, comicVersion: input.comicVersion, hidden: false,
+    lang: input.lang, langScope: input.langScope,
     // A reply inherits its parent root's published state (the caller passes
     // `parent.published`): a reply to a published root is itself published and
     // immediately visible; a reply to a draft stays draft. Falls back to draft

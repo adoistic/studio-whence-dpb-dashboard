@@ -29,6 +29,8 @@ import { normalizeSubjectSlug } from '@/lib/slugs'
 import { citationMapFromSources } from '@/lib/provenance'
 import { PersonTabs } from '@/components/PersonTabs'
 import { ComicEditions } from '@/components/ComicEditions'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
+import { comicLanguages, draftKeyFor } from '@/lib/comicLanguages'
 import { useProvenanceMarkers } from '@/lib/useProvenanceMarkers'
 import { ProvenanceTooltip } from '@/components/ProvenanceTooltip'
 import { CommentGutter } from '@/components/feedback/CommentGutter'
@@ -76,7 +78,11 @@ function Detail({ label, value }: { label: string; value: string | number }) {
 
 
 export function ComicPageShell({ comic }: { comic: Comic }) {
-  const draft = useGatedText(`drafts/${comic.line}/${comic.slug}.html`)
+  // Every language this comic's script is published in, original first. A comic
+  // with no translation yields one entry and the switcher stays hidden.
+  const languages = useMemo(() => comicLanguages(comic), [comic])
+  const [lang, setLang] = useState(() => languages[0].code)
+  const draft = useGatedText(draftKeyFor(comic, lang))
 
   const scriptRef = useRef<HTMLDivElement>(null)
   const figureSlug = normalizeSubjectSlug(comic.subject_slug)
@@ -125,6 +131,19 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
   // When a comment in the Comments view is clicked, switch to the Draft view and
   // remember which beat to scroll to once it's mounted.
   const [pendingJumpRef, setPendingJumpRef] = useState<string | null>(null)
+
+  // A search result links to /<line>/<slug>?page=N&lang=xx — open that language
+  // and scroll to that page. Runs once on mount; an unknown language or a
+  // non-numeric page is ignored rather than breaking the page.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const wanted = params.get('lang')
+    if (wanted && languages.some((l) => l.code === wanted)) setLang(wanted)
+    const page = parseInt(params.get('page') ?? '', 10)
+    if (Number.isFinite(page)) setPendingJumpRef(`p${page}`)
+    // `languages` is stable per comic; this is a mount-time intent, not a sync.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [languages])
 
   // ── Page-level comments on the READER ─────────────────────────────────────
   // The reader and the script share page numbering, so reader comments anchor
@@ -321,6 +340,8 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
                     <ComicCmykButton comic={comic} />
                     <ComicExportButton
                       comic={comic}
+                      lang={lang}
+                      originalLanguage={languages[0].code}
                       threads={fbThreads.filter((t) => visibleTo(t.root, canMod))}
                       draftHtml={draft.text || null}
                     />
@@ -339,6 +360,9 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
         {/* Page-scoped comments drawer (opened from the reader) */}
         {commentPage != null && (
           <PageCommentsPanel
+                  lang={lang}
+                  originalLanguage={languages[0].code}
+                  languages={languages}
             comicId={comicId}
             line={comic.line}
             comicVersion={comic.version ?? 0}
@@ -361,6 +385,9 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
             {/* Reader header — the copy toolbar + the Draft/Comments view tab
                 read as one bar; the toolbar stays visible in BOTH views. */}
             <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+              {/* Language pills — the script swaps in place, gutter and all */}
+              <LanguageSwitcher languages={languages} active={lang} onChange={setLang} />
               {/* View tab toggle */}
               <div
                 role="tablist"
@@ -390,6 +417,7 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
                   )
                 })}
               </div>
+              </div>
               <div className="flex flex-wrap items-center gap-3">
                 {draft.text && <ComicDocxButton comic={comic} draftHtml={draft.text} />}
                 <CopyScriptToolbar
@@ -416,6 +444,9 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
                   so the gutter's own sticky "Comments" header isn't hidden behind it. */}
               <aside className="lg:sticky lg:top-20 lg:w-[22rem] lg:shrink-0">
                 <CommentGutter
+                  lang={lang}
+                  originalLanguage={languages[0].code}
+                  languages={languages}
                   comicId={`${comic.line}__${comic.slug}`}
                   line={comic.line}
                   comicVersion={comic.version ?? 0}
@@ -426,6 +457,9 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
             </div>
             ) : (
               <CommentsView
+                  lang={lang}
+                  originalLanguage={languages[0].code}
+                  languages={languages}
                 comicId={`${comic.line}__${comic.slug}`}
                 line={comic.line}
                 comicVersion={comic.version ?? 0}

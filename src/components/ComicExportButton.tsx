@@ -5,6 +5,7 @@
 // (exportZip → jszip, exportDocx → docx) load only inside the handler.
 import { useState } from 'react'
 import type { Comic } from '@/types/content'
+import { appliesToLanguage } from '@/lib/feedbackTypes'
 import type { Thread } from '@/lib/feedbackTypes'
 import { buildExportModel, type ExportOptions } from '@/lib/exportModel'
 import { fetchExportImages } from '@/lib/exportFetch'
@@ -24,10 +25,27 @@ function download(bytes: Uint8Array, filename: string, mime: string) {
   URL.revokeObjectURL(href)
 }
 
-export function ComicExportButton({ comic, threads, draftHtml }: {
+/**
+ * The threads an export should carry: exactly what the reader is seeing in this
+ * language. Exporting every language's comments into one document would put
+ * Hindi feedback into an English handoff — the same conflation the reader was
+ * changed to avoid.
+ */
+export function exportableThreads(
+  threads: Thread[], lang: string, originalLanguage: string,
+): Thread[] {
+  return threads.filter((t) => appliesToLanguage(t.root, lang, originalLanguage))
+}
+
+export function ComicExportButton({ comic, threads, draftHtml, lang, originalLanguage }: {
   comic: Comic
   /** ALREADY visibility-filtered by the caller (visibleTo per role). */
   threads: Thread[]
+  /** The language being read; the export is scoped to it. Optional so a call
+   *  site without language context behaves exactly as before. */
+  lang?: string
+  /** The comic's authored language — how a pre-language comment is attributed. */
+  originalLanguage?: string
   /** Rendered draft HTML, or null for script-less (legacy) comics. */
   draftHtml: string | null
 }) {
@@ -54,7 +72,13 @@ export function ComicExportButton({ comic, threads, draftHtml }: {
       }
       const { parseDraftHtml } = await import('@/lib/comicDocx')
       const draftPages = draftHtml ? parseDraftHtml(draftHtml).pages : null
-      const model = buildExportModel({ comic, threads, draftPages, options })
+      const model = buildExportModel({
+        comic,
+        threads: exportableThreads(threads, lang ?? originalLanguage ?? 'en',
+                                   originalLanguage ?? 'en'),
+        draftPages,
+        options,
+      })
       const { images, failed } = await fetchExportImages(comic)
 
       if (format === 'zip') {

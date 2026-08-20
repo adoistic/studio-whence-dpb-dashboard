@@ -87,6 +87,16 @@ beforeAll(async () => {
       createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
     })
 
+    // A published root carrying the LANGUAGE pair — used to prove the
+    // author-update branch pins `lang` / `langScope`.
+    await setDoc(doc(db, 'feedback/lang-doc'), {
+      comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'mr.ankitgzb@gmail.com', authorName: 'Ankit', authorRole: 'editor',
+      body: 'before', status: 'open', category: 'fact', comicVersion: 1, hidden: false, published: true,
+      lang: 'en', langScope: 'en',
+      createdAt: '2026-06-03', updatedAt: '2026-06-03', editedAt: null,
+    })
+
     // ── Work-allocation seeds ──
     // x@thothica.com is used as a plain MEMBER across the feedback/roles blocks
     // and reads the seeded biographies comic + its version subcollection there.
@@ -418,6 +428,39 @@ describe('firestore.rules — feedback', () => {
     // Mutating category is denied.
     await assertFails(setDoc(doc(db, 'feedback/cat-doc'),
       { ...base, body: 'edited', category: 'tone', editedAt: '2026-06-04' }))
+  })
+  it('author can edit own body but cannot re-scope the comment\'s languages', async () => {
+    const db = editor()
+    const base = {
+      comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'mr.ankitgzb@gmail.com', authorName: 'Ankit', authorRole: 'editor',
+      status: 'open', category: 'fact', comicVersion: 1, hidden: false, published: true,
+      createdAt: '2026-06-03', updatedAt: '2026-06-04',
+    }
+    // Editing the body while keeping the language pair is allowed.
+    await assertSucceeds(setDoc(doc(db, 'feedback/lang-doc'),
+      { ...base, body: 'edited', lang: 'en', langScope: 'en', editedAt: '2026-06-04' }))
+    // Widening the scope to every language after the fact is denied.
+    await assertFails(setDoc(doc(db, 'feedback/lang-doc'),
+      { ...base, body: 'edited', lang: 'en', langScope: 'all', editedAt: '2026-06-04' }))
+    // Re-attributing which language it was written in is denied.
+    await assertFails(setDoc(doc(db, 'feedback/lang-doc'),
+      { ...base, body: 'edited', lang: 'hi', langScope: 'en', editedAt: '2026-06-04' }))
+    // Dropping the fields entirely is denied (null != 'en').
+    await assertFails(setDoc(doc(db, 'feedback/lang-doc'),
+      { ...base, body: 'edited', editedAt: '2026-06-04' }))
+  })
+  it('a legacy comment with no language fields still edits cleanly', async () => {
+    // The 272 comments predating language support have neither field; the
+    // `.get(field, null)` comparison must let their authors keep editing.
+    const db = editor()
+    await assertSucceeds(setDoc(doc(db, 'feedback/cat-doc'), {
+      comicId: 'biographies__01-x', line: 'biographies', parentId: null, anchors: [],
+      authorEmail: 'mr.ankitgzb@gmail.com', authorName: 'Ankit', authorRole: 'editor',
+      status: 'open', category: 'fact', comicVersion: 1, hidden: false, published: true,
+      createdAt: '2026-06-03', updatedAt: '2026-06-04',
+      body: 'edited with no language fields', editedAt: '2026-06-04',
+    }))
   })
   it('author cannot flip hidden on own doc', async () => {
     await assertFails(setDoc(doc(editor(), 'feedback/root-ankit'),
