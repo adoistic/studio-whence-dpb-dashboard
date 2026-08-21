@@ -9,6 +9,7 @@ import { appliesToLanguage } from '@/lib/feedbackTypes'
 import type { Thread } from '@/lib/feedbackTypes'
 import { buildExportModel, type ExportOptions } from '@/lib/exportModel'
 import { fetchExportImages } from '@/lib/exportFetch'
+import { watermarkImageMap } from '@/lib/watermark'
 
 type Format = 'zip' | 'author' | 'side'
 
@@ -54,6 +55,9 @@ export function ComicExportButton({ comic, threads, draftHtml, lang, originalLan
   const [includeComments, setIncludeComments] = useState(true)
   const [includeScript, setIncludeScript] = useState(true)
   const [includeResolved, setIncludeResolved] = useState(false)
+  // Off by default: the export is a working bundle for reviewers, and only
+  // becomes a share-safe copy when someone deliberately asks for one.
+  const [watermarked, setWatermarked] = useState(false)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
 
@@ -79,11 +83,16 @@ export function ComicExportButton({ comic, threads, draftHtml, lang, originalLan
         draftPages,
         options,
       })
-      const { images, failed } = await fetchExportImages(comic)
+      const { images: fetched, failed } = await fetchExportImages(comic)
+      const images = watermarked ? await watermarkImageMap(fetched) : fetched
 
       if (format === 'zip') {
         const { buildExportZip } = await import('@/lib/exportZip')
-        download(await buildExportZip(model, images), `${comic.slug}-export.zip`, 'application/zip')
+        download(
+          await buildExportZip(model, images),
+          watermarked ? `${comic.slug}-export-watermarked.zip` : `${comic.slug}-export.zip`,
+          'application/zip',
+        )
       } else {
         const blocksMod = await import('@/lib/exportBlocks')
         const blocks = format === 'author'
@@ -143,6 +152,7 @@ export function ComicExportButton({ comic, threads, draftHtml, lang, originalLan
             {check(includeComments, setIncludeComments, 'Comments')}
             {hasScript && check(includeScript, setIncludeScript, 'Script')}
             {check(includeResolved, setIncludeResolved, "Include resolved / won't-fix threads")}
+            {check(watermarked, setWatermarked, 'Watermarked low-res pages (safe to circulate)')}
           </div>
           <button
             type="button"
