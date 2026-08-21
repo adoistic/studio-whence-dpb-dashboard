@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import { PDFDocument } from 'pdf-lib'
 import type { Comic } from '@/types/content'
-import { comicPageKeys } from '@/lib/comicPageKeys'
+import { comicPageKeys, comicWebPageKeys } from '@/lib/comicPageKeys'
 import { resolveUrls } from '@/lib/dataApi'
+import { watermarkedPageJpeg } from '@/lib/watermark'
 
 /** True when the bytes start with the PNG 8-byte signature. */
 function isPng(bytes: Uint8Array): boolean {
@@ -41,17 +42,23 @@ export async function buildComicPdf(
 }
 
 export function ComicPdfButton({ comic }: { comic: Comic }) {
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<null | 'full' | 'preview'>(null)
   const [error, setError] = useState<string | null>(null)
 
-  async function onDownload() {
-    setBusy(true); setError(null)
+  /**
+   * @param preview  Build the share-safe copy: the 1200px web variants rather
+   *   than the print masters, downscaled again and stamped `© Diamond Toons`.
+   *   Diamond can circulate that without handing out print-quality art.
+   */
+  async function onDownload(preview: boolean) {
+    setBusy(preview ? 'preview' : 'full'); setError(null)
     try {
-      const keys = comicPageKeys(comic)
+      const keys = preview ? comicWebPageKeys(comic) : comicPageKeys(comic)
       const urls = await resolveUrls(keys)
       const ordered = keys.map((k) => urls[k]).filter(Boolean)
       if (ordered.length === 0) throw new Error('no pages')
-      const images = await Promise.all(
+      type PageBytes = { bytes: Uint8Array; type: string }
+      let images: PageBytes[] = await Promise.all(
         ordered.map(async (u) => {
           const res = await fetch(u)
           if (!res.ok) throw new Error(`fetch ${res.status}`)
@@ -59,6 +66,18 @@ export function ComicPdfButton({ comic }: { comic: Comic }) {
           return { bytes: buf, type: res.headers.get('content-type') ?? 'image/jpeg' }
         }),
       )
+      if (preview) {
+        // Sequential, not Promise.all: a 64-page book would otherwise hold 64
+        // decoded bitmaps and 64 canvases in memory at once.
+        const stamped: PageBytes[] = []
+        for (const img of images) {
+          stamped.push({
+            bytes: await watermarkedPageJpeg(img.bytes, img.type),
+            type: 'image/jpeg',
+          })
+        }
+        images = stamped
+      }
       const pdfBytes = await buildComicPdf(images)
       // Copy into a fresh ArrayBuffer so the BlobPart type is a plain
       // ArrayBuffer (pdf-lib returns Uint8Array<ArrayBufferLike>).
@@ -67,27 +86,39 @@ export function ComicPdfButton({ comic }: { comic: Comic }) {
       const blob = new Blob([buffer], { type: 'application/pdf' })
       const href = URL.createObjectURL(blob)
       const a = document.createElement('a')
-      a.href = href; a.download = `${comic.slug}.pdf`
+      a.href = href
+      a.download = preview ? `${comic.slug}-preview-watermarked.pdf` : `${comic.slug}.pdf`
       document.body.appendChild(a); a.click(); a.remove()
       URL.revokeObjectURL(href)
     } catch (err) {
       console.error('[ComicPdfButton]', err)
       setError('Could not build the PDF. Please try again.')
     } finally {
-      setBusy(false)
+      setBusy(null)
     }
   }
 
   return (
     <div className="flex flex-col gap-1">
-      <button
-        type="button"
-        onClick={onDownload}
-        disabled={busy}
-        className="inline-flex items-center gap-2 rounded-full bg-brand-indigo px-5 py-2 font-sans text-[0.72rem] font-semibold uppercase tracking-label text-brand-pale-dusk transition-opacity hover:opacity-90 disabled:opacity-50"
-      >
-        {busy ? 'Building PDF…' : 'Download PDF'}
-      </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onDownload(false)}
+          disabled={busy !== null}
+          className="inline-flex items-center gap-2 rounded-full bg-brand-indigo px-5 py-2 font-sans text-[0.72rem] font-semibold uppercase tracking-label text-brand-pale-dusk transition-opacity hover:opacity-90 disabled:opacity-50"
+        >
+          {busy === 'full' ? 'Building PDF…' : 'Download PDF'}
+        </button>
+        <button
+          type="button"
+          onClick={() => onDownload(true)}
+          disabled={busy !== null}
+          title="Low-resolution, stamped © Diamond Toons — safe to circulate"
+          className="inline-flex items-center gap-2 rounded-full border border-brand-pale-dusk px-5 py-2 font-sans text-[0.72rem] font-semibold uppercase tracking-label text-brand-indigo transition-colors hover:bg-brand-threshold/60 disabled:opacity-50"
+        >
+          {busy === 'preview' ? 'Building preview…' : 'Preview PDF (watermarked)'}
+        </button>
+      </div>
       {error && <span role="alert" className="font-sans text-[0.7rem] text-red-700">{error}</span>}
     </div>
   )
