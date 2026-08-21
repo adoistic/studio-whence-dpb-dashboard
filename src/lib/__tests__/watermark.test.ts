@@ -7,6 +7,7 @@ import {
 describe('scaleToFit', () => {
   test('shrinks a large page to the cap, preserving aspect ratio', () => {
     expect(scaleToFit(2016, 2688, 1000)).toEqual({ width: 750, height: 1000 })
+    expect(scaleToFit(2016, 2688, 800)).toEqual({ width: 600, height: 800 })
   })
 
   test('caps the LONG edge whichever way the page is oriented', () => {
@@ -65,7 +66,14 @@ describe('watermarkMetrics', () => {
   })
 
   test('keeps a floor so a tiny page is still legibly marked', () => {
-    expect(watermarkMetrics(60, 80).fontPx).toBeGreaterThanOrEqual(11)
+    // Below ~12px the mark stops reading as words and becomes speckle.
+    expect(watermarkMetrics(60, 80).fontPx).toBeGreaterThanOrEqual(18)
+  })
+
+  test('the mark is large enough to read on a preview page', () => {
+    // 600x800 is a preview page at the current cap; the mark should be a
+    // comfortably readable size on it, not a fleck.
+    expect(watermarkMetrics(600, 800).fontPx).toBeGreaterThanOrEqual(28)
   })
 
   test('marks are spaced further apart horizontally than vertically', () => {
