@@ -20,10 +20,10 @@
 /** Long edge of a preview page, in pixels. Sourced from the 1200px web variants,
  *  so this only ever shrinks. Small enough to be unusable for print, large
  *  enough that the lettering stays readable on screen. */
-export const PREVIEW_MAX_EDGE = 1000
+export const PREVIEW_MAX_EDGE = 800
 
 /** JPEG quality for a preview page. */
-export const PREVIEW_QUALITY = 0.7
+export const PREVIEW_QUALITY = 0.62
 
 /** The mark itself. */
 export const WATERMARK_TEXT = '© Diamond Toons'
@@ -35,7 +35,7 @@ export const WATERMARK_ANGLE_DEG = -30
  *  Calibrated by rendering real pages: below ~0.3 the mark survives only over
  *  pale areas and vanishes across the coloured art, which is exactly where a
  *  preview copy needs to be marked. */
-export const WATERMARK_FILL = 'rgba(80, 80, 80, 0.42)'
+export const WATERMARK_FILL = 'rgba(80, 80, 80, 0.53)'
 
 export interface Size {
   width: number
@@ -91,12 +91,14 @@ export function watermarkMetrics(width: number, height: number): {
   fontPx: number; stepX: number; stepY: number
 } {
   const base = Math.min(width, height)
-  const fontPx = Math.max(11, Math.round(base * 0.018))
+  const fontPx = Math.max(18, Math.round(base * 0.054))
   return {
     fontPx,
-    // Horizontal spacing keyed to the text's own length; vertical to its height.
-    // These give roughly 8 marks across and 19 down on a 750x1000 page — dense
-    // enough that no crop of a page comes away clean.
+    // Spacing scales WITH the text, so the marks tile rather than collide.
+    // Roughly 3 across and 6 down on a 600x800 page: large enough that
+    // "© Diamond Toons" is legible on every one of them. A much denser grid of
+    // small marks was tried and rejected — below ~12px the words stop reading
+    // and the page just looks dirty, which defeats a credit watermark.
     stepX: Math.round(fontPx * 7.5),
     stepY: Math.round(fontPx * 4.2),
   }
