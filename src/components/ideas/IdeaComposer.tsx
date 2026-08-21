@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useEditor, EditorContent, type Editor } from '@tiptap/react'
 import { StarterKit } from '@tiptap/starter-kit'
 import { Image } from '@tiptap/extension-image'
@@ -104,6 +104,12 @@ export function IdeaComposer({
   // was replaced by the Haldiram's one and could not be recovered). `reset()`
   // regenerates it after every successful post.
   const [ideaId, setIdeaId] = useState<string>(() => newIdeaRef().id)
+  // A ref mirroring `ideaId`, so the id advances SYNCHRONOUSLY on post. State
+  // alone is not enough: setIdeaId only lands on the next render, so a post
+  // firing before that render commits would still close over the previous id
+  // and overwrite the idea just saved. The ref is the value actually written;
+  // the state exists so the paste hook and render see it.
+  const idRef = useRef<string>(ideaId)
 
   const [title, setTitle] = useState('')
   const [visibility, setVisibility] = useState<Visibility>('private')
@@ -126,7 +132,9 @@ export function IdeaComposer({
 
   const reset = () => {
     // A NEW id for the next idea — see the note where ideaId is minted.
-    setIdeaId(newIdeaRef().id)
+    const next = newIdeaRef().id
+    idRef.current = next        // synchronous: the next post cannot reuse the old id
+    setIdeaId(next)
     setTitle('')
     setVisibility('private')
     setRecipientsRaw('')
@@ -141,7 +149,7 @@ export function IdeaComposer({
     try {
       const markdown = htmlToMarkdown(editor.getHTML())
       const input = buildCreateInput({ title, markdown, r2Images, visibility, recipientsRaw })
-      await createIdea(ideaId, input, author)
+      await createIdea(idRef.current, input, author)
       reset()
       onPosted?.()
     } catch {
