@@ -96,16 +96,21 @@ export function IdeaComposer({
   author: { email: string; name: string }
   onPosted?: () => void
 }) {
-  // Mint the idea id once, before any image upload, so R2 keys are stable.
-  // useState's lazy initializer runs exactly once and is render-safe (unlike
-  // reading a ref's .current during render).
-  const [ideaId] = useState<string>(() => newIdeaRef().id)
+  // Mint the idea id BEFORE any image upload, so R2 keys are stable while the
+  // idea is being composed. It must be minted afresh for every idea: this id is
+  // the document id, and `createIdea` uses setDoc, so reusing it overwrites the
+  // previous idea wholesale. That is not hypothetical — posting a second idea
+  // without reloading destroyed the first (Shruti, 2026-08-21: an Emami idea
+  // was replaced by the Haldiram's one and could not be recovered). `reset()`
+  // regenerates it after every successful post.
+  const [ideaId, setIdeaId] = useState<string>(() => newIdeaRef().id)
 
   const [title, setTitle] = useState('')
   const [visibility, setVisibility] = useState<Visibility>('private')
   const [recipientsRaw, setRecipientsRaw] = useState('')
   const [r2Images, setR2Images] = useState<R2Image[]>([])
   const [posting, setPosting] = useState(false)
+  const [postError, setPostError] = useState<string | null>(null)
 
   const editorConfig = useMemo(() => makeIdeaEditor(), [])
   const editor = useEditor(editorConfig)
@@ -120,6 +125,8 @@ export function IdeaComposer({
   if (!canModerate(role)) return null
 
   const reset = () => {
+    // A NEW id for the next idea — see the note where ideaId is minted.
+    setIdeaId(newIdeaRef().id)
     setTitle('')
     setVisibility('private')
     setRecipientsRaw('')
@@ -130,12 +137,18 @@ export function IdeaComposer({
   const onPost = async () => {
     if (!editor) return
     setPosting(true)
+    setPostError(null)
     try {
       const markdown = htmlToMarkdown(editor.getHTML())
       const input = buildCreateInput({ title, markdown, r2Images, visibility, recipientsRaw })
       await createIdea(ideaId, input, author)
       reset()
       onPosted?.()
+    } catch {
+      // Previously there was no catch at all: a failed post re-enabled the
+      // button and said nothing, so the author had no way to know their idea
+      // had not been saved. The text is deliberately left in the editor.
+      setPostError("Couldn't post that idea. Your text is still here — try again.")
     } finally {
       setPosting(false)
     }
@@ -200,6 +213,12 @@ export function IdeaComposer({
           placeholder="Recipient emails, comma-separated"
           className="mb-3 w-full rounded-md border border-brand-pale-dusk bg-white px-3 py-2 text-sm text-brand-umber"
         />
+      )}
+
+      {postError && (
+        <p role="alert" className="mb-2 font-sans text-[0.72rem] text-brand-clay">
+          {postError}
+        </p>
       )}
 
       <div className="flex justify-end">

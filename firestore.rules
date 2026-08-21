@@ -360,13 +360,20 @@ service cloud.firestore {
 
       // Admin may change anything. The author may edit ONLY content fields —
       // status/tags/visibility/recipients/author are frozen after create.
+      // `createdAt` is pinned so an author "update" can never be a disguised
+      // REPLACEMENT of a different idea. A client bug did exactly that: the
+      // composer reused one document id for every post, so a second idea
+      // setDoc'd over the first and destroyed it (Shruti, 2026-08-21). The
+      // client is fixed; this makes the database refuse it too, because a
+      // silent overwrite of someone's writing is unrecoverable.
       allow update: if isAdmin()
                     || (resource.data.author == userEmail()
                         && request.resource.data.author     == resource.data.author
                         && request.resource.data.status     == resource.data.status
                         && request.resource.data.tags       == resource.data.tags
                         && request.resource.data.visibility == resource.data.visibility
-                        && request.resource.data.recipients == resource.data.recipients);
+                        && request.resource.data.recipients == resource.data.recipients
+                        && request.resource.data.createdAt  == resource.data.createdAt);
 
       allow delete: if isAdmin() || resource.data.author == userEmail();
 

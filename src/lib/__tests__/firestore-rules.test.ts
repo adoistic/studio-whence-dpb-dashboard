@@ -878,6 +878,18 @@ describe('firestore.rules — ideas & idea_reads', () => {
     await assertSucceeds(setDoc(doc(admin(), 'ideas/idea-edit'),
       ideaDoc({ author: 'sub@dpb.in', status: 'shipped' })))
   })
+  it('author CANNOT overwrite one idea with a different one (createdAt is pinned)', async () => {
+    // The failure this guards: a composer bug reused one document id for every
+    // post, so a second idea setDoc'd over the first and destroyed it. A real
+    // edit keeps createdAt; a replacement mints a new one.
+    // Uses its OWN doc — `idea-edit` is mutated by earlier tests in this block.
+    await assertSucceeds(setDoc(doc(subAdmin(), 'ideas/idea-clobber'),
+      ideaDoc({ author: 'sub@dpb.in' })))
+    await assertSucceeds(setDoc(doc(subAdmin(), 'ideas/idea-clobber'),
+      ideaDoc({ author: 'sub@dpb.in', bodyMarkdown: 'genuinely edited' })))
+    await assertFails(setDoc(doc(subAdmin(), 'ideas/idea-clobber'),
+      ideaDoc({ author: 'sub@dpb.in', title: 'A DIFFERENT idea', createdAt: '2026-08-21' })))
+  })
 
   // ── DELETE ──
   it('author can delete; admin can delete; unrelated member cannot', async () => {
