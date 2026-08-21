@@ -5,7 +5,7 @@ import { PDFDocument } from 'pdf-lib'
 import type { Comic } from '@/types/content'
 import { comicPageKeys, comicWebPageKeys } from '@/lib/comicPageKeys'
 import { resolveUrls } from '@/lib/dataApi'
-import { watermarkedPageJpeg } from '@/lib/watermark'
+import { previewPageJpeg } from '@/lib/watermark'
 
 /** True when the bytes start with the PNG 8-byte signature. */
 function isPng(bytes: Uint8Array): boolean {
@@ -41,19 +41,24 @@ export async function buildComicPdf(
   return pdf.save()
 }
 
+/** What a download contains. `low` and `watermarked` are both low-resolution;
+ *  only the latter carries the © Diamond Toons mark. */
+type PdfVariant = 'full' | 'low' | 'watermarked'
+
 export function ComicPdfButton({ comic }: { comic: Comic }) {
-  const [busy, setBusy] = useState<null | 'full' | 'preview'>(null)
+  const [busy, setBusy] = useState<null | PdfVariant>(null)
   const [error, setError] = useState<string | null>(null)
 
   /**
-   * @param preview  Build the share-safe copy: the 1200px web variants rather
-   *   than the print masters, downscaled again and stamped `© Diamond Toons`.
-   *   Diamond can circulate that without handing out print-quality art.
+   * `full` embeds the print masters untouched. `low` and `watermarked` both
+   * start from the 1200px web variants and downscale again; only `watermarked`
+   * is stamped, which is what makes it safe to circulate.
    */
-  async function onDownload(preview: boolean) {
-    setBusy(preview ? 'preview' : 'full'); setError(null)
+  async function onDownload(variant: PdfVariant) {
+    const small = variant !== 'full'
+    setBusy(variant); setError(null)
     try {
-      const keys = preview ? comicWebPageKeys(comic) : comicPageKeys(comic)
+      const keys = small ? comicWebPageKeys(comic) : comicPageKeys(comic)
       const urls = await resolveUrls(keys)
       const ordered = keys.map((k) => urls[k]).filter(Boolean)
       if (ordered.length === 0) throw new Error('no pages')
@@ -66,17 +71,19 @@ export function ComicPdfButton({ comic }: { comic: Comic }) {
           return { bytes: buf, type: res.headers.get('content-type') ?? 'image/jpeg' }
         }),
       )
-      if (preview) {
+      if (small) {
         // Sequential, not Promise.all: a 64-page book would otherwise hold 64
         // decoded bitmaps and 64 canvases in memory at once.
-        const stamped: PageBytes[] = []
+        const processed: PageBytes[] = []
         for (const img of images) {
-          stamped.push({
-            bytes: await watermarkedPageJpeg(img.bytes, img.type),
+          processed.push({
+            bytes: await previewPageJpeg(img.bytes, img.type, {
+              watermark: variant === 'watermarked',
+            }),
             type: 'image/jpeg',
           })
         }
-        images = stamped
+        images = processed
       }
       const pdfBytes = await buildComicPdf(images)
       // Copy into a fresh ArrayBuffer so the BlobPart type is a plain
@@ -87,7 +94,11 @@ export function ComicPdfButton({ comic }: { comic: Comic }) {
       const href = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = href
-      a.download = preview ? `${comic.slug}-preview-watermarked.pdf` : `${comic.slug}.pdf`
+      a.download = {
+        full: `${comic.slug}.pdf`,
+        low: `${comic.slug}-lowres.pdf`,
+        watermarked: `${comic.slug}-lowres-watermarked.pdf`,
+      }[variant]
       document.body.appendChild(a); a.click(); a.remove()
       URL.revokeObjectURL(href)
     } catch (err) {
@@ -103,20 +114,30 @@ export function ComicPdfButton({ comic }: { comic: Comic }) {
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          onClick={() => onDownload(false)}
+          onClick={() => onDownload('full')}
           disabled={busy !== null}
+          title="Full-resolution print masters"
           className="inline-flex items-center gap-2 rounded-full bg-brand-indigo px-5 py-2 font-sans text-[0.72rem] font-semibold uppercase tracking-label text-brand-pale-dusk transition-opacity hover:opacity-90 disabled:opacity-50"
         >
           {busy === 'full' ? 'Building PDF…' : 'Download PDF'}
         </button>
         <button
           type="button"
-          onClick={() => onDownload(true)}
+          onClick={() => onDownload('low')}
           disabled={busy !== null}
-          title="Low-resolution, stamped © Diamond Toons — safe to circulate"
+          title="Low-resolution, no watermark — a light file to read or email"
           className="inline-flex items-center gap-2 rounded-full border border-brand-pale-dusk px-5 py-2 font-sans text-[0.72rem] font-semibold uppercase tracking-label text-brand-indigo transition-colors hover:bg-brand-threshold/60 disabled:opacity-50"
         >
-          {busy === 'preview' ? 'Building preview…' : 'Preview PDF (watermarked)'}
+          {busy === 'low' ? 'Building…' : 'Low-res PDF'}
+        </button>
+        <button
+          type="button"
+          onClick={() => onDownload('watermarked')}
+          disabled={busy !== null}
+          title="Low-resolution and stamped © Diamond Toons — safe to circulate"
+          className="inline-flex items-center gap-2 rounded-full border border-brand-pale-dusk px-5 py-2 font-sans text-[0.72rem] font-semibold uppercase tracking-label text-brand-indigo transition-colors hover:bg-brand-threshold/60 disabled:opacity-50"
+        >
+          {busy === 'watermarked' ? 'Building…' : 'Low-res + watermark'}
         </button>
       </div>
       {error && <span role="alert" className="font-sans text-[0.7rem] text-red-700">{error}</span>}

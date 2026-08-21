@@ -134,16 +134,23 @@ async function decode(bytes: Uint8Array, type: string): Promise<ImageBitmap> {
 }
 
 /**
- * One page → a downscaled, watermarked JPEG.
+ * One page → a downscaled JPEG, optionally stamped.
  *
- * Throws if the browser cannot give us a 2D context; the caller reports that
- * rather than silently handing back an unwatermarked page, which would be the
- * worst possible failure for this feature.
+ * The two are independent on purpose: a low-resolution copy is useful on its own
+ * (email, a quick read on a phone) and the mark is what makes it safe to
+ * circulate. Asking for the mark always implies the downscale, never the
+ * reverse.
+ *
+ * Throws if the browser cannot give us a 2D context. The caller reports that
+ * rather than silently handing back an UNMARKED page when a mark was asked for,
+ * which would be the worst possible failure for this feature.
  */
-export async function watermarkedPageJpeg(
+export async function previewPageJpeg(
   bytes: Uint8Array,
   type = 'image/jpeg',
-  maxEdge = PREVIEW_MAX_EDGE,
+  { watermark = true, maxEdge = PREVIEW_MAX_EDGE }: {
+    watermark?: boolean; maxEdge?: number
+  } = {},
 ): Promise<Uint8Array> {
   const bitmap = await decode(bytes, type)
   const { width, height } = scaleToFit(bitmap.width, bitmap.height, maxEdge)
@@ -156,7 +163,7 @@ export async function watermarkedPageJpeg(
 
   ctx.drawImage(bitmap, 0, 0, width, height)
   bitmap.close?.()
-  paintWatermark(ctx, width, height)
+  if (watermark) paintWatermark(ctx, width, height)
 
   const blob: Blob | null = await new Promise((resolve) =>
     canvas.toBlob(resolve, 'image/jpeg', PREVIEW_QUALITY),
@@ -167,27 +174,28 @@ export async function watermarkedPageJpeg(
 
 
 /**
- * Stamp every image in a fetched-image map, in place of the originals.
+ * Downscale (and optionally stamp) every image in a fetched-image map.
  *
- * Used by the export bundle so its pages carry the same mark as the preview
- * PDF. Sequential by design: a 64-page book stamped in parallel would hold
- * every decoded bitmap and canvas in memory at once.
+ * Sequential by design: a 64-page book processed in parallel would hold every
+ * decoded bitmap and canvas in memory at once.
  *
- * A page that fails to stamp is DROPPED rather than passed through unmarked —
- * silently shipping one clean page inside a watermarked bundle would defeat the
- * point of the bundle.
+ * When a MARK was requested and a page fails, that page is DROPPED rather than
+ * passed through — silently shipping one clean page inside a watermarked bundle
+ * would defeat the point of the bundle. When only a downscale was requested
+ * there is nothing to leak, so the original is kept instead of losing a page.
  */
-export async function watermarkImageMap<K>(
+export async function previewImageMap<K>(
   images: Map<K, { bytes: Uint8Array; width: number; height: number }>,
+  { watermark = true }: { watermark?: boolean } = {},
 ): Promise<Map<K, { bytes: Uint8Array; width: number; height: number }>> {
   const out = new Map<K, { bytes: Uint8Array; width: number; height: number }>()
   for (const [ref, img] of images) {
     try {
-      const bytes = await watermarkedPageJpeg(img.bytes)
+      const bytes = await previewPageJpeg(img.bytes, 'image/jpeg', { watermark })
       const { width, height } = scaleToFit(img.width, img.height, PREVIEW_MAX_EDGE)
       out.set(ref, { bytes, width, height })
     } catch {
-      // dropped on purpose — see the note above
+      if (!watermark) out.set(ref, img)
     }
   }
   return out
