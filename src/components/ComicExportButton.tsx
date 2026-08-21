@@ -9,7 +9,7 @@ import { appliesToLanguage } from '@/lib/feedbackTypes'
 import type { Thread } from '@/lib/feedbackTypes'
 import { buildExportModel, type ExportOptions } from '@/lib/exportModel'
 import { fetchExportImages } from '@/lib/exportFetch'
-import { watermarkImageMap } from '@/lib/watermark'
+import { previewImageMap } from '@/lib/watermark'
 
 type Format = 'zip' | 'author' | 'side'
 
@@ -55,9 +55,10 @@ export function ComicExportButton({ comic, threads, draftHtml, lang, originalLan
   const [includeComments, setIncludeComments] = useState(true)
   const [includeScript, setIncludeScript] = useState(true)
   const [includeResolved, setIncludeResolved] = useState(false)
-  // Off by default: the export is a working bundle for reviewers, and only
-  // becomes a share-safe copy when someone deliberately asks for one.
-  const [watermarked, setWatermarked] = useState(false)
+  // Page images: full masters, a light low-resolution copy, or a low-resolution
+  // copy stamped © Diamond Toons. Full by default — the export is a working
+  // bundle for reviewers, and only becomes a share-safe copy on request.
+  const [pageQuality, setPageQuality] = useState<'full' | 'low' | 'watermarked'>('full')
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
 
@@ -84,13 +85,16 @@ export function ComicExportButton({ comic, threads, draftHtml, lang, originalLan
         options,
       })
       const { images: fetched, failed } = await fetchExportImages(comic)
-      const images = watermarked ? await watermarkImageMap(fetched) : fetched
+      const images = pageQuality === 'full'
+        ? fetched
+        : await previewImageMap(fetched, { watermark: pageQuality === 'watermarked' })
 
       if (format === 'zip') {
         const { buildExportZip } = await import('@/lib/exportZip')
+        const zipSuffix = { full: '', low: '-lowres', watermarked: '-lowres-watermarked' }[pageQuality]
         download(
           await buildExportZip(model, images),
-          watermarked ? `${comic.slug}-export-watermarked.zip` : `${comic.slug}-export.zip`,
+          `${comic.slug}-export${zipSuffix}.zip`,
           'application/zip',
         )
       } else {
@@ -123,6 +127,18 @@ export function ComicExportButton({ comic, threads, draftHtml, lang, originalLan
       {label}
     </label>
   )
+  const pageRadio = (value: 'full' | 'low' | 'watermarked', label: string) => (
+    <label key={value} className="flex items-center gap-2 font-sans text-[0.8rem] text-brand-ink">
+      <input
+        type="radio"
+        name="export-page-quality"
+        checked={pageQuality === value}
+        onChange={() => setPageQuality(value)}
+        aria-label={label}
+      />
+      {label}
+    </label>
+  )
   const check = (checked: boolean, set: (v: boolean) => void, label: string) => (
     <label className="flex items-center gap-2 font-sans text-[0.8rem] text-brand-ink">
       <input type="checkbox" checked={checked} onChange={(e) => set(e.target.checked)} aria-label={label} />
@@ -152,7 +168,12 @@ export function ComicExportButton({ comic, threads, draftHtml, lang, originalLan
             {check(includeComments, setIncludeComments, 'Comments')}
             {hasScript && check(includeScript, setIncludeScript, 'Script')}
             {check(includeResolved, setIncludeResolved, "Include resolved / won't-fix threads")}
-            {check(watermarked, setWatermarked, 'Watermarked low-res pages (safe to circulate)')}
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="font-sans text-[0.68rem] font-semibold uppercase tracking-label text-brand-ink/60">Page images</span>
+            {pageRadio('full', 'Full resolution')}
+            {pageRadio('low', 'Low resolution')}
+            {pageRadio('watermarked', 'Low resolution + watermark')}
           </div>
           <button
             type="button"

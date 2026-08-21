@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'vitest'
 import {
-  scaleToFit, tilePositions, watermarkMetrics,
+  scaleToFit, tilePositions, watermarkMetrics, previewImageMap,
   PREVIEW_MAX_EDGE, WATERMARK_TEXT,
 } from '@/lib/watermark'
 
@@ -86,5 +86,27 @@ describe('watermarkMetrics', () => {
 describe('the mark itself', () => {
   test('is the Diamond Toons credit', () => {
     expect(WATERMARK_TEXT).toBe('© Diamond Toons')
+  })
+})
+
+describe('previewImageMap — resolution and the mark are independent', () => {
+  // No real canvas in jsdom, so previewPageJpeg always throws here. That makes
+  // this an honest test of the FAILURE policy, which differs by intent.
+  const one = () => new Map([[1, { bytes: new Uint8Array([1, 2, 3]), width: 2016, height: 2688 }]])
+
+  test('a page that cannot be STAMPED is dropped, never shipped unmarked', async () => {
+    const out = await previewImageMap(one(), { watermark: true })
+    expect(out.size).toBe(0)
+  })
+
+  test('a page that cannot be downscaled is kept — nothing leaks by keeping it', async () => {
+    const out = await previewImageMap(one(), { watermark: false })
+    expect(out.size).toBe(1)
+    expect(out.get(1)!.bytes).toEqual(new Uint8Array([1, 2, 3]))
+  })
+
+  test('an empty map stays empty either way', async () => {
+    expect((await previewImageMap(new Map(), { watermark: true })).size).toBe(0)
+    expect((await previewImageMap(new Map(), { watermark: false })).size).toBe(0)
   })
 })
