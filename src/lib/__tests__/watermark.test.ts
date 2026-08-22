@@ -39,10 +39,22 @@ describe('tilePositions', () => {
     expect(Math.max(...pts.map((p) => p.y))).toBeGreaterThanOrEqual(reach - 100)
   })
 
-  test('the grid is symmetric about the origin', () => {
+  test('alternate rows are staggered, so no clean vertical lane runs through', () => {
+    // Coverage, not symmetry, is the requirement: an unstaggered grid leaves
+    // straight lanes between the columns of marks.
     const pts = tilePositions(600, 600, 200, 200)
-    const xs = pts.map((p) => p.x)
-    expect(Math.abs(Math.min(...xs))).toBeCloseTo(Math.max(...xs), 5)
+    const rowY = [...new Set(pts.map((p) => p.y))].sort((a, b) => a - b)
+    const xsAt = (y: number) => pts.filter((p) => p.y === y).map((p) => p.x).sort((a, b) => a - b)
+    expect(xsAt(rowY[0])[0]).not.toBe(xsAt(rowY[1])[0])
+  })
+
+  test('the grid still reaches past the page in every direction', () => {
+    const pts = tilePositions(600, 800, 100, 100)
+    const reach = Math.hypot(600, 800)
+    expect(Math.min(...pts.map((p) => p.x))).toBeLessThanOrEqual(-reach + 100)
+    expect(Math.max(...pts.map((p) => p.x))).toBeGreaterThanOrEqual(reach - 100)
+    expect(Math.min(...pts.map((p) => p.y))).toBeLessThanOrEqual(-reach + 100)
+    expect(Math.max(...pts.map((p) => p.y))).toBeGreaterThanOrEqual(reach - 100)
   })
 
   test('a tighter step yields more marks', () => {
@@ -66,17 +78,24 @@ describe('watermarkMetrics', () => {
   })
 
   test('keeps a floor so a tiny page is still marked', () => {
-    expect(watermarkMetrics(60, 80).fontPx).toBeGreaterThanOrEqual(11)
+    expect(watermarkMetrics(60, 80).fontPx).toBeGreaterThanOrEqual(9)
   })
 
   test('the mark stays small and dense, not big and sparse', () => {
     // A 3x-larger mark was shipped and reverted: it left wide clean areas and
-    // read as clumsy over the art. On a 600x800 preview page the grid should
-    // give many marks, not a handful.
+    // read as clumsy over the art.
     const m = watermarkMetrics(600, 800)
-    expect(m.fontPx).toBeLessThanOrEqual(14)
-    expect(Math.floor(600 / m.stepX)).toBeGreaterThanOrEqual(6)
-    expect(Math.floor(800 / m.stepY)).toBeGreaterThanOrEqual(14)
+    expect(m.fontPx).toBeLessThanOrEqual(12)
+    expect(Math.floor(600 / m.stepX)).toBeGreaterThanOrEqual(7)
+    expect(Math.floor(800 / m.stepY)).toBeGreaterThanOrEqual(35)
+  })
+
+  test('marks never collide: the horizontal step clears the text width', () => {
+    // "© Diamond Toons" runs about 7.2x the font size. A step at 7.5x left them
+    // all but touching, which is the crowding this spacing exists to avoid.
+    const m = watermarkMetrics(600, 800)
+    const approxTextWidth = m.fontPx * 7.2
+    expect(m.stepX).toBeGreaterThan(approxTextWidth)
   })
 
   test('marks are spaced further apart horizontally than vertically', () => {
