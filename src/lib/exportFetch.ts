@@ -41,6 +41,39 @@ async function defaultMeasure(bytes: Uint8Array): Promise<{ width: number; heigh
   return dims
 }
 
+
+/**
+ * Fetch each page, preferring the 1200px web variant and falling back to the
+ * 2000px master WHEN THE FETCH FAILS.
+ *
+ * The fallback must happen at fetch time, not resolve time: `/resolve` presigns
+ * a URL whether or not the object exists, so a missing web variant is only
+ * discovered by asking for it. 29 comics were published before the derivatives
+ * existed, and every low-resolution download on them 404'd (Adnan, 2026-08-21).
+ *
+ * Small batches: 60+ parallel full-page fetches can stall the tab. Order is
+ * preserved, and a page that fails both ways comes back null rather than
+ * shifting every page after it.
+ */
+export async function fetchPagesWithFallback(
+  pairs: { webKey: string; masterKey: string }[],
+  urls: Record<string, string>,
+  preferWeb: boolean,
+  fetchBytes: (url: string) => Promise<Uint8Array | null> = defaultFetchBytes,
+): Promise<(Uint8Array | null)[]> {
+  const out: (Uint8Array | null)[] = new Array(pairs.length).fill(null)
+  const BATCH = 6
+  for (let i = 0; i < pairs.length; i += BATCH) {
+    await Promise.all(pairs.slice(i, i + BATCH).map(async (p, j) => {
+      let bytes: Uint8Array | null = null
+      if (preferWeb && urls[p.webKey]) bytes = await fetchBytes(urls[p.webKey])
+      if (!bytes && urls[p.masterKey]) bytes = await fetchBytes(urls[p.masterKey])
+      out[i + j] = bytes
+    }))
+  }
+  return out
+}
+
 export async function fetchExportImages(comic: Comic, deps?: Partial<FetchDeps>): Promise<FetchResult> {
   // Lazy import: dataApi initializes Firebase on load, which must not happen
   // in unit tests (they inject `resolve`) nor before the click that needs it.
