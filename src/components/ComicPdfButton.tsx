@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { PDFDocument } from 'pdf-lib'
 import type { Comic } from '@/types/content'
-import { comicPageKeys, comicWebPageKeys } from '@/lib/comicPageKeys'
+import { comicPageKeys, pickPageUrls, webVariantKey } from '@/lib/comicPageKeys'
 import { resolveUrls } from '@/lib/dataApi'
 import { previewPageJpeg } from '@/lib/watermark'
 
@@ -58,10 +58,17 @@ export function ComicPdfButton({ comic }: { comic: Comic }) {
     const small = variant !== 'full'
     setBusy(variant); setError(null)
     try {
-      const keys = small ? comicWebPageKeys(comic) : comicPageKeys(comic)
-      const urls = await resolveUrls(keys)
-      const ordered = keys.map((k) => urls[k]).filter(Boolean)
-      if (ordered.length === 0) throw new Error('no pages')
+      // Resolve the masters ALWAYS, and the web variants too when we want the
+      // small ones — then pick per page. A comic published before the web
+      // derivatives existed has none, and without the fallback the low-res
+      // download resolves nothing at all.
+      const masterKeys = comicPageKeys(comic)
+      const wanted = small
+        ? [...masterKeys.map(webVariantKey), ...masterKeys]
+        : masterKeys
+      const urls = await resolveUrls(wanted)
+      const ordered = pickPageUrls(masterKeys, urls, small)
+      if (ordered.length === 0) throw new Error('no pages resolved')
       type PageBytes = { bytes: Uint8Array; type: string }
       let images: PageBytes[] = await Promise.all(
         ordered.map(async (u) => {
@@ -102,8 +109,12 @@ export function ComicPdfButton({ comic }: { comic: Comic }) {
       document.body.appendChild(a); a.click(); a.remove()
       URL.revokeObjectURL(href)
     } catch (err) {
-      console.error('[ComicPdfButton]', err)
-      setError('Could not build the PDF. Please try again.')
+      // Name the STAGE. The first report of this feature failing was a bare
+      // "Could not build the PDF", which located nothing: the cause turned out
+      // to be pages resolving to zero URLs, several layers from the message.
+      console.error('[ComicPdfButton]', variant, err)
+      const detail = err instanceof Error ? err.message : String(err)
+      setError(`Could not build the ${variant === 'full' ? 'PDF' : 'preview'} — ${detail}. Please try again.`)
     } finally {
       setBusy(null)
     }
