@@ -28,26 +28,3 @@ export function webVariantKey(masterKey: string): string {
 export function comicWebPageKeys(comic: Comic): string[] {
   return comicPageKeys(comic).map(webVariantKey)
 }
-
-/**
- * Ordered page URLs, preferring the 1200px web variant and falling back to the
- * 2000px master PER PAGE.
- *
- * The web variants are an OPTIMISATION, not a guarantee: 29 comics were
- * published before the derivatives existed and have none. The reader already
- * falls back to masters; the downloads did not, so every low-resolution
- * download on those comics resolved zero URLs and died with "Could not build
- * the PDF" (Adnan, 2026-08-21). Falling back costs a larger fetch and nothing
- * else — a low-res download downscales the bytes anyway.
- *
- * `masterKeys` drives the ORDER; a page that resolved neither way is dropped
- * rather than left as a hole in the document.
- */
-export function pickPageUrls(
-  masterKeys: string[], urls: Record<string, string>, preferWeb: boolean,
-): string[] {
-  return masterKeys
-    .map((masterKey) =>
-      (preferWeb ? urls[webVariantKey(masterKey)] : undefined) ?? urls[masterKey])
-    .filter((u): u is string => !!u)
-}

@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import { PDFDocument } from 'pdf-lib'
 import type { Comic } from '@/types/content'
-import { comicPageKeys, pickPageUrls, webVariantKey } from '@/lib/comicPageKeys'
+import { comicPageKeys, webVariantKey } from '@/lib/comicPageKeys'
 import { resolveUrls } from '@/lib/dataApi'
+import { fetchPagesWithFallback } from '@/lib/exportFetch'
 import { previewPageJpeg } from '@/lib/watermark'
 
 /** True when the bytes start with the PNG 8-byte signature. */
@@ -58,26 +59,26 @@ export function ComicPdfButton({ comic }: { comic: Comic }) {
     const small = variant !== 'full'
     setBusy(variant); setError(null)
     try {
-      // Resolve the masters ALWAYS, and the web variants too when we want the
-      // small ones — then pick per page. A comic published before the web
-      // derivatives existed has none, and without the fallback the low-res
-      // download resolves nothing at all.
+      // Resolve the masters always, plus the web variants when we want the small
+      // ones, then fall back at FETCH time — `/resolve` signs a URL whether or
+      // not the object exists, so a missing web variant only shows up on fetch.
       const masterKeys = comicPageKeys(comic)
-      const wanted = small
-        ? [...masterKeys.map(webVariantKey), ...masterKeys]
-        : masterKeys
-      const urls = await resolveUrls(wanted)
-      const ordered = pickPageUrls(masterKeys, urls, small)
-      if (ordered.length === 0) throw new Error('no pages resolved')
-      type PageBytes = { bytes: Uint8Array; type: string }
-      let images: PageBytes[] = await Promise.all(
-        ordered.map(async (u) => {
-          const res = await fetch(u)
-          if (!res.ok) throw new Error(`fetch ${res.status}`)
-          const buf = new Uint8Array(await res.arrayBuffer())
-          return { bytes: buf, type: res.headers.get('content-type') ?? 'image/jpeg' }
-        }),
+      const pairs = masterKeys.map((masterKey) => ({
+        webKey: webVariantKey(masterKey), masterKey,
+      }))
+      const urls = await resolveUrls(
+        small ? [...pairs.map((p) => p.webKey), ...masterKeys] : masterKeys,
       )
+      const fetched = await fetchPagesWithFallback(pairs, urls, small)
+      type PageBytes = { bytes: Uint8Array; type: string }
+      let images: PageBytes[] = fetched
+        .filter((b): b is Uint8Array => b !== null)
+        .map((bytes) => ({ bytes, type: 'image/jpeg' }))
+      if (images.length === 0) throw new Error('no pages could be fetched')
+      if (images.length < masterKeys.length) {
+        throw new Error(
+          `${masterKeys.length - images.length} of ${masterKeys.length} pages could not be fetched`)
+      }
       if (small) {
         // Sequential, not Promise.all: a 64-page book would otherwise hold 64
         // decoded bitmaps and 64 canvases in memory at once.
