@@ -78,8 +78,11 @@ export function tilePositions(
   const rows = Math.ceil(reach / stepY)
   const points: { x: number; y: number }[] = []
   for (let j = -rows; j <= rows; j++) {
+    // Alternate rows are offset half a step, so the marks interlock instead of
+    // forming columns with clean vertical lanes running between them.
+    const offset = j % 2 === 0 ? 0 : stepX / 2
     for (let i = -cols; i <= cols; i++) {
-      points.push({ x: i * stepX, y: j * stepY })
+      points.push({ x: i * stepX + offset, y: j * stepY })
     }
   }
   return points
@@ -91,16 +94,18 @@ export function watermarkMetrics(width: number, height: number): {
   fontPx: number; stepX: number; stepY: number
 } {
   const base = Math.min(width, height)
-  const fontPx = Math.max(11, Math.round(base * 0.018))
+  const fontPx = Math.max(9, Math.round(base * 0.015))
   return {
     fontPx,
-    // Spacing scales WITH the text, so the marks tile rather than collide.
-    // Roughly 8 across and 18 down on a 600x800 page. A 3x-larger mark was
-    // tried and reverted (Adnan, 2026-08-21: "the font size is too big, and we
-    // have far too few watermarks") — big sparse marks leave wide clean areas
-    // and read as clumsy over the artwork.
-    stepX: Math.round(fontPx * 7.5),
-    stepY: Math.round(fontPx * 4.2),
+    // Spacing scales WITH the text. `stepX` is set from the text's own WIDTH
+    // (about 7.2x the font size for this string) plus a clear gap: at 7.5x the
+    // marks all but touched, which read as crowding. `stepY` is deliberately
+    // tight — the earlier 4.2 left wide empty bands between rows.
+    //
+    // On a 600x800 preview page: ~8 marks across, ~41 down, 6px of clear space
+    // between neighbours. Full coverage with nothing bare, nothing colliding.
+    stepX: Math.round(fontPx * 8.6),
+    stepY: Math.round(fontPx * 2.2),
   }
 }
 
