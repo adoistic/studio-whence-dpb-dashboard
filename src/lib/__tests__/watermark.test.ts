@@ -65,15 +65,18 @@ describe('watermarkMetrics', () => {
     expect(large.stepX).toBeGreaterThan(small.stepX)
   })
 
-  test('keeps a floor so a tiny page is still legibly marked', () => {
-    // Below ~12px the mark stops reading as words and becomes speckle.
-    expect(watermarkMetrics(60, 80).fontPx).toBeGreaterThanOrEqual(18)
+  test('keeps a floor so a tiny page is still marked', () => {
+    expect(watermarkMetrics(60, 80).fontPx).toBeGreaterThanOrEqual(11)
   })
 
-  test('the mark is large enough to read on a preview page', () => {
-    // 600x800 is a preview page at the current cap; the mark should be a
-    // comfortably readable size on it, not a fleck.
-    expect(watermarkMetrics(600, 800).fontPx).toBeGreaterThanOrEqual(28)
+  test('the mark stays small and dense, not big and sparse', () => {
+    // A 3x-larger mark was shipped and reverted: it left wide clean areas and
+    // read as clumsy over the art. On a 600x800 preview page the grid should
+    // give many marks, not a handful.
+    const m = watermarkMetrics(600, 800)
+    expect(m.fontPx).toBeLessThanOrEqual(14)
+    expect(Math.floor(600 / m.stepX)).toBeGreaterThanOrEqual(6)
+    expect(Math.floor(800 / m.stepY)).toBeGreaterThanOrEqual(14)
   })
 
   test('marks are spaced further apart horizontally than vertically', () => {

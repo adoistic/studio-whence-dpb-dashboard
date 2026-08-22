@@ -91,14 +91,14 @@ export function watermarkMetrics(width: number, height: number): {
   fontPx: number; stepX: number; stepY: number
 } {
   const base = Math.min(width, height)
-  const fontPx = Math.max(18, Math.round(base * 0.054))
+  const fontPx = Math.max(11, Math.round(base * 0.018))
   return {
     fontPx,
     // Spacing scales WITH the text, so the marks tile rather than collide.
-    // Roughly 3 across and 6 down on a 600x800 page: large enough that
-    // "© Diamond Toons" is legible on every one of them. A much denser grid of
-    // small marks was tried and rejected — below ~12px the words stop reading
-    // and the page just looks dirty, which defeats a credit watermark.
+    // Roughly 8 across and 18 down on a 600x800 page. A 3x-larger mark was
+    // tried and reverted (Adnan, 2026-08-21: "the font size is too big, and we
+    // have far too few watermarks") — big sparse marks leave wide clean areas
+    // and read as clumsy over the artwork.
     stepX: Math.round(fontPx * 7.5),
     stepY: Math.round(fontPx * 4.2),
   }
