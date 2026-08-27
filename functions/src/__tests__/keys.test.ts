@@ -133,4 +133,24 @@ describe('safeKey', () => {
   test('sites/ traversal is rejected via /read', () => {
     expect(safeKey('sites/../secrets/x', READ_PREFIXES)).toBeNull()
   })
+
+  test('/read allows panels/ keys (Panels-view page model)', () => {
+    expect(
+      safeKey('panels/biographies/01-betting-on-the-impossible.json', READ_PREFIXES)
+    ).toBe('panels/biographies/01-betting-on-the-impossible.json')
+  })
+
+  test('panels/ is NOT presignable via /resolve', () => {
+    expect(
+      safeKey('panels/biographies/01-betting-on-the-impossible.json', RESOLVE_PREFIXES)
+    ).toBeNull()
+  })
+
+  test('panels/ traversal is rejected via /read', () => {
+    expect(safeKey('panels/../secrets/x.json', READ_PREFIXES)).toBeNull()
+  })
+
+  test('panels/ rejects double-encoded traversal that survives one decode', () => {
+    expect(safeKey('panels/%2e%2e/secrets/x.json', READ_PREFIXES)).toBeNull()
+  })
 })

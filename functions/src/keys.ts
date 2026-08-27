@@ -29,13 +29,17 @@ export const RESOLVE_PREFIXES = [
 
 /** Prefixes readable through `/read` (proxied text). Narrower than resolve.
  * `ai-conversations/` serves transcript bytes inline like the other `/read`
- * prefixes — it is deliberately NOT in RESOLVE_PREFIXES (never presigned). */
+ * prefixes — it is deliberately NOT in RESOLVE_PREFIXES (never presigned).
+ * `panels/` (the Panels-view JSON page model) is the same shape: served
+ * inline as text by `/read` and deliberately NOT in RESOLVE_PREFIXES, so it
+ * can never be presigned into a standalone downloadable URL. */
 export const READ_PREFIXES = [
   'research/',
   'drafts/',
   'docs/',
   'ai-conversations/',
   'sites/',
+  'panels/',
 ] as const;
 
 /** Prefixes writable through the presigned-PUT /upload-url route. */

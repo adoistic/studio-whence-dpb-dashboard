@@ -67,6 +67,9 @@ export interface AllocationDeps {
  *   - `drafts/{line}/{slug}.html`
  *       → { comicId: `{line}__{slug}`, line }. Subject is NOT in the path; it
  *         must be looked up from the comic doc (done in isKeyAllowedForMember).
+ *   - `panels/{line}/{slug}.json` (Panels-view page model)
+ *       → same shape/resolution as `drafts/{line}/{slug}.html` above, so it
+ *         maps to the identical comicId as that comic's draft.
  *   - `research/{rel}` where `rel` is a repo-relative POSIX path:
  *       biographies: `research/biographies/NN-…/_books/{subject}/…`
  *         → line = first segment after `research/`; subject = segment after `_books/`.
@@ -118,6 +121,19 @@ export function scopeOfKey(key: string): KeyScope {
     const file = parts[2]
     if (!line || !file) return {}
     const slug = file.replace(/\.html$/i, '')
+    if (!slug) return {}
+    return { line, comicId: `${line}__${slug}` }
+  }
+
+  // ── panels/{line}/{slug}.json (Panels-view page model) ───────────────────
+  //   Same shape as drafts/{line}/{slug}.html above, so it resolves to the
+  //   SAME comicId as that comic's draft — a comic/line/figure/program grant
+  //   that unlocks the draft unlocks its panel model too, nothing wider.
+  if (top === 'panels') {
+    const line = parts[1]
+    const file = parts[2]
+    if (!line || !file) return {}
+    const slug = file.replace(/\.json$/i, '')
     if (!slug) return {}
     return { line, comicId: `${line}__${slug}` }
   }

@@ -166,6 +166,19 @@ describe('scopeOfKey', () => {
         comicId: 'legacy__hanuman-celestial-superpower',
       },
     },
+    {
+      name: 'panels/{line}/{slug}.json → comicId + line (same shape as drafts)',
+      key: 'panels/biographies/01-betting-on-the-impossible.json',
+      expected: {
+        line: 'biographies',
+        comicId: 'biographies__01-betting-on-the-impossible',
+      },
+    },
+    {
+      name: 'panels malformed (missing slug segment) → {} (not a partial scope)',
+      key: 'panels/onlyoneseg.json',
+      expected: {},
+    },
   ]
 
   for (const c of cases) {
@@ -343,6 +356,22 @@ describe('isKeyAllowedForMember', () => {
       alloc({ comics: ['biographies__01-the-debut'] })
     )
     expect(ok).toBe(true)
+  })
+
+  test('comic grant allows the equivalent panels key (same comicId as its draft)', async () => {
+    const ok = await isKeyAllowedForMember(
+      'panels/biographies/01-the-debut.json',
+      alloc({ comics: ['biographies__01-the-debut'] })
+    )
+    expect(ok).toBe(true)
+  })
+
+  test('panels key: member without the grant is denied', async () => {
+    const ok = await isKeyAllowedForMember(
+      'panels/biographies/01-the-debut.json',
+      alloc({ comics: ['biographies__02-someone-else'] })
+    )
+    expect(ok).toBe(false)
   })
 
   test('draft key: RAW figure grant matched via comic-doc subject lookup', async () => {
