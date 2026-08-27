@@ -112,6 +112,108 @@ describe('PanelView', () => {
   })
 })
 
+// The canonical interleaved-turn case: MAYE speaks, ELON replies, MAYE speaks
+// again. This is the shape a per-speaker "stack all of MAYE's lines together"
+// regression would get wrong: it would place her second line right after her
+// first (same or adjacent row, ignoring ELON's turn in between) instead of
+// after ELON's, in actual script order.
+function canonicalDialoguePanel(rect: [number, number, number, number] = [0, 0, 12, 8]) {
+  return {
+    number: 1,
+    ref: 'p1.pl1',
+    rect,
+    note: null,
+    artRef: 'p1.pl1.art',
+    artBrief: '',
+    artSrcCount: 0,
+    crowded: false,
+    turns: 3,
+    narration: [],
+    sfx: [],
+    columns: [
+      {
+        name: 'MAYE',
+        figure: 'woman',
+        boxes: [
+          { ref: 'p1.pl1.b1', kind: 'dialogue' as const, text: 'you can do this.', speaker: 'MAYE', srcCount: 0, turn: 0, column: 0 },
+          { ref: 'p1.pl1.b3', kind: 'dialogue' as const, text: 'i knew it.', speaker: 'MAYE', srcCount: 0, turn: 2, column: 0 },
+        ],
+      },
+      {
+        name: 'ELON',
+        figure: 'boy',
+        boxes: [
+          { ref: 'p1.pl1.b2', kind: 'dialogue' as const, text: 'i will try.', speaker: 'ELON', srcCount: 0, turn: 1, column: 1 },
+        ],
+      },
+    ],
+  }
+}
+
+function dialogueModel(rect: [number, number, number, number] = [0, 0, 12, 8]): PanelModel {
+  return {
+    schema: 1,
+    title: 'Canonical cascade fixture',
+    aspect: 1.44,
+    grid: { cols: 12, rows: 16 },
+    errors: [],
+    pages: [{ number: 1, ref: 'p1', layoutId: '1a', panels: [canonicalDialoguePanel(rect)] }],
+  }
+}
+
+describe('PanelView — dialogue cascade grid placement (regression guard)', () => {
+  // These tests read the actual inline `style.gridColumn` / `style.gridRow`
+  // off the rendered cells. A prior test asserting only "the last balloon has
+  // a tail" cannot distinguish the correct interleaved cascade from a
+  // regression back to per-speaker stacking — both would still put a tail on
+  // MAYE's second line. These assertions can only pass if turn 0/1/2 land on
+  // three DISTINCT rows in script order.
+  test("Maye's first line sits at column 1, row 1", () => {
+    render(<PanelView model={dialogueModel()} />)
+    const cell = screen.getByText('YOU CAN DO THIS.').closest('.pv-dialogue-cell') as HTMLElement
+    expect(cell.style.gridColumn).toBe('1')
+    expect(cell.style.gridRow).toBe('1')
+  })
+
+  test("Elon's reply sits at column 2, row 2", () => {
+    render(<PanelView model={dialogueModel()} />)
+    const cell = screen.getByText('I WILL TRY.').closest('.pv-dialogue-cell') as HTMLElement
+    expect(cell.style.gridColumn).toBe('2')
+    expect(cell.style.gridRow).toBe('2')
+  })
+
+  test("Maye's second line sits at column 1, row 3 — NOT row 2 stacked under her first line", () => {
+    render(<PanelView model={dialogueModel()} />)
+    const cell = screen.getByText('I KNEW IT.').closest('.pv-dialogue-cell') as HTMLElement
+    expect(cell.style.gridColumn).toBe('1')
+    // The failing case for a per-speaker-stack regression: it would land this
+    // at row 2 (right after Maye's own first line) instead of row 3 (after
+    // Elon's intervening turn, in true script order).
+    expect(cell.style.gridRow).toBe('3')
+    expect(cell.style.gridRow).not.toBe('2')
+  })
+
+  test('the figure/speaker-name row sits strictly below every balloon row (turns + 1)', () => {
+    render(<PanelView model={dialogueModel()} />)
+    const mayeFigureCell = screen.getByText('MAYE').closest('.pv-figure-cell') as HTMLElement
+    const elonFigureCell = screen.getByText('ELON').closest('.pv-figure-cell') as HTMLElement
+    // turns is 3, so the figure row is row 4 — one past the highest balloon row (3).
+    expect(mayeFigureCell.style.gridRow).toBe('4')
+    expect(mayeFigureCell.style.gridColumn).toBe('1')
+    expect(elonFigureCell.style.gridRow).toBe('4')
+    expect(elonFigureCell.style.gridColumn).toBe('2')
+  })
+
+  test('the panel element itself converts a non-trivial zero-based rect to one-based grid placement', () => {
+    // rect = [col:6, row:4, w:6, h:5] → CSS grid lines are 1-based, so this
+    // must render as column-start 7 spanning 6, row-start 5 spanning 5.
+    render(<PanelView model={dialogueModel([6, 4, 6, 5])} />)
+    const panelEl = document.querySelector('[data-panel-ref="p1.pl1"]') as HTMLElement
+    expect(panelEl.style.gridColumn).toBe('7 / span 6')
+    expect(panelEl.style.gridRow).toBe('5 / span 5')
+  })
+})
+
 describe('parsePanelModel', () => {
   test('returns null for non-JSON text', () => {
     expect(parsePanelModel('not json')).toBeNull()
