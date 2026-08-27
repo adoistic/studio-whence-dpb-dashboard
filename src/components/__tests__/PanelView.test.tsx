@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest'
+import { describe, test, expect, afterEach } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import { PanelView } from '../PanelView'
 import { parsePanelModel, panelsKeyFor, type PanelModel } from '@/lib/panelModel'
@@ -211,6 +211,66 @@ describe('PanelView — dialogue cascade grid placement (regression guard)', () 
     const panelEl = document.querySelector('[data-panel-ref="p1.pl1"]') as HTMLElement
     expect(panelEl.style.gridColumn).toBe('7 / span 6')
     expect(panelEl.style.gridRow).toBe('5 / span 5')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Task 3 (spec §3.3): the page box is fixed, so a panel never grows past its
+// grid row and never scrolls — an over-full box clips, and a small
+// "OVERFLOWS" corner tag reveals when that happened. Before this fix,
+// `.pv-panel` used `overflow: visible; align-self: start; height: auto;
+// min-height: 100%` to let a panel grow instead of clip — but the grid ROW it
+// sat in never grew to match, so the grown panel simply painted over the
+// panel below it on the page (the overlap bug). There was also no overflow
+// tag of any kind. jsdom does no real layout, so scrollHeight/clientHeight
+// are mocked directly on HTMLElement.prototype to exercise both branches.
+// ---------------------------------------------------------------------------
+
+describe('PanelView — overflow marker (Task 3 regression guard)', () => {
+  afterEach(() => {
+    // Only remove the override THIS suite adds; leave jsdom's own
+    // (unrelated) definitions on Element.prototype alone.
+    if (Object.prototype.hasOwnProperty.call(HTMLElement.prototype, 'scrollHeight')) {
+      delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollHeight
+    }
+    if (Object.prototype.hasOwnProperty.call(HTMLElement.prototype, 'clientHeight')) {
+      delete (HTMLElement.prototype as unknown as Record<string, unknown>).clientHeight
+    }
+  })
+
+  function mockOverflow(scrollHeight: number, clientHeight: number) {
+    Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+      configurable: true,
+      value: scrollHeight,
+    })
+    Object.defineProperty(HTMLElement.prototype, 'clientHeight', {
+      configurable: true,
+      value: clientHeight,
+    })
+  }
+
+  test('a panel whose measured content exceeds its box shows the OVERFLOWS tag', () => {
+    mockOverflow(500, 100)
+    render(<PanelView model={model()} />)
+    expect(screen.getByText('OVERFLOWS')).toBeInTheDocument()
+  })
+
+  test('a panel whose measured content fits its box shows no OVERFLOWS tag', () => {
+    mockOverflow(100, 100)
+    render(<PanelView model={model()} />)
+    expect(screen.queryByText('OVERFLOWS')).not.toBeInTheDocument()
+  })
+
+  test('the panel clips instead of growing past its grid row (no overlap)', () => {
+    // The regression this replaces: `overflow: visible` + `height: auto` let
+    // a panel grow past the grid row it was placed in, with nothing
+    // reserving that extra space — so it painted over the panel below.
+    render(<PanelView model={model()} />)
+    const styleText = document.querySelector('style')?.textContent ?? ''
+    const panelRule = styleText.split('.pv-panel {')[1]?.split('}')[0] ?? ''
+    expect(panelRule).toContain('overflow: hidden')
+    expect(panelRule).not.toContain('overflow: visible')
+    expect(panelRule).not.toContain('height: auto')
   })
 })
 

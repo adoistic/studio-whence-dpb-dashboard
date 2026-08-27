@@ -17,13 +17,21 @@
  * existing feedback system (`src/components/feedback/anchorRef.ts`) walks the
  * DOM for those attributes to anchor comments. Do not rename or drop them.
  *
- * One deliberate divergence from the print-oriented reference: this is a
- * scrolling web view, not a paginated PDF, so a panel here never clips or
- * scrolls its own content — an over-full box simply grows the panel instead
- * (see `.pv-panel` below). The print renderer clips, because a PDF page can't
- * grow.
+ * Per spec §3.3, the page box is FIXED (a comic page has a fixed aspect
+ * ratio) in every renderer, this one included — a panel never grows taller
+ * than its grid row and never scrolls; an over-full box clips, exactly like
+ * `tools/panel_preview.py`. An earlier version of this component let a
+ * `.pv-panel` grow past its row's height (`overflow: visible; height: auto`)
+ * on the theory that a scrolling web view didn't need to clip — but the grid
+ * row itself did NOT grow to match, so the panel simply painted over the
+ * panel(s) below it on the page. Silent clipping alone would still hide real
+ * "this text is too long" information from a reviewer, so each panel body is
+ * measured after render (scrollHeight vs clientHeight) and a panel whose
+ * content didn't fit gets a small `OVERFLOWS` corner tag — see
+ * `usePanelOverflow` below.
  */
 
+import { useLayoutEffect, useRef, useState } from 'react'
 import type { ModelPage, ModelPanel, PanelBox, PanelModel, SpeakerColumn } from '@/lib/panelModel'
 
 // ---------------------------------------------------------------------------
@@ -252,10 +260,50 @@ function insetReservations(panels: ModelPanel[]): Map<string, [number, number]> 
   return reservations
 }
 
+/**
+ * Measures a panel body's rendered content against its (clipped) box height
+ * after every render and re-measures on any resize, so `.pv-panel-overflow-tag`
+ * only shows when content genuinely didn't fit. Ported from
+ * `tools/panel_preview.py`'s inline `_OVERFLOW_SCRIPT` (which reads
+ * scrollHeight vs clientHeight once layout has happened) — same signal, React
+ * idiom instead of a raw `<script>`.
+ *
+ * `useLayoutEffect` runs synchronously after DOM mutations and before the
+ * browser paints, so the tag never visibly flashes in the wrong state.
+ * ResizeObserver is optional (guarded — not available in every test/SSR
+ * environment) and only refines the initial measurement on a later resize;
+ * the effect always measures at least once on mount/update regardless.
+ */
+function usePanelOverflow(deps: unknown): [React.RefObject<HTMLDivElement | null>, boolean] {
+  const ref = useRef<HTMLDivElement>(null)
+  const [overflows, setOverflows] = useState(false)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const measure = () => setOverflows(el.scrollHeight - el.clientHeight > 1)
+    measure()
+    window.addEventListener('resize', measure)
+    let ro: ResizeObserver | undefined
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(measure)
+      ro.observe(el)
+    }
+    return () => {
+      window.removeEventListener('resize', measure)
+      ro?.disconnect()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deps])
+
+  return [ref, overflows]
+}
+
 function PanelBlock({ panel, reserve }: { panel: ModelPanel; reserve: [number, number] }) {
   const [col, row, w, h] = panel.rect
   const [topFrac, bottomFrac] = reserve
   const crowded = !!panel.crowded
+  const [bodyRef, overflows] = usePanelOverflow(panel)
 
   return (
     <div
@@ -265,7 +313,8 @@ function PanelBlock({ panel, reserve }: { panel: ModelPanel; reserve: [number, n
     >
       <div className="pv-panel-number">{panel.number}</div>
       {panel.note && <div className="pv-panel-note">{panel.note}</div>}
-      <div className="pv-panel-body">
+      {overflows && <div className="pv-panel-overflow-tag">OVERFLOWS</div>}
+      <div className="pv-panel-body" ref={bodyRef}>
         {topFrac > 0 && <div style={{ flex: `0 0 ${(topFrac * 100).toFixed(1)}%` }} />}
         {panel.narration.length > 0 && (
           <div className="pv-narration-stack">
@@ -406,15 +455,32 @@ const PV_CSS = `
   background: var(--pv-paper);
   display: flex;
   flex-direction: column;
-  overflow: visible;
-  align-self: start;
-  height: auto;
-  min-height: 100%;
+  overflow: hidden;
   padding: 2px 4px 3px;
   min-width: 0;
+  min-height: 0;
 }
 
 .pv-panel-crowded { background: var(--pv-crowded-bg); }
+
+/* Spec §3.3: the page box is fixed, so a panel's own box never grows past
+   its grid row -- content that doesn't fit clips here instead of overlapping
+   the panel below (the bug this replaced: overflow visible + height auto let
+   a panel grow past its row with nothing reserving that extra space). */
+.pv-panel-overflow-tag {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  background: var(--pv-error-border);
+  color: #fff;
+  font-size: 6px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 1px 4px;
+  border-radius: 2px;
+  z-index: 6;
+  line-height: 1.4;
+}
 
 .pv-panel-note {
   position: absolute;
@@ -443,10 +509,12 @@ const PV_CSS = `
 
 .pv-panel-body {
   flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding-top: 10px;
+  overflow: hidden;
 }
 
 .pv-narration-stack, .pv-sfx-stack {
