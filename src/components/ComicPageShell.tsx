@@ -22,6 +22,8 @@ import { ComicDocxButton } from '@/components/ComicDocxButton'
 import { ComicExportButton } from '@/components/ComicExportButton'
 import { AmazonModulesPanel } from '@/components/AmazonModulesPanel'
 import { useGatedText } from '@/lib/useGatedText'
+import { parsePanelModel, panelsKeyFor } from '@/lib/panelModel'
+import { PanelView } from '@/components/PanelView'
 import { useFigure } from '@/lib/catalog'
 import { useVisibleComics } from '@/lib/visibleCatalog'
 import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
@@ -83,6 +85,16 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
   const languages = useMemo(() => comicLanguages(comic), [comic])
   const [lang, setLang] = useState(() => languages[0].code)
   const draft = useGatedText(draftKeyFor(comic, lang))
+
+  // ── Script ⇄ Panels view ─────────────────────────────────────────────────
+  // The panel model is an approximate comic-page rehearsal built from the same
+  // script — a 12x16 grid of panels with narration/dialogue as boxes/balloons
+  // instead of finished art. It is published separately from the draft and may
+  // not exist yet for a given comic, so parsing is a soft failure: an absent or
+  // unparseable model just means the Panels view isn't offered.
+  const panels = useGatedText(panelsKeyFor(comic.line, comic.slug))
+  const panelModel = useMemo(() => parsePanelModel(panels.text), [panels.text])
+  const [pageMode, setPageMode] = useState<'script' | 'panels'>('script')
 
   const scriptRef = useRef<HTMLDivElement>(null)
   const figureSlug = normalizeSubjectSlug(comic.subject_slug)
@@ -417,6 +429,48 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
                   )
                 })}
               </div>
+              {/* Script ⇄ Panels toggle — only meaningful in the Draft view,
+                  since it swaps what mounts inside scriptRef. Panels is
+                  disabled (never hidden) when no publishable model exists, so
+                  the affordance is discoverable and its absence explained. */}
+              {view === 'draft' && (
+                <div
+                  role="tablist"
+                  aria-label="Page rendering"
+                  className="inline-flex items-center gap-0.5 rounded-full border border-brand-pale-dusk bg-brand-threshold/70 p-0.5 font-sans"
+                >
+                  {([
+                    { key: 'script', label: 'Script', disabled: false },
+                    {
+                      key: 'panels',
+                      label: 'Panels',
+                      disabled: !panelModel,
+                    },
+                  ] as const).map(({ key, label, disabled }) => {
+                    const active = pageMode === key
+                    return (
+                      <button
+                        key={key}
+                        type="button"
+                        role="tab"
+                        aria-selected={active}
+                        disabled={disabled}
+                        title={disabled ? 'Panel view not published for this comic yet.' : undefined}
+                        onClick={() => setPageMode(key)}
+                        className={`rounded-full px-4 py-1.5 font-sans text-[0.72rem] font-semibold uppercase tracking-label transition-colors ${
+                          active
+                            ? 'bg-brand-indigo text-brand-pale-dusk shadow-sm'
+                            : disabled
+                              ? 'cursor-not-allowed text-brand-slate/40'
+                              : 'text-brand-slate hover:text-brand-indigo'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    )
+                  })}
+                </div>
+              )}
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 {draft.text && <ComicDocxButton comic={comic} draftHtml={draft.text} />}
@@ -435,8 +489,18 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
                   shows between sheets and the page structure is obvious. */}
               <div className="min-w-0 flex-1">
                 <div className="mx-auto max-w-[760px]">
-                  <DraftScript html={draft.text} innerRef={scriptRef} />
-                  {tip && <ProvenanceTooltip {...tip} />}
+                  {pageMode === 'panels' && panelModel ? (
+                    // Same scriptRef container as the Draft view, so
+                    // indexUnits(scriptRef.current) keeps finding whichever
+                    // rendering is mounted — comments, the gutter, snapshots
+                    // and version diffing all work unchanged.
+                    <div ref={scriptRef}>
+                      <PanelView model={panelModel} />
+                    </div>
+                  ) : (
+                    <DraftScript html={draft.text} innerRef={scriptRef} />
+                  )}
+                  {pageMode === 'script' && tip && <ProvenanceTooltip {...tip} />}
                 </div>
               </div>
               {/* The comment margin — sticky beside the page, scrolls on its own.
