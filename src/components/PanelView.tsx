@@ -394,7 +394,7 @@ function PanelBlock({ panel, insets = [] }: { panel: ModelPanel; insets?: ModelP
 function PageBlock({ page, aspect }: { page: ModelPage; aspect: number }) {
   const { hosted, insetRefs } = insetHosts(page.panels)
   return (
-    <div className="pv-page-shell">
+    <div className="pv-page-shell" style={{ ['--pv-aspect' as string]: String(aspect) }}>
       <div className="pv-page-label">
         <span className="pv-page-num">Page {page.number}</span>
         <span className="pv-page-meta">
@@ -489,6 +489,8 @@ const PV_CSS = `
    began. The page now carries a solid header bar and a heavy frame; panels
    carry a filled numbered badge. */
 .pv-page-shell {
+  /* The query container for the page's portrait floor below. */
+  container-type: inline-size;
   margin: 0 0 44px;
   background: var(--pv-paper);
   border: 2px solid var(--pv-ink);
@@ -519,9 +521,16 @@ const PV_CSS = `
   opacity: 0.75;
 }
 
+/* A comic page is PORTRAIT, and it must look it. Height is content-driven so
+   a dense page can grow rather than clip -- but with no floor, a sparse page
+   collapsed to whatever its text needed and came out wider than it was tall
+   (measured: 0.78, 0.94, 1.13 against the 1.44 a real page has). The
+   container query gives portrait proportions as a MINIMUM: the page is
+   always at least width x aspect, and still free to grow past it. */
 .pv-comic-page {
   position: relative;
   width: 100%;
+  min-height: calc(100cqw * var(--pv-aspect, 1.44));
   display: grid;
   grid-template-columns: repeat(12, 1fr);
   grid-template-rows: repeat(16, minmax(28px, auto));
