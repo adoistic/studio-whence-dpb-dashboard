@@ -334,6 +334,22 @@ function PanelBody({ panel, bodyRef }: {
         </div>
       )}
       <DialogueCascade panel={panel} />
+      {/* Characters the Art line puts in this panel who say nothing here.
+          Drawing only speakers made them disappear, so a reviewer could not
+          see who was actually in the scene. Marked distinctly because their
+          presence is inferred from the Art line, not stated by a speaker
+          tag -- a wrong guess must be visible, not silently mixed in. */}
+      {(panel.silent?.length ?? 0) > 0 && (
+        <div className="pv-silent-row">
+          {panel.silent!.map((s) => (
+            <div className="pv-figure-cell pv-figure-silent" key={`silent-${s.name}`}>
+              <FigureSvg kind={s.figure || DEFAULT_FIGURE} />
+              <div className="pv-speaker-name">{upper(s.name)}</div>
+              <div className="pv-silent-tag">no line here</div>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="pv-art-brief" data-beat-ref={panel.artRef}>
         {panel.artBrief || ''}
       </div>
@@ -380,7 +396,10 @@ function PageBlock({ page, aspect }: { page: ModelPage; aspect: number }) {
   return (
     <div className="pv-page-shell">
       <div className="pv-page-label">
-        PAGE {page.number} &middot; layout {page.layoutId}
+        <span className="pv-page-num">Page {page.number}</span>
+        <span className="pv-page-meta">
+          {page.panels.length} panel{page.panels.length === 1 ? '' : 's'} &middot; layout {page.layoutId}
+        </span>
       </div>
       <section
         className="pv-comic-page"
@@ -464,16 +483,40 @@ const PV_CSS = `
 }
 .pv-errors ul { margin: 4px 0 0; padding-left: 18px; }
 
+/* A page must read as a distinct SHEET and a panel as a division within it.
+   At 11px grey the page label was easy to miss entirely, so scrolling a
+   48-page script gave no clear sense of where one page ended and the next
+   began. The page now carries a solid header bar and a heavy frame; panels
+   carry a filled numbered badge. */
 .pv-page-shell {
-  margin: 0 0 32px;
+  margin: 0 0 44px;
   background: var(--pv-paper);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  border: 2px solid var(--pv-ink);
+  border-radius: 3px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.22);
+  overflow: hidden;
 }
 
 .pv-page-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--pv-ink);
+  color: var(--pv-paper);
+  padding: 7px 12px;
+}
+.pv-page-num {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.pv-page-meta {
   font-size: 11px;
-  color: #666;
-  padding: 6px 10px 0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.75;
 }
 
 .pv-comic-page {
@@ -555,10 +598,16 @@ const PV_CSS = `
 
 .pv-panel-number {
   position: absolute;
-  top: 3px;
-  left: 5px;
+  top: 0;
+  left: 0;
+  min-width: 20px;
+  text-align: center;
   font-size: 11px;
-  color: #999;
+  font-weight: 700;
+  color: var(--pv-paper);
+  background: var(--pv-ink);
+  padding: 1px 5px 2px;
+  border-bottom-right-radius: 4px;
   z-index: 5;
   line-height: 1.4;
 }
@@ -569,7 +618,7 @@ const PV_CSS = `
   display: flex;
   flex-direction: column;
   gap: 5px;
-  padding-top: 16px;
+  padding-top: 19px;
   overflow: hidden;
 }
 
@@ -681,6 +730,24 @@ const PV_CSS = `
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.pv-silent-row {
+  flex: 0 0 auto;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 6px;
+}
+.pv-figure-silent { opacity: 0.55; }
+.pv-figure-silent .pv-figure-svg { stroke-dasharray: 5 4; }
+.pv-silent-tag {
+  font-size: 8px;
+  font-style: italic;
+  color: #888;
+  text-align: center;
+  margin-top: 1px;
 }
 
 .pv-art-brief {

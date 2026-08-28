@@ -43,6 +43,10 @@ export interface ModelPanel {
   narration: PanelBox[]
   columns: SpeakerColumn[]
   sfx: PanelBox[]
+  /** Characters the Art line places in the panel who have no line in it.
+   *  Inferred from the Art line against the comic's own speaking cast, so it
+   *  is a best guess -- rendered visibly distinct from real speakers. */
+  silent?: { name: string; figure: string }[]
 }
 
 export interface ModelPage {
