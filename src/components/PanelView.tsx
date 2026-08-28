@@ -32,7 +32,7 @@
  */
 
 import { useLayoutEffect, useRef, useState } from 'react'
-import type { ModelPage, ModelPanel, PanelBox, PanelModel, SpeakerColumn } from '@/lib/panelModel'
+import type { ModelPage, ModelPanel, PanelBox, PanelModel } from '@/lib/panelModel'
 
 // ---------------------------------------------------------------------------
 // Stick figures — one inline SVG per silhouette type, ported 1:1 from
@@ -176,47 +176,52 @@ function DialogueCascade({ panel }: { panel: ModelPanel }) {
     }
   })
 
-  const balloonCells: React.ReactNode[] = []
+  // Each speaker's figure sits in the SAME grid row as that speaker's OWN
+  // last balloon -- not a single shared row at the foot of the whole cascade.
+  // A shared final row disconnects a figure from its own dialogue whenever
+  // OTHER columns keep talking after this speaker's last line: with three
+  // speakers where one speaks only once early on, a shared-row figure sits
+  // two, three, sometimes many rows below the balloon it actually belongs
+  // to, with unrelated speakers' balloons visibly in between. Anchoring each
+  // figure to lastTurnByCol -- data already computed for the balloon tail --
+  // keeps every figure mathematically adjacent to the dialogue it answers
+  // for, deterministically, with no separate "figure row" concept at all.
+  const cells: React.ReactNode[] = []
   columns.forEach((col, cIdx) => {
     for (const box of col.boxes) {
       if (box.turn == null) continue
       const c = box.column ?? cIdx
       const isLast = box.turn === lastTurnByCol.get(c)
-      balloonCells.push(
+      cells.push(
         <div
           key={box.ref}
           className="pv-dialogue-cell"
           style={{ gridColumn: c + 1, gridRow: box.turn + 1 }}
         >
           <DialogueBox box={box} speaker={col.name} />
-          {isLast && <div className="pv-balloon-tail" />}
+          {isLast && (
+            <>
+              <div className="pv-balloon-tail" />
+              <div className="pv-figure-cell">
+                <FigureSvg kind={col.figure || DEFAULT_FIGURE} />
+                <div className="pv-speaker-name">{upper(col.name)}</div>
+              </div>
+            </>
+          )}
         </div>,
       )
     }
   })
-
-  const figureRow = turns + 1
-  const figureCells = columns.map((col: SpeakerColumn, cIdx: number) => (
-    <div
-      key={`figure-${cIdx}-${col.name}`}
-      className="pv-figure-cell"
-      style={{ gridColumn: cIdx + 1, gridRow: figureRow }}
-    >
-      <FigureSvg kind={col.figure || DEFAULT_FIGURE} />
-      <div className="pv-speaker-name">{upper(col.name)}</div>
-    </div>
-  ))
 
   return (
     <div
       className="pv-dialogue-grid"
       style={{
         gridTemplateColumns: `repeat(${columns.length}, 1fr)`,
-        gridTemplateRows: `repeat(${turns}, auto) auto`,
+        gridTemplateRows: `repeat(${turns}, auto)`,
       }}
     >
-      {balloonCells}
-      {figureCells}
+      {cells}
     </div>
   )
 }

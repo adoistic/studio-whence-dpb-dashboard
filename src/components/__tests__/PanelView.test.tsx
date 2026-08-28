@@ -195,23 +195,41 @@ describe('PanelView — dialogue cascade grid placement (regression guard)', () 
     expect(cell.style.gridRow).not.toBe('2')
   })
 
-  test('the figure/speaker-name row sits strictly below every balloon row (turns + 1)', () => {
+  test("each speaker's figure sits in the SAME row as that speaker's own last balloon (Adnan, 2026-08-28)", () => {
+    // A shared figure row at the foot of the whole cascade disconnects a
+    // figure from its own dialogue whenever another column keeps talking
+    // afterward: with MAYE(turn0)/ELON(turn1)/MAYE(turn2), a shared row would
+    // put BOTH figures at row 4, dragging ELON's figure two rows below his
+    // own (and only) line, with MAYE's unrelated second line sitting visibly
+    // in between. Each figure now lives inside the SAME .pv-dialogue-cell as
+    // that column's own last turn -- deterministically, from lastTurnByCol,
+    // the same data that already decides which balloon gets the tail.
     render(<PanelView model={dialogueModel()} />)
-    // Each speaker's name now appears twice by design: once on every one of
-    // their balloons (.pv-balloon-speaker, so attribution never depends on
-    // scrolling to the bottom row) and once in the shared figure row
-    // (.pv-figure-cell .pv-speaker-name). Scope to the figure-row instance.
     const mayeFigureCell = screen.getAllByText('MAYE')
       .map((el) => el.closest('.pv-figure-cell'))
       .find((el): el is HTMLElement => el !== null) as HTMLElement
     const elonFigureCell = screen.getAllByText('ELON')
       .map((el) => el.closest('.pv-figure-cell'))
       .find((el): el is HTMLElement => el !== null) as HTMLElement
-    // turns is 3, so the figure row is row 4 — one past the highest balloon row (3).
-    expect(mayeFigureCell.style.gridRow).toBe('4')
-    expect(mayeFigureCell.style.gridColumn).toBe('1')
-    expect(elonFigureCell.style.gridRow).toBe('4')
-    expect(elonFigureCell.style.gridColumn).toBe('2')
+    const mayeCascadeCell = mayeFigureCell.closest('.pv-dialogue-cell') as HTMLElement
+    const elonCascadeCell = elonFigureCell.closest('.pv-dialogue-cell') as HTMLElement
+    // MAYE's last turn is 2 -> row 3; ELON's last (only) turn is 1 -> row 2.
+    // Different rows -- there is no single shared "figure row" any more.
+    expect(mayeCascadeCell.style.gridRow).toBe('3')
+    expect(mayeCascadeCell.style.gridColumn).toBe('1')
+    expect(elonCascadeCell.style.gridRow).toBe('2')
+    expect(elonCascadeCell.style.gridColumn).toBe('2')
+  })
+
+  test("a speaker's figure never appears next to that speaker's non-last balloon", () => {
+    // MAYE's FIRST line (turn 0) is not her last -- it must carry no figure,
+    // only her second line (turn 2, the tail-bearing one) does.
+    render(<PanelView model={dialogueModel()} />)
+    const cells = Array.from(document.querySelectorAll<HTMLElement>('.pv-dialogue-cell'))
+    const mayeFirstLineCell = cells.find((c) => c.style.gridRow === '1')!
+    expect(mayeFirstLineCell.querySelector('.pv-figure-cell')).toBeNull()
+    const mayeLastLineCell = cells.find((c) => c.style.gridRow === '3')!
+    expect(mayeLastLineCell.querySelector('.pv-figure-cell')).not.toBeNull()
   })
 
   test('the panel element itself converts a non-trivial zero-based rect to one-based grid placement', () => {
