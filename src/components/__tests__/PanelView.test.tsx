@@ -362,6 +362,68 @@ describe('PanelView — page height is content-driven, not clipped to a fixed as
   })
 })
 
+describe('PanelView — an inset never covers its host\'s text (Adnan, 2026-08-28)', () => {
+  // Real case: Mahabharata "the boy who knew the door" p15 -- panel 1 is
+  // rect [0,0,12,16] (the WHOLE page) and panel 2 is rect [7,10,5,6] marked
+  // `inset`, i.e. deliberately drawn on top of panel 1. Rendering that
+  // overlap literally hid panel 1's dialogue and figures underneath it. The
+  // old mitigation reserved a top/bottom BAND of the host by fraction, which
+  // cannot protect a CORNER -- the shape an inset actually is.
+  function insetModel(): PanelModel {
+    const host = {
+      number: 1, ref: 'p15.pl1', rect: [0, 0, 12, 16] as [number, number, number, number],
+      note: null, artRef: 'p15.pl1.art', artBrief: 'host brief',
+      artSrcCount: 0, crowded: false, turns: 1,
+      narration: [{ ref: 'p15.pl1.b1', kind: 'caption' as const, text: 'host narration', speaker: null, srcCount: 0, turn: null, column: null }],
+      sfx: [],
+      columns: [{ name: 'BHIMA', figure: 'neutral', boxes: [
+        { ref: 'p15.pl1.b2', kind: 'dialogue' as const, text: 'host line', speaker: 'BHIMA', srcCount: 0, turn: 0, column: 0 },
+      ] }],
+    }
+    const inset = {
+      number: 2, ref: 'p15.pl2', rect: [7, 10, 5, 6] as [number, number, number, number],
+      note: 'inset', artRef: 'p15.pl2.art', artBrief: 'inset brief',
+      artSrcCount: 0, crowded: false, turns: 1,
+      narration: [], sfx: [],
+      columns: [{ name: 'ABHIMANYU', figure: 'neutral', boxes: [
+        { ref: 'p15.pl2.b1', kind: 'dialogue' as const, text: 'inset line', speaker: 'ABHIMANYU', srcCount: 0, turn: 0, column: 0 },
+      ] }],
+    }
+    return {
+      schema: 1, title: 'inset fixture', aspect: 1.44,
+      grid: { cols: 12, rows: 16 }, errors: [],
+      pages: [{ number: 15, ref: 'p15', layoutId: '2c', panels: [host, inset] }],
+    }
+  }
+
+  test('the inset is nested inside its host, not placed as an overlapping grid item', () => {
+    render(<PanelView model={insetModel()} />)
+    const inset = document.querySelector('[data-panel-ref="p15.pl2"]') as HTMLElement
+    expect(inset).not.toBeNull()
+    // It must live INSIDE the host panel...
+    expect(inset.closest('[data-panel-ref="p15.pl1"]')).not.toBeNull()
+    // ...and must NOT carry its own grid placement (which is what made it overlap).
+    expect(inset.style.gridColumn).toBe('')
+    expect(inset.style.gridRow).toBe('')
+  })
+
+  test("the inset's own text still renders and is still comment-anchorable", () => {
+    render(<PanelView model={insetModel()} />)
+    expect(screen.getByText('INSET LINE')).toBeInTheDocument()
+    // Its beat refs must survive nesting, or comments on an inset break.
+    expect(document.querySelector('[data-beat-ref="p15.pl2.b1"]')).not.toBeNull()
+    expect(document.querySelector('[data-beat-ref="p15.pl2.art"]')).not.toBeNull()
+  })
+
+  test('the host keeps exactly one top-level panel on the page grid', () => {
+    render(<PanelView model={insetModel()} />)
+    const page = document.querySelector('.pv-comic-page') as HTMLElement
+    const topLevel = Array.from(page.children).filter((c) => c.classList.contains('pv-panel'))
+    expect(topLevel.length).toBe(1)
+    expect(topLevel[0].getAttribute('data-panel-ref')).toBe('p15.pl1')
+  })
+})
+
 describe('parsePanelModel', () => {
   test('returns null for non-JSON text', () => {
     expect(parsePanelModel('not json')).toBeNull()

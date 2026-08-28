@@ -237,33 +237,39 @@ function DialogueCascade({ panel }: { panel: ModelPanel }) {
  * drawn on top of a larger neighbour, and without this a host's narration can
  * start flush in the exact corner the inset covers.
  */
-function insetReservations(panels: ModelPanel[]): Map<string, [number, number]> {
-  const reservations = new Map<string, [number, number]>()
+function insetHosts(panels: ModelPanel[]): {
+  hosted: Map<string, ModelPanel[]>
+  insetRefs: Set<string>
+} {
+  const hosted = new Map<string, ModelPanel[]>()
+  const insetRefs = new Set<string>()
   const insets = panels.filter((p) => p.note === 'inset')
-  if (insets.length === 0) return reservations
+  if (insets.length === 0) return { hosted, insetRefs }
 
-  for (const host of panels) {
-    const [hc, hr, hw, hh] = host.rect
-    if (hh <= 0) continue
-    let topFrac = 0
-    let bottomFrac = 0
-    for (const ins of insets) {
-      if (ins === host) continue
-      const [ic, ir, iw, ih] = ins.rect
-      const x0 = Math.max(hc, ic)
-      const x1 = Math.min(hc + hw, ic + iw)
-      const y0 = Math.max(hr, ir)
-      const y1 = Math.min(hr + hh, ir + ih)
-      if (x1 <= x0 || y1 <= y0) continue
-      const frac = (y1 - y0) / hh
-      if (y0 <= hr) topFrac = Math.max(topFrac, frac)
-      else if (y1 >= hr + hh) bottomFrac = Math.max(bottomFrac, frac)
+  for (const ins of insets) {
+    const [ic, ir, iw, ih] = ins.rect
+    let bestHost: ModelPanel | null = null
+    let bestArea = 0
+    for (const host of panels) {
+      if (host === ins || host.note === 'inset') continue
+      const [hc, hr, hw, hh] = host.rect
+      const overlap =
+        Math.max(0, Math.min(hc + hw, ic + iw) - Math.max(hc, ic)) *
+        Math.max(0, Math.min(hr + hh, ir + ih) - Math.max(hr, ir))
+      if (overlap > bestArea) {
+        bestArea = overlap
+        bestHost = host
+      }
     }
-    if (topFrac || bottomFrac) {
-      reservations.set(host.ref, [Math.min(topFrac, 0.85), Math.min(bottomFrac, 0.85)])
-    }
+    // An inset with no overlapping host stays a normal grid item -- it has
+    // nothing to sit inside and nothing to cover.
+    if (!bestHost) continue
+    insetRefs.add(ins.ref)
+    const list = hosted.get(bestHost.ref)
+    if (list) list.push(ins)
+    else hosted.set(bestHost.ref, [ins])
   }
-  return reservations
+  return { hosted, insetRefs }
 }
 
 /**
@@ -305,9 +311,38 @@ function usePanelOverflow(deps: unknown): [React.RefObject<HTMLDivElement | null
   return [ref, overflows]
 }
 
-function PanelBlock({ panel, reserve }: { panel: ModelPanel; reserve: [number, number] }) {
+/** A panel's own contents, without the outer grid-placed shell. Shared by a
+ *  normal panel and by a nested inset, so both render identically inside. */
+function PanelBody({ panel, bodyRef }: {
+  panel: ModelPanel
+  bodyRef?: React.RefObject<HTMLDivElement | null>
+}) {
+  return (
+    <div className="pv-panel-body" ref={bodyRef}>
+      {panel.narration.length > 0 && (
+        <div className="pv-narration-stack">
+          {panel.narration.map((b) => (
+            <CaptionBox key={b.ref} box={b} />
+          ))}
+        </div>
+      )}
+      {panel.sfx.length > 0 && (
+        <div className="pv-sfx-stack">
+          {panel.sfx.map((b) => (
+            <SfxBox key={b.ref} box={b} />
+          ))}
+        </div>
+      )}
+      <DialogueCascade panel={panel} />
+      <div className="pv-art-brief" data-beat-ref={panel.artRef}>
+        {panel.artBrief || ''}
+      </div>
+    </div>
+  )
+}
+
+function PanelBlock({ panel, insets = [] }: { panel: ModelPanel; insets?: ModelPanel[] }) {
   const [col, row, w, h] = panel.rect
-  const [topFrac, bottomFrac] = reserve
   const crowded = !!panel.crowded
   const [bodyRef, overflows] = usePanelOverflow(panel)
 
@@ -320,34 +355,28 @@ function PanelBlock({ panel, reserve }: { panel: ModelPanel; reserve: [number, n
       <div className="pv-panel-number">{panel.number}</div>
       {panel.note && <div className="pv-panel-note">{panel.note}</div>}
       {overflows && <div className="pv-panel-overflow-tag">OVERFLOWS</div>}
-      <div className="pv-panel-body" ref={bodyRef}>
-        {topFrac > 0 && <div style={{ flex: `0 0 ${(topFrac * 100).toFixed(1)}%` }} />}
-        {panel.narration.length > 0 && (
-          <div className="pv-narration-stack">
-            {panel.narration.map((b) => (
-              <CaptionBox key={b.ref} box={b} />
-            ))}
+      <PanelBody panel={panel} bodyRef={bodyRef} />
+      {/* An INSET panel overlaps its host in the finished comic. Drawing that
+          overlap here hid the host's own text underneath it -- and the old
+          fix (reserving a top/bottom BAND of the host, by fraction) could
+          never protect a CORNER region, which is the shape an inset actually
+          is. Since this view exists to READ the script, no panel may cover
+          another's words: the inset is nested inside its host and badged
+          instead. This also matches what the Word renderer already does. */}
+      {insets.map((ins) => (
+        <div className="pv-inset" data-panel-ref={ins.ref} key={ins.ref}>
+          <div className="pv-inset-label">
+            Inset &middot; panel {ins.number}
           </div>
-        )}
-        {panel.sfx.length > 0 && (
-          <div className="pv-sfx-stack">
-            {panel.sfx.map((b) => (
-              <SfxBox key={b.ref} box={b} />
-            ))}
-          </div>
-        )}
-        <DialogueCascade panel={panel} />
-        <div className="pv-art-brief" data-beat-ref={panel.artRef}>
-          {panel.artBrief || ''}
+          <PanelBody panel={ins} />
         </div>
-        {bottomFrac > 0 && <div style={{ flex: `0 0 ${(bottomFrac * 100).toFixed(1)}%` }} />}
-      </div>
+      ))}
     </div>
   )
 }
 
 function PageBlock({ page, aspect }: { page: ModelPage; aspect: number }) {
-  const reservations = insetReservations(page.panels)
+  const { hosted, insetRefs } = insetHosts(page.panels)
   return (
     <div className="pv-page-shell">
       <div className="pv-page-label">
@@ -358,9 +387,11 @@ function PageBlock({ page, aspect }: { page: ModelPage; aspect: number }) {
         data-page-ref={page.ref}
         data-aspect={aspect}
       >
-        {page.panels.map((p) => (
-          <PanelBlock key={p.ref} panel={p} reserve={reservations.get(p.ref) ?? [0, 0]} />
-        ))}
+        {page.panels
+          .filter((p) => !insetRefs.has(p.ref))
+          .map((p) => (
+            <PanelBlock key={p.ref} panel={p} insets={hosted.get(p.ref) ?? []} />
+          ))}
       </section>
     </div>
   )
@@ -468,6 +499,25 @@ const PV_CSS = `
 }
 
 .pv-panel-crowded { background: var(--pv-crowded-bg); }
+
+/* A nested inset: its own bordered box inside its host, clearly labelled.
+   It sits in normal flow so it can never cover the host's text. */
+.pv-inset {
+  flex: 0 0 auto;
+  margin-top: 6px;
+  border: 1.5px double var(--pv-panel-border);
+  border-radius: 2px;
+  padding: 4px 5px 3px;
+  background: var(--pv-paper);
+}
+.pv-inset-label {
+  font-size: 9px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #666;
+  margin-bottom: 3px;
+}
+.pv-inset .pv-panel-body { padding-top: 0; overflow: visible; }
 
 /* Spec §3.3: the page box is fixed, so a panel's own box never grows past
    its grid row -- content that doesn't fit clips here instead of overlapping
