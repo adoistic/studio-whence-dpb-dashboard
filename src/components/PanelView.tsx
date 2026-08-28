@@ -142,9 +142,10 @@ function SfxBox({ box }: { box: PanelBox }) {
   )
 }
 
-function DialogueBox({ box }: { box: PanelBox }) {
+function DialogueBox({ box, speaker }: { box: PanelBox; speaker: string }) {
   return (
     <div className="pv-box pv-box-dialogue" data-beat-ref={box.ref}>
+      <span className="pv-balloon-speaker">{upper(speaker)}</span>
       {upper(box.text)}
     </div>
   )
@@ -187,7 +188,7 @@ function DialogueCascade({ panel }: { panel: ModelPanel }) {
           className="pv-dialogue-cell"
           style={{ gridColumn: c + 1, gridRow: box.turn + 1 }}
         >
-          <DialogueBox box={box} />
+          <DialogueBox box={box} speaker={col.name} />
           {isLast && <div className="pv-balloon-tail" />}
         </div>,
       )
@@ -350,7 +351,7 @@ function PageBlock({ page, aspect }: { page: ModelPage; aspect: number }) {
       <section
         className="pv-comic-page"
         data-page-ref={page.ref}
-        style={{ aspectRatio: `1 / ${aspect}` }}
+        data-aspect={aspect}
       >
         {page.panels.map((p) => (
           <PanelBlock key={p.ref} panel={p} reserve={reservations.get(p.ref) ?? [0, 0]} />
@@ -444,7 +445,7 @@ const PV_CSS = `
   width: 100%;
   display: grid;
   grid-template-columns: repeat(12, 1fr);
-  grid-template-rows: repeat(16, 1fr);
+  grid-template-rows: repeat(16, minmax(28px, auto));
   gap: 2mm;
   padding: 4mm;
 }
@@ -473,10 +474,10 @@ const PV_CSS = `
   right: 2px;
   background: var(--pv-error-border);
   color: #fff;
-  font-size: 6px;
+  font-size: 9px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  padding: 1px 4px;
+  padding: 2px 6px;
   border-radius: 2px;
   z-index: 6;
   line-height: 1.4;
@@ -488,10 +489,10 @@ const PV_CSS = `
   right: 2px;
   background: var(--pv-note-bg);
   color: var(--pv-note-fg);
-  font-size: 7px;
+  font-size: 9px;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  padding: 1px 4px;
+  padding: 2px 6px;
   border-radius: 2px;
   z-index: 5;
   line-height: 1.4;
@@ -499,9 +500,9 @@ const PV_CSS = `
 
 .pv-panel-number {
   position: absolute;
-  top: 2px;
-  left: 3px;
-  font-size: 7px;
+  top: 3px;
+  left: 5px;
+  font-size: 11px;
   color: #999;
   z-index: 5;
   line-height: 1.4;
@@ -512,21 +513,21 @@ const PV_CSS = `
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding-top: 10px;
+  gap: 5px;
+  padding-top: 16px;
   overflow: hidden;
 }
 
 .pv-narration-stack, .pv-sfx-stack {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 5px;
   flex: 0 0 auto;
 }
 
 .pv-box {
-  font-size: 7px;
-  line-height: 1.25;
+  font-size: 13px;
+  line-height: 1.35;
   text-transform: uppercase;
   word-break: break-word;
 }
@@ -534,20 +535,21 @@ const PV_CSS = `
 .pv-box-caption {
   background: var(--pv-caption-bg);
   border: 1px solid #d8c07a;
-  border-left: 2px solid var(--pv-caption-rule);
-  padding: 3px 5px;
+  border-left: 3px solid var(--pv-caption-rule);
+  padding: 6px 9px;
 }
 
 .pv-caption-speaker {
   display: block;
-  font-size: 6px;
+  font-size: 10px;
+  font-weight: 700;
   color: var(--pv-caption-rule);
   letter-spacing: 0.04em;
-  margin-bottom: 1px;
+  margin-bottom: 2px;
 }
 
 .pv-sfx-box {
-  font-size: 9px;
+  font-size: 15px;
   font-style: italic;
   font-weight: 700;
   letter-spacing: 0.12em;
@@ -576,11 +578,20 @@ const PV_CSS = `
 
 .pv-box-dialogue {
   background: var(--pv-balloon-bg);
-  border: 1px solid var(--pv-balloon-border);
-  border-radius: 8px;
-  padding: 3px 6px;
+  border: 1.5px solid var(--pv-balloon-border);
+  border-radius: 10px;
+  padding: 6px 10px;
   text-align: center;
   max-width: 100%;
+}
+
+.pv-balloon-speaker {
+  display: block;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #777;
+  margin-bottom: 2px;
 }
 
 .pv-balloon-tail {
@@ -593,22 +604,23 @@ const PV_CSS = `
 }
 
 .pv-figure-svg {
-  width: 18px;
+  width: 26px;
   height: auto;
   stroke: currentColor;
   stroke-width: 3;
   fill: none;
   color: #333;
   display: block;
-  margin: 1px auto 0;
+  margin: 2px auto 0;
 }
 
 .pv-speaker-name {
-  font-size: 6px;
+  font-size: 10px;
+  font-weight: 700;
   letter-spacing: 0.04em;
   color: #444;
   text-transform: uppercase;
-  margin-top: 1px;
+  margin-top: 2px;
   text-align: center;
   max-width: 100%;
   overflow: hidden;
@@ -618,12 +630,12 @@ const PV_CSS = `
 
 .pv-art-brief {
   flex: 0 0 auto;
-  font-size: 6.5px;
+  font-size: 11px;
   font-style: italic;
   color: var(--pv-brief-color);
   text-transform: none;
   border-top: 1px dotted #ccc;
-  padding-top: 2px;
-  margin-top: 2px;
+  padding-top: 4px;
+  margin-top: 4px;
 }
 `

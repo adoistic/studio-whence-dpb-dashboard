@@ -675,6 +675,80 @@
   .comic-script .cs-unit-select { transition: none; }
 }
 
+/* ── Select mode, panel view (.pv-root) ─────────────────────────────────────
+   The panel view's units are small, dense boxes (a balloon, a narration box,
+   a panel), not flowing paragraphs — the draft view's hover-reveal pattern
+   keys off draft-only class names (.cs-caption, .cs-dialogue, ...) that don't
+   exist here, and the draft view's pill sizing assumes room the panel view's
+   boxes don't have. So the panel view gets its OWN always-visible (not
+   hover-gated — these boxes are small and a hover-only toggle would be hard
+   to reach), compact version of the same .cs-unit-select/.cs-unit-select-box
+   the draft view uses, anchored to the box it decorates rather than inline in
+   its text. The draft-view rules above are untouched. */
+
+.pv-root .cs-unit-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  cursor: pointer;
+  font-family: var(--font-sans, system-ui);
+  font-size: 8px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--brand-indigo, #3B3664);
+  background: var(--brand-cream, #F5EFE4);
+  border: 1px solid var(--brand-lavender, #766992);
+  border-radius: 999px;
+  padding: 2px 5px;
+  box-shadow: 0 1px 2px rgba(30, 26, 58, 0.2);
+  opacity: 0.85;
+  position: absolute;
+  z-index: 7;
+}
+.pv-root .cs-unit-select-box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  font-size: 7px;
+  line-height: 1;
+}
+.pv-root .cs-unit-select-label { display: none; }
+.pv-root .cs-unit-select:hover,
+.pv-root .cs-unit-select:focus-visible { opacity: 1; background: var(--brand-pale-dusk, #E8E2F0); }
+.pv-root .cs-unit-select:focus-visible {
+  outline: 2px solid var(--brand-gold, #C4A265);
+  outline-offset: 1px;
+}
+.pv-root .cs-unit-select.is-selected {
+  opacity: 1;
+  color: var(--brand-cream, #F5EFE4);
+  background: var(--brand-indigo, #3B3664);
+  border-color: var(--brand-indigo, #3B3664);
+}
+.pv-root .cs-unit-select.is-selected:hover { background: var(--brand-twilight-mid, #4A4374); }
+
+/* Anchor points: each level's toggle pins to a corner of its own box that no
+   other decoration (panel number, note, overflow tag) already occupies. */
+.pv-root .pv-comic-page,
+.pv-root .pv-panel,
+.pv-root .pv-box,
+.pv-root .pv-sfx-box,
+.pv-root .pv-art-brief { position: relative; }
+
+.pv-root .cs-page-select { top: 4px; right: 4px; }
+.pv-root .cs-panel-select { bottom: 3px; left: 4px; }
+.pv-root .cs-beat-select { bottom: 2px; right: 2px; font-size: 7px; padding: 1px 4px; }
+
+.pv-root .cs-unit-selected {
+  outline: 2px solid var(--brand-indigo, #3B3664);
+  outline-offset: 1px;
+}
+
+
 /* Idea Drop composer — make the whole editor box a focus target. The Tiptap
    contenteditable is only as tall as its content, so without this a click in
    the empty lower area of the box focuses the wrapper, not the editor, and the

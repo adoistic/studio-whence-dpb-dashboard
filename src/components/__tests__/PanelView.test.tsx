@@ -86,12 +86,14 @@ describe('PanelView', () => {
     render(<PanelView model={model()} />)
     const panel = document.querySelector('[data-panel-ref="p8.pl1"]') as HTMLElement
     // JRD's first line and JRD's column label both live under the same panel.
+    // "JRD" itself now appears twice (once per balloon, once in the figure
+    // row) by design -- assert presence, not a single match.
     const jrdLine = within(panel).getByText('I WILL FLY THIS THING.')
     expect(jrdLine).toBeInTheDocument()
-    expect(within(panel).getByText('JRD')).toBeInTheDocument()
+    expect(within(panel).getAllByText('JRD').length).toBeGreaterThan(0)
     // Neville's line is likewise scoped to this panel, under his own column.
     expect(within(panel).getByText('YOU ARE MAD.')).toBeInTheDocument()
-    expect(within(panel).getByText('NEVILLE')).toBeInTheDocument()
+    expect(within(panel).getAllByText('NEVILLE').length).toBeGreaterThan(0)
   })
 
   test("a speaker's last balloon carries the down-tail, earlier ones do not", () => {
@@ -195,8 +197,16 @@ describe('PanelView — dialogue cascade grid placement (regression guard)', () 
 
   test('the figure/speaker-name row sits strictly below every balloon row (turns + 1)', () => {
     render(<PanelView model={dialogueModel()} />)
-    const mayeFigureCell = screen.getByText('MAYE').closest('.pv-figure-cell') as HTMLElement
-    const elonFigureCell = screen.getByText('ELON').closest('.pv-figure-cell') as HTMLElement
+    // Each speaker's name now appears twice by design: once on every one of
+    // their balloons (.pv-balloon-speaker, so attribution never depends on
+    // scrolling to the bottom row) and once in the shared figure row
+    // (.pv-figure-cell .pv-speaker-name). Scope to the figure-row instance.
+    const mayeFigureCell = screen.getAllByText('MAYE')
+      .map((el) => el.closest('.pv-figure-cell'))
+      .find((el): el is HTMLElement => el !== null) as HTMLElement
+    const elonFigureCell = screen.getAllByText('ELON')
+      .map((el) => el.closest('.pv-figure-cell'))
+      .find((el): el is HTMLElement => el !== null) as HTMLElement
     // turns is 3, so the figure row is row 4 — one past the highest balloon row (3).
     expect(mayeFigureCell.style.gridRow).toBe('4')
     expect(mayeFigureCell.style.gridColumn).toBe('1')
@@ -271,6 +281,66 @@ describe('PanelView — overflow marker (Task 3 regression guard)', () => {
     expect(panelRule).toContain('overflow: hidden')
     expect(panelRule).not.toContain('overflow: visible')
     expect(panelRule).not.toContain('height: auto')
+  })
+})
+
+describe('PanelView — every balloon carries its own speaker label (Adnan, 2026-08-28)', () => {
+  // A comic reader complained: with the speaker's name shown only once, in
+  // the shared figure row at the very bottom of the cascade, "who is
+  // speaking when" was not clear -- especially once a panel's content is
+  // tall enough that the figure row scrolls out of view or gets clipped.
+  // Every balloon now carries its own speaker label directly, so attribution
+  // never depends on tracing back to a row that may not even be visible.
+  test('each dialogue balloon shows its own speaker name, not just the bottom row', () => {
+    render(<PanelView model={dialogueModel()} />)
+    // canonicalDialoguePanel is MAYE(turn0) / ELON(turn1) / MAYE(turn2) -- three
+    // balloons, three labels. DOM order is grouped by COLUMN (Maye's two boxes,
+    // then Elon's), not by turn -- grid-row is what fixes visual/reading order,
+    // independent of source order -- so this reads the label paired with each
+    // balloon's OWN gridRow rather than assuming DOM order is turn order.
+    const cells = Array.from(document.querySelectorAll<HTMLElement>('.pv-dialogue-cell'))
+    expect(cells.length).toBe(3)
+    const byTurn = new Map(
+      cells.map((cell) => [
+        Number(cell.style.gridRow),
+        cell.querySelector('.pv-balloon-speaker')?.textContent,
+      ]),
+    )
+    expect(byTurn.get(1)).toBe('MAYE')
+    expect(byTurn.get(2)).toBe('ELON')
+    expect(byTurn.get(3)).toBe('MAYE')
+  })
+
+  test("a balloon's own label sits inside that balloon, not the shared figure row", () => {
+    render(<PanelView model={dialogueModel()} />)
+    const balloon = document.querySelector('.pv-box-dialogue') as HTMLElement
+    const label = within(balloon).getByText('MAYE')
+    expect(label.className).toContain('pv-balloon-speaker')
+    // The figure row's OWN copy of the name lives in a different box entirely.
+    expect(balloon.closest('.pv-figure-cell')).toBeNull()
+  })
+})
+
+describe('PanelView — page height is content-driven, not clipped to a fixed aspect ratio', () => {
+  // A comic script has 6+ panels of wildly different dialogue density sharing
+  // one page. A page locked to a fixed aspect ratio (width alone determining
+  // height) forces every panel's row track back to a fraction of that fixed
+  // height regardless of content -- which is what produced the illegible
+  // 6-7px fonts and near-universal OVERFLOWS tags this suite guards against.
+  test('the page grid has no fixed aspect-ratio and its rows are not a bare 1fr split', () => {
+    render(<PanelView model={model()} />)
+    const page = document.querySelector('.pv-comic-page') as HTMLElement
+    expect(page.style.aspectRatio).toBe('')
+    const styleText = document.querySelector('style')?.textContent ?? ''
+    const pageRule = styleText.split('.pv-comic-page {')[1]?.split('}')[0] ?? ''
+    expect(pageRule).not.toMatch(/grid-template-rows:\s*repeat\(16,\s*1fr\)/)
+    expect(pageRule).toMatch(/grid-template-rows:\s*repeat\(16,\s*minmax\(/)
+  })
+
+  test('the aspect value is still carried on the page element (not simply dropped)', () => {
+    render(<PanelView model={model()} />)
+    const page = document.querySelector('.pv-comic-page') as HTMLElement
+    expect(page.getAttribute('data-aspect')).toBe('1.44')
   })
 })
 
