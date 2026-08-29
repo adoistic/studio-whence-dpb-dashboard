@@ -19,6 +19,7 @@ import { ComicPdfButton } from '@/components/ComicPdfButton'
 import { ComicPptButton } from '@/components/ComicPptButton'
 import { ComicCmykButton } from '@/components/ComicCmykButton'
 import { ComicDocxButton } from '@/components/ComicDocxButton'
+import { ComicPanelExportButton } from '@/components/ComicPanelExportButton'
 import { ComicExportButton } from '@/components/ComicExportButton'
 import { AmazonModulesPanel } from '@/components/AmazonModulesPanel'
 import { useGatedText } from '@/lib/useGatedText'
@@ -474,6 +475,11 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 {draft.text && <ComicDocxButton comic={comic} draftHtml={draft.text} />}
+                {/* The panel layout, downloadable. The on-screen toggle above
+                    was screen-only until 2026-08-29; this is the same layout as
+                    a Word file and a print-ready PDF. Renders nothing for books
+                    with no panel grammar. */}
+                {view === 'draft' && <ComicPanelExportButton comic={comic} />}
                 <CopyScriptToolbar
                   comicId={`${comic.line}__${comic.slug}`}
                   comicTitle={comic.title}

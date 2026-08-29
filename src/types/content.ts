@@ -72,6 +72,23 @@ export interface Comic {
     bytes: number
     filename: string
   }
+  // Panel-layout script exports — the SAME approximate comic-page layout the
+  // `Script | Panels` toggle renders on screen, rendered to Word and PDF by
+  // biographies/tools/render_comic.sh --layout panel and published to gated
+  // comic-scoped artifacts/comics/…/script-exports/ keys by
+  // tools/publish_script_exports.py. Present only for comics with panel
+  // grammar (activity books and storybooks have none). Drives the panel
+  // download control beside the Script ⇄ Panels toggle, which exists because
+  // the toggle was screen-only: a reviewer who wanted to PRINT the panel view
+  // had no way to get it (Adnan, 2026-08-29).
+  scriptExports?: {
+    layout: 'panel'
+    docxKey: string
+    pdfKey: string
+    pages?: number
+    sourceSha?: string
+    updated?: string
+  }
   // Amazon A+ marketing modules (banner, image-header, "a peek inside", "why this
   // story"), published to gated comic-scoped artifacts/comics/…/amazon-modules/…
   // keys. Present only for comics that ship A+ modules. Drives the "A+ Modules"
