@@ -89,12 +89,29 @@ export function computePagesFromR2(keys: string[]): Map<string, PagesBlock> {
   return out
 }
 
+/** What else the doc says about itself, beyond its stored `pages` block. */
+export interface ReconcileOpts {
+  /** `artWithdrawn: true` — the source repo pulled this art on purpose
+   *  (tools/withdraw_comic.py). The bytes may still be in R2 so the decision
+   *  stays reversible; they are NOT to be read as truth. */
+  artWithdrawn?: boolean
+  /** `target_length_pages` from the script front matter (0 / undefined = unknown). */
+  targetPages?: number
+}
+
 /**
  * Pure: decide the write for one comic. Returns the `PagesBlock` to write, or
  * `null` for "leave the doc alone".
  *
  *  - legacy comic            → null (registry-owned; never touched)
+ *  - art withdrawn            → null (a withdrawal is a property of the comic;
+ *                               this function re-attached two rejected Rāmāyaṇa
+ *                               volumes every hour until 2026-09-07)
  *  - no page art in R2        → null (never blank a reader on a list hiccup)
+ *  - far shorter than script  → null (a lone page-01.jpg left by a broken
+ *                               publish is contiguous 1..1; healing it made a
+ *                               48-page book read as a 1-page one — the same
+ *                               10% slack the source-repo guard allows)
  *  - stored block == desired  → null (idempotent no-op)
  *  - otherwise                → the desired block (missing / drifted count or cover)
  */
@@ -102,9 +119,13 @@ export function reconcile(
   current: unknown,
   desired: PagesBlock | undefined,
   isLegacy: boolean,
+  opts: ReconcileOpts = {},
 ): PagesBlock | null {
   if (isLegacy) return null
+  if (opts.artWithdrawn === true) return null
   if (!desired) return null
+  const target = Number(opts.targetPages ?? 0)
+  if (target > 0 && desired.count < target * 0.9) return null
   const c = current as Partial<PagesBlock> | undefined | null
   if (c && c.hasPages === true && c.count === desired.count && (c.coverKey ?? null) === desired.coverKey) {
     return null
@@ -133,9 +154,14 @@ export const healComicPages = onSchedule(
     let batch = db.batch()
     let ops = 0
     for (const doc of snap.docs) {
-      const data = doc.data() as { line?: unknown; pages?: unknown }
+      const data = doc.data() as {
+        line?: unknown; pages?: unknown; artWithdrawn?: unknown; target_length_pages?: unknown
+      }
       const isLegacy = data.line === LEGACY_LINE
-      const block = reconcile(data.pages, desired.get(doc.id), isLegacy)
+      const block = reconcile(data.pages, desired.get(doc.id), isLegacy, {
+        artWithdrawn: data.artWithdrawn === true,
+        targetPages: typeof data.target_length_pages === 'number' ? data.target_length_pages : Number(data.target_length_pages ?? 0) || 0,
+      })
       if (!block) continue
       batch.update(doc.ref, { pages: block })
       healed.push(doc.id)

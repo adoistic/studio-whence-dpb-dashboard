@@ -103,3 +103,26 @@ describe("reconcile", () => {
     expect(reconcile({ hasPages: true, count: 2 }, noCover, false)).toBeNull();
   });
 });
+
+describe('reconcile — a withdrawal and a token set are not drift (2026-09-07)', () => {
+  const desired = { hasPages: true as const, count: 64, coverKey: 'images/comics/indic/01-one-soul/cover.jpg' }
+
+  it('never re-attaches pages to a comic whose art was withdrawn on purpose', () => {
+    expect(reconcile(undefined, desired, false, { artWithdrawn: true })).toBeNull()
+  })
+
+  it('refuses a block far shorter than the script (a lone page-01.jpg is contiguous 1..1)', () => {
+    const one = { hasPages: true as const, count: 1, coverKey: null }
+    expect(reconcile(undefined, one, false, { targetPages: 48 })).toBeNull()
+  })
+
+  it('allows the 10% slack the activity books need (48 sheets against a nominal 50)', () => {
+    const sheets = { hasPages: true as const, count: 48, coverKey: null }
+    expect(reconcile(undefined, sheets, false, { targetPages: 50 })).toEqual(sheets)
+  })
+
+  it('still heals a missing block when nothing says otherwise', () => {
+    expect(reconcile(undefined, desired, false, {})).toEqual(desired)
+    expect(reconcile(undefined, desired, false, { targetPages: 64 })).toEqual(desired)
+  })
+})
