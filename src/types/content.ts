@@ -289,6 +289,10 @@ export interface Headline {
 export interface CoverageTotals {
   lines: number
   figures: number
+  // Optional because a coverage doc written before 2026-09-16 has no word
+  // count in it — the homepage KPI falls back to its constant until the next
+  // whole-corpus publish lands one.
+  words?: number
   comics: number
   published: number
   approved: number
@@ -317,6 +321,7 @@ export interface CoverageLine {
   title: string
   subtitle: string
   figures: number
+  words?: number
   programs: CoverageProgram[]
   comics: CoveragePipeline
 }

@@ -247,6 +247,9 @@ export function filterCoverageBySurface(
     totals: {
       lines: lines.length,
       figures: sum((l) => l.figures),
+      // Only present once a post-2026-09-16 coverage doc has been published;
+      // left undefined otherwise so the KPI falls back rather than showing 0.
+      words: coverage.totals.words === undefined ? undefined : sum((l) => l.words ?? 0),
       comics: sum((l) => l.comics.total),
       published: sum((l) => l.comics.published),
       approved: sum((l) => l.comics.approved),

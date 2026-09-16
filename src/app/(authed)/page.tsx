@@ -14,8 +14,15 @@ import { useResolved } from '@/lib/useResolved'
 import { HERO_BACKDROP, SAMPLE_PAGES } from '@/lib/images'
 import type { ActivityEntry } from '@/types/content'
 
-// "words on file" is a known library figure — ~10 million words across ~70 books
-// and ~224 transcripts. The build script will supply this dynamically later.
+// FALLBACK ONLY. "Words on file" now comes from meta/coverage like the other
+// three KPIs — `_build_coverage()` sums each figure's own word count.
+//
+// This constant used to BE the number, under a comment saying the build script
+// would supply it dynamically later. It never did, so for as long as the
+// library grew from ~70 books and ~224 transcripts to 363 figures across nine
+// lines, the homepage kept reporting the figure it started with. It is kept
+// only so a coverage doc published before 2026-09-16 still renders something
+// rather than a zero. (Adnan spotted it, 2026-09-16.)
 const WORDS_ON_FILE = 10_000_000
 
 export default function Home() {
@@ -46,7 +53,7 @@ export default function Home() {
     ? [
         { label: 'figures researched', value: coverage?.totals.figures ?? meta!.headline.figures_researched },
         { label: 'comics in production', value: coverage?.totals.comics ?? meta!.headline.comics_in_production },
-        { label: 'words on file', value: WORDS_ON_FILE, formatter: 'million' },
+        { label: 'words on file', value: coverage?.totals.words ?? WORDS_ON_FILE, formatter: 'million' },
         { label: 'lines active', value: coverage?.totals.lines ?? meta!.headline.lines_active },
       ]
     : null
