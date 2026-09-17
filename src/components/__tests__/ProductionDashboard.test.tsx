@@ -149,7 +149,12 @@ describe('ProductionDashboard', () => {
         comic({ slug: 'c', created: '2026-03-01' }),
       ],
     })
-    expect(screen.getByText(/authoring activity, not pages drawn/)).toBeInTheDocument()
+    // It plots script authoring, it is still not pages drawn over time, and it
+    // no longer implies artwork has no dates at all — those live per comic.
+    const note = screen.getByText(/this chart plots\s+script authoring/)
+    expect(note).toBeInTheDocument()
+    expect(note.textContent).toMatch(/not pages drawn over time/)
+    expect(note.textContent).toMatch(/Version history/)
   })
 
   it('explains the counting rule in the footnote', () => {

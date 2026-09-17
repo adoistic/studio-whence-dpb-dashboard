@@ -7,8 +7,10 @@ export type Status = 'draft' | 'in-review' | 'approved' | 'published' | 'placeho
 export type LineSlug = string
 
 // changelog is heterogeneous: biography comics use objects, toddlers comics
-// use plain strings (already-formatted "YYYY-MM-DD — note" entries).
-export type ChangelogEntry = string | { date: string; note: string }
+// use plain strings (already-formatted "YYYY-MM-DD — note" entries). The date
+// is optional because an entry can be written without one, and every reader
+// here already has to cope with that (see productionModel's monthOf guard).
+export type ChangelogEntry = string | { date?: string; note: string }
 
 export interface Comic {
   title: string
@@ -26,6 +28,29 @@ export interface Comic {
   updated?: string
   changelog?: ChangelogEntry[]
   version?: number
+  // Artwork history, published separately from the script's own changelog. A
+  // book whose pages were re-rendered after its words last changed has an
+  // artUpdated later than `updated`, and the portal must be able to say so.
+  artChangelog?: ChangelogEntry[]
+  artVersion?: number
+  artUpdated?: string
+  // The corrections ledger: every item raised on this book (from the portal's
+  // own feedback threads or from a Diamond correction register) and where it
+  // stands.
+  corrections?: {
+    items: Array<{
+      id: string
+      source: 'portal' | 'register'
+      page?: number
+      raised?: string
+      summary: string
+      state: 'applied' | 'raised-with-diamond' | 'needs-decision'
+      done?: string
+      note?: string
+    }>
+    counts: { applied: number; raisedWithDiamond: number; needsDecision: number }
+    total: number
+  }
   sources_count?: number
   slug: string
   subject_slug: string | null

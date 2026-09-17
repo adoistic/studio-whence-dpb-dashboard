@@ -277,7 +277,14 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
         </div>
 
         {/* Version history timeline */}
-        <VersionTimeline changelog={comic.changelog ?? []} version={comic.version} />
+        <VersionTimeline
+          changelog={comic.changelog ?? []}
+          version={comic.version}
+          artChangelog={comic.artChangelog}
+          artVersion={comic.artVersion}
+          artUpdated={comic.artUpdated}
+          corrections={comic.corrections}
+        />
 
         {/* Client-facing documents (concept-note, sources-and-quotes, …) —
             renders nothing unless the catalog published a docs manifest. */}

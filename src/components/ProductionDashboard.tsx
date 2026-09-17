@@ -402,9 +402,10 @@ function Trend({ points }: { points: TrendPoint[] }) {
         </span>
       </div>
       <p className="mt-3 max-w-prose font-sans text-[0.7rem] leading-relaxed text-brand-slate">
-        Built from each script’s creation date and its dated changelog entries. Art carries no
-        per-page date in the catalog — only a current count — so this is authoring activity, not
-        pages drawn over time.
+        Built from each script’s creation date and its dated changelog entries, so this chart plots
+        script authoring. A page carries no date of its own in the catalog, only a current count, so
+        it is not pages drawn over time. When a book’s artwork was last re-rendered is on that
+        book’s own page, under Version history.
       </p>
     </section>
   )
