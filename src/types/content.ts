@@ -89,6 +89,20 @@ export interface Comic {
     bytes: number
     filename: string
   }
+  // PDF renderings of the editable decks, one per published language, at
+  // artifacts/comics/{line}/{slug}/{slug}-editable-{lang}.pdf. Written by
+  // tools/publish_deck_pdfs.py, which renders the deck it fetches FROM R2 so the
+  // PDF is always of the deck the portal actually serves. Drives DeckReader —
+  // reading a translated edition in the portal rather than downloading a .pptx
+  // first, which is what the script reader's language switcher already allows.
+  deckPdf?: {
+    editions: {
+      language: string
+      key: string
+      deckKey?: string
+      bytes?: number
+    }[]
+  }
   // Print-ready CMYK PDF copy (separated to PSO Uncoated v3 / FOGRA52), published
   // to a gated comic-scoped artifacts/comics/… key. Present only for books that
   // ship a CMYK export. Drives the "Download CMYK (print)" button.

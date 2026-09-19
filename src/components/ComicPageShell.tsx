@@ -8,6 +8,7 @@ import { SectionHead } from '@/components/SectionHead'
 import { VersionTimeline } from '@/components/feedback/VersionTimeline'
 import { DocumentsPanel } from '@/components/DocumentsPanel'
 import { LanguageSection } from '@/components/LanguageSection'
+import { DeckReader } from '@/components/DeckReader'
 import { CoverOptions } from '@/components/CoverOptions'
 import { InsideCovers } from '@/components/InsideCovers'
 import { BackCover } from '@/components/BackCover'
@@ -304,6 +305,15 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
           <BackCover comic={comic} />
           <Activities comic={comic} />
           <AboutTheBook comic={comic} />
+        </div>
+
+        {/* Read the editable deck in any published language. Sits ABOVE the
+            downloads because reading is the common case and downloading is
+            not — before this, a translated edition could only be seen by
+            downloading the .pptx first. Renders nothing without a deckPdf
+            block. */}
+        <div className="mt-16">
+          <DeckReader comic={comic} />
         </div>
 
         {/* Translated editions (Hindi / English) — translated script + editable
