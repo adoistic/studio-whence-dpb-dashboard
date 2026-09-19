@@ -307,15 +307,6 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
           <AboutTheBook comic={comic} />
         </div>
 
-        {/* Read the editable deck in any published language. Sits ABOVE the
-            downloads because reading is the common case and downloading is
-            not — before this, a translated edition could only be seen by
-            downloading the .pptx first. Renders nothing without a deckPdf
-            block. */}
-        <div className="mt-16">
-          <DeckReader comic={comic} />
-        </div>
-
         {/* Translated editions (Hindi / English) — translated script + editable
             .pptx and/or blank-version PDF. Renders nothing unless the catalog
             published a translations[] block. */}
@@ -386,6 +377,10 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
             )}
           </section>
         )}
+
+        {/* Read the editable deck, in any published language — the same reader
+            as the comic above, deliberately, and placed after it. */}
+        <DeckReader comic={comic} />
 
         {/* Page-scoped comments drawer (opened from the reader) */}
         {commentPage != null && (

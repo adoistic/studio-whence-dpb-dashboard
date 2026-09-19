@@ -89,6 +89,14 @@ export interface Comic {
     bytes: number
     filename: string
   }
+  // The editable decks rasterised to PAGE IMAGES, one set per published
+  // language, at images/comics/{line}/{slug}/deck/{code}/page-NN.jpg with a
+  // web/ variant beside it — the same shape as a comic's own pages, so the
+  // deck reads through the same PageFlipViewer instead of an embedded PDF.
+  // Written by tools/publish_deck_pages.py.
+  deckPages?: {
+    editions: { language: string; code?: string; count?: number }[]
+  }
   // PDF renderings of the editable decks, one per published language, at
   // artifacts/comics/{line}/{slug}/{slug}-editable-{lang}.pdf. Written by
   // tools/publish_deck_pdfs.py, which renders the deck it fetches FROM R2 so the
