@@ -162,11 +162,21 @@ export function Topbar() {
           </span>
         </button>
 
+        {/* The menu grows with the studio: every line adds a row, and with ten
+            lines plus the tools, the surface switcher and the account block it
+            is taller than a laptop viewport. Without a height cap it was simply
+            clipped at the bottom edge with no way to reach the rest, so the
+            newest line — always last in the list — looked as though it had
+            never been published. Cap it to the space below the header and let
+            it scroll; `overscroll-contain` stops a trackpad flick from
+            scrolling the page behind it once the menu reaches its end. */}
         {open && (
           <nav
             id={menuId}
             aria-label="Main navigation"
-            className="absolute right-6 top-full z-50 mt-2 flex w-60 flex-col gap-1 rounded-xl border border-brand-pale-dusk bg-brand-pale-dusk/95 p-2 shadow-lg backdrop-blur-md"
+            className="absolute right-6 top-full z-50 mt-2 flex max-h-[calc(100vh-5rem)] w-60 flex-col
+              gap-1 overflow-y-auto overscroll-contain rounded-xl border border-brand-pale-dusk
+              bg-brand-pale-dusk/95 p-2 shadow-lg backdrop-blur-md"
           >
             <MenuItem
               label={HOME_LINK.label}

@@ -32,6 +32,10 @@ export const LINE_VISUALS: Record<string, LineVisual> = {
   toddlers: { image: 'images/comics/toddlers/numbers/cover.jpg', note: 'Diamond Books · early-learning workbooks' },
   tingaland: { image: 'images/toddlers/tingaland/settings/tingaland-landscape-night-digital-art-background.jpg', note: 'Diamond Junior · Tinga Dojo & friends' },
   'did-you-know': { note: 'Little Chanakya · true, surprising facts' },
+  // Note-only while the art is still to come. This is the first line written
+  // partly for adults, and the first with no house narrator, so Little
+  // Chanakya does not belong on its plate the way he does on biographies.
+  'graphic-wisdom': { note: 'One idea about how to live, carried by a story' },
   // Manga categories. Note-only on purpose: the manga surface is styled by its
   // own CSS register (see MangaBackdrop / .surface-manga) rather than by the
   // photographic hero the comics lines use, so no image key belongs here.
