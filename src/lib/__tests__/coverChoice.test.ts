@@ -18,7 +18,7 @@ const up = vi.hoisted(() => ({
 }))
 vi.mock('@/lib/dataApi', () => ({ uploadCoverRef: up.uploadCoverRef }))
 
-import { setOptionAsOfficial, uploadOfficialCover } from '@/lib/coverChoice'
+import { coverChoiceDocId, setOptionAsOfficial, uploadOfficialCover } from '@/lib/coverChoice'
 
 beforeEach(() => {
   calls.setDoc = []
@@ -56,5 +56,14 @@ describe('coverChoice', () => {
       key: 'artifacts/comics/legacy/x/cover-refs/ref.png',
       label: 'ref.png',
     })
+  })
+
+  it('coverChoiceDocId keeps the bare comic id for the original, suffixes a translation', () => {
+    expect(coverChoiceDocId('legacy__x')).toBe('legacy__x')
+    expect(coverChoiceDocId('legacy__x', 'en', 'en')).toBe('legacy__x')
+    expect(coverChoiceDocId('legacy__x', 'hi', 'en')).toBe('legacy__x__hi')
+    // a Hindi original: its own language is the bare id, English is the suffixed one
+    expect(coverChoiceDocId('legacy__rajyog', 'hi', 'hi')).toBe('legacy__rajyog')
+    expect(coverChoiceDocId('legacy__rajyog', 'en', 'hi')).toBe('legacy__rajyog__en')
   })
 })

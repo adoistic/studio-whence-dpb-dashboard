@@ -84,6 +84,12 @@ service cloud.firestore {
                 || allocDoc().get('programs', []).hasAny([get(/databases/$(database)/documents/comics/$(cid)).data.get('program_slug','')])))
       ));
     }
+    // A cover choice doc is `{line}__{slug}` for the book's own language, or
+    // `{line}__{slug}__{lang}` for a translated edition's cover (MDH's Hindi
+    // cover) — a separate doc so picking one language never replaces another.
+    function coverChoiceComicOf(id) {
+      return id.split('__')[0] + '__' + id.split('__')[1];
+    }
     function coverChoiceLineOf(id) {
       return id.split('__')[0];
     }
@@ -96,7 +102,7 @@ service cloud.firestore {
         : key.matches('^artifacts/comics/' + coverChoiceLineOf(id) + '/' + coverChoiceSlugOf(id) + '/cover-refs/[^/]+$');
     }
     function validCoverChoiceWrite(id) {
-      return id.matches('^[a-z0-9-]+__[a-z0-9-]+$')
+      return id.matches('^[a-z0-9-]+__[a-z0-9-]+(__[a-z]{2,3})?$')
         && request.resource.data.keys().hasOnly([
           'source', 'key', 'label', 'setByEmail', 'setByName', 'setAt'
         ])
@@ -334,10 +340,11 @@ service cloud.firestore {
     }
 
     // ── Cover choice (official cover per comic; client-written by moderators) ──
-    // Doc id is the comicId `{line}__{slug}`. Members can read the choice only
+    // Doc id is the comicId `{line}__{slug}` (plus `__{lang}` for a translated
+    // edition's cover). Members can read the choice only
     // for allocated comics; moderators can write and must stamp their own email.
     match /coverChoices/{id} {
-      allow read: if isAllowlisted() && feedbackAllocAllowed(id);
+      allow read: if isAllowlisted() && feedbackAllocAllowed(coverChoiceComicOf(id));
       allow create, update: if isSubAdmin()
         && request.resource.data.setByEmail == userEmail()
         && validCoverChoiceWrite(id);

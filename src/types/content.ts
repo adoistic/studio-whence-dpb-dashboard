@@ -80,6 +80,10 @@ export interface Comic {
     hasPages: boolean
     count: number
     coverKey: string | null
+    /** Front covers for the translated editions, one per language code. The
+     *  original's cover stays in `coverKey`; a Hindi edition's cover lives
+     *  here, so the Hindi deck opens on a Hindi cover. */
+    covers?: { lang: string; key: string }[]
   }
   // Editable PowerPoint (.pptx) copy, published to a gated comic-scoped
   // artifacts/comics/… key. Present only for books that ship an editable export
@@ -177,7 +181,9 @@ export interface Comic {
   // for the editorial team to review and choose. Drives the CoverOptions gallery.
   coverOptions?: {
     language: string
-    options: { key: string; label: string }[]
+    /** `lang` (a language code) marks an option for a translated edition — a
+     *  Hindi cover among English ones. Absent means the block's own language. */
+    options: { key: string; label: string; lang?: string }[]
   }
   // Inside covers (inside-front + inside-back printed inner pages — e.g. Hanuman's
   // "Meet the Characters" cast page and "The World of Hanuman" reader's companion).

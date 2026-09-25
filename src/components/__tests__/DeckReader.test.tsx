@@ -96,4 +96,30 @@ describe('DeckReader', () => {
     expect(screen.queryByRole('tablist')).not.toBeInTheDocument()
     expect(frame()).toHaveAttribute('src', `https://signed.example/${EN1}`)
   })
+
+  test('each edition opens on its own cover', () => {
+    const withCovers = {
+      ...comic,
+      pages: {
+        hasPages: true, count: 32,
+        coverKey: 'images/comics/medicomics/01-the-sugar-truth/cover.jpg',
+        covers: [{ lang: 'hi', key: 'images/comics/medicomics/01-the-sugar-truth/cover-hi.jpg' }],
+      },
+    } as Comic
+    render(<DeckReader comic={withCovers} />)
+    expect(frame()).toHaveAttribute('src', 'https://signed.example/images/comics/medicomics/01-the-sugar-truth/web/cover.jpg')
+    expect(screen.getByText('1 / 33')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('tab', { name: /hindi/i }))
+    expect(frame()).toHaveAttribute('src', 'https://signed.example/images/comics/medicomics/01-the-sugar-truth/web/cover-hi.jpg')
+  })
+
+  test('an edition without its own cover does not borrow another language\'s', () => {
+    const enOnly = {
+      ...comic,
+      pages: { hasPages: true, count: 32, coverKey: 'images/comics/medicomics/01-the-sugar-truth/cover.jpg' },
+    } as Comic
+    render(<DeckReader comic={enOnly} />)
+    fireEvent.click(screen.getByRole('tab', { name: /hindi/i }))
+    expect(frame()).toHaveAttribute('src', `https://signed.example/${HI1}`)
+  })
 })

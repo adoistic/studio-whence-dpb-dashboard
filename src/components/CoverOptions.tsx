@@ -1,11 +1,14 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { Comic } from '@/types/content'
 import { useResolved } from '@/lib/useResolved'
 import { SectionHead } from '@/components/SectionHead'
 import { downloadKey } from '@/lib/downloadDoc'
-import { setOptionAsOfficial, uploadOfficialCover, useCoverChoice } from '@/lib/coverChoice'
+import { languageLabel } from '@/lib/comicLanguages'
+import {
+  coverChoiceDocId, setOptionAsOfficial, uploadOfficialCover, useCoverChoice,
+} from '@/lib/coverChoice'
 
 interface Props {
   comic: Comic
@@ -19,12 +22,27 @@ interface Props {
  * `coverOptions` catalog block and are resolved to short-lived presigned R2 URLs
  * via the same /resolve channel as the reader. Renders nothing if the comic
  * carries no cover options.
+ *
+ * A book with a translated edition has a cover per language (MDH's Hindi cover
+ * sits beside its English ones). Options then carry a `lang`, the gallery gets
+ * the same language pills as the deck reader, and each language keeps its own
+ * official pick — choosing the Hindi cover must never replace the English one.
  */
 export function CoverOptions({ comic, canModerate = false, author }: Props) {
   const co = comic.coverOptions
-  const options = co?.options ?? []
+  const original = comic.originalLanguage ?? 'en'
+  const allOptions = useMemo(() => co?.options ?? [], [co])
+  // Languages present among the options, original first.
+  const langs = useMemo(() => {
+    const seen = [...new Set(allOptions.map((o) => o.lang ?? original))]
+    return seen.sort((a, b) => Number(b === original) - Number(a === original))
+  }, [allOptions, original])
+  const [pickedLang, setLang] = useState<string>('')
+  const lang = langs.includes(pickedLang) ? pickedLang : (langs[0] ?? original)
+  const options = allOptions.filter((o) => (o.lang ?? original) === lang)
   const comicId = `${comic.line}__${comic.slug}`
-  const { choice } = useCoverChoice(comicId)
+  const choiceId = coverChoiceDocId(comicId, lang, original)
+  const { choice } = useCoverChoice(choiceId)
   const uploadedKey = choice?.source === 'upload' ? choice.key : null
   const urls = useResolved([
     ...options.map((o) => o.key),
@@ -42,7 +60,7 @@ export function CoverOptions({ comic, canModerate = false, author }: Props) {
     if (!canModerate) return
     setBusy(true)
     try {
-      await uploadOfficialCover(comicId, { line: comic.line, slug: comic.slug }, file, coverAuthor)
+      await uploadOfficialCover(choiceId, { line: comic.line, slug: comic.slug }, file, coverAuthor)
     } finally {
       setBusy(false)
       if (fileRef.current) fileRef.current.value = ''
@@ -51,10 +69,41 @@ export function CoverOptions({ comic, canModerate = false, author }: Props) {
 
   return (
     <section className="flex flex-col gap-6 border-t border-brand-pale-dusk pt-16">
-      <SectionHead kicker="Covers" title="Cover options" />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SectionHead kicker="Covers" title="Cover options" />
+        {langs.length > 1 && (
+          <div
+            role="tablist"
+            aria-label="Cover language"
+            className="inline-flex items-center gap-0.5 rounded-full border border-brand-pale-dusk bg-brand-threshold/70 p-0.5 font-sans"
+          >
+            {langs.map((code) => {
+              const isActive = code === lang
+              return (
+                <button
+                  key={code}
+                  type="button"
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setLang(code)}
+                  className={`rounded-full px-4 py-1.5 font-sans text-[0.72rem] font-semibold uppercase tracking-label transition-colors ${
+                    isActive
+                      ? 'bg-brand-indigo text-brand-pale-dusk shadow-sm'
+                      : 'text-brand-slate hover:text-brand-indigo'
+                  }`}
+                >
+                  {languageLabel(code)}
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
       <p className="font-serif text-brand-umber leading-relaxed">
         {options.length > 0
-          ? `Candidate front-cover designs${co?.language ? ` (${co.language})` : ''} — review and pick the one to take forward.`
+          ? langs.length > 1
+            ? `Candidate front-cover designs for the ${languageLabel(lang)} edition — review and pick the one to take forward. Each language keeps its own cover.`
+            : `Candidate front-cover designs${co?.language ? ` (${co.language})` : ''} — review and pick the one to take forward.`
           : 'No candidate front-cover designs have been published yet.'}
         {canModerate ? ' Set one below or upload your own reference.' : ''}
       </p>
@@ -100,7 +149,7 @@ export function CoverOptions({ comic, canModerate = false, author }: Props) {
                     {!isOfficialOption(o.key) && (
                       <button
                         type="button"
-                        onClick={() => setOptionAsOfficial(comicId, o, coverAuthor)}
+                        onClick={() => setOptionAsOfficial(choiceId, o, coverAuthor)}
                         className="rounded-full border border-brand-indigo px-3 py-1 font-sans text-[0.66rem] font-semibold uppercase tracking-label text-brand-indigo transition-colors hover:bg-brand-indigo hover:text-brand-cream"
                       >
                         Set official

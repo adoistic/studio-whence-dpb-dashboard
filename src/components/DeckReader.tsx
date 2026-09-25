@@ -6,6 +6,7 @@ import type { Comic } from '@/types/content'
 import { SectionHead } from '@/components/SectionHead'
 import { PageFlipViewer } from '@/components/PageFlipViewer'
 import { downloadKey } from '@/lib/downloadDoc'
+import { webVariantKey } from '@/lib/comicPageKeys'
 
 /**
  * Read the editable deck, in any published language, exactly the way the comic
@@ -22,6 +23,11 @@ import { downloadKey } from '@/lib/downloadDoc'
  *
  * The language pills sit in the section header, where the comic's own
  * Comic PDF / A+ Modules toggle sits, rather than being invented somewhere new.
+ *
+ * Each edition opens on its OWN front cover, like the comic reader opens on the
+ * book's: the original on `pages.coverKey`, a translation on its entry in
+ * `pages.covers`. An edition with no cover of its own starts at page 1 rather
+ * than borrowing another language's cover.
  */
 export function DeckReader({ comic }: { comic: Comic }) {
   const editions = useMemo(
@@ -48,14 +54,20 @@ export function DeckReader({ comic }: { comic: Comic }) {
 
   const current = ordered.find((e) => e.language === active) ?? ordered[0]
 
-  const keys = useMemo(() => {
+  const masterKeys = useMemo(() => {
     if (!current) return []
-    const base = `images/comics/${comic.line}/${comic.slug}/deck/${current.code ?? 'en'}`
-    return Array.from({ length: current.count ?? 0 },
-      (_, n) => `${base}/web/page-${String(n + 1).padStart(2, '0')}.jpg`)
-  }, [current, comic.line, comic.slug])
+    const code = (current.code ?? 'en').toLowerCase()
+    const base = `images/comics/${comic.line}/${comic.slug}/deck/${code}`
+    const pages = Array.from({ length: current.count ?? 0 },
+      (_, n) => `${base}/page-${String(n + 1).padStart(2, '0')}.jpg`)
+    const original = (comic.originalLanguage ?? 'en').toLowerCase()
+    const cover = code === original
+      ? comic.pages?.coverKey
+      : comic.pages?.covers?.find((c) => c.lang.toLowerCase() === code)?.key
+    return cover ? [cover, ...pages] : pages
+  }, [current, comic.line, comic.slug, comic.originalLanguage, comic.pages])
 
-  const masterKeys = useMemo(() => keys.map((k) => k.replace('/web/', '/')), [keys])
+  const keys = useMemo(() => masterKeys.map(webVariantKey), [masterKeys])
 
   if (ordered.length === 0 || !current) return null
 

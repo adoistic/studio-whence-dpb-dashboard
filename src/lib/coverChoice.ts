@@ -11,8 +11,20 @@ export interface CoverChoiceAuthor {
   name: string
 }
 
-/** Live official-cover choice for a comic (`coverChoices/{comicId}`). */
-export function useCoverChoice(comicId: string): { choice: CoverChoice | null; loading: boolean } {
+/**
+ * The `coverChoices` doc id for one language of a comic.
+ *
+ * The original language keeps the bare comicId, so every choice recorded before
+ * covers had languages still reads as the book's cover. A translated edition
+ * gets its own doc, `{comicId}__{lang}`: picking the Hindi cover must not
+ * overwrite the English one, which is what a single doc per comic would do.
+ */
+export function coverChoiceDocId(comicId: string, lang?: string, originalLang = 'en'): string {
+  return !lang || lang === originalLang ? comicId : `${comicId}__${lang}`
+}
+
+/** Live official-cover choice (`coverChoices/{docId}`, see `coverChoiceDocId`). */
+export function useCoverChoice(docId: string): { choice: CoverChoice | null; loading: boolean } {
   const [state, setState] = useState<{ choice: CoverChoice | null; loading: boolean }>({
     choice: null,
     loading: true,
@@ -20,7 +32,7 @@ export function useCoverChoice(comicId: string): { choice: CoverChoice | null; l
 
   useEffect(() => {
     const unsub = onSnapshot(
-      doc(db, 'coverChoices', comicId),
+      doc(db, 'coverChoices', docId),
       (snap) => setState({
         choice: snap.exists() ? (snap.data() as CoverChoice) : null,
         loading: false,
@@ -28,18 +40,18 @@ export function useCoverChoice(comicId: string): { choice: CoverChoice | null; l
       () => setState({ choice: null, loading: false }),
     )
     return unsub
-  }, [comicId])
+  }, [docId])
 
   return state
 }
 
 /** Mark one of the comic's cover options as official. */
 export function setOptionAsOfficial(
-  comicId: string,
+  docId: string,
   option: { key: string; label: string },
   author: CoverChoiceAuthor,
 ) {
-  return setDoc(doc(db, 'coverChoices', comicId), {
+  return setDoc(doc(db, 'coverChoices', docId), {
     source: 'option',
     key: option.key,
     label: option.label,
@@ -51,13 +63,13 @@ export function setOptionAsOfficial(
 
 /** Upload a reference image and set it as the official cover. */
 export async function uploadOfficialCover(
-  comicId: string,
+  docId: string,
   comic: { line: string; slug: string },
   file: File,
   author: CoverChoiceAuthor,
 ): Promise<void> {
   const key = await uploadCoverRef(comic.line, comic.slug, file)
-  await setDoc(doc(db, 'coverChoices', comicId), {
+  await setDoc(doc(db, 'coverChoices', docId), {
     source: 'upload',
     key,
     label: file.name,
