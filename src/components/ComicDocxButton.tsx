@@ -13,6 +13,22 @@ const ACCENT = '7A2E2E' // terracotta-ish, neutral
  * (docx-js) library is lazy-imported INSIDE the click handler so it never lands
  * in the initial bundle / SSR path.
  */
+/**
+ * The disclaimer printed under the export's metadata. It used to be the health
+ * line for every book, so a biography of a cricketer went out saying "not a
+ * substitute for professional advice" (Diamond, Sehwag register). Biographies
+ * carry the biography disclosure Diamond set for MDH; the medical and awareness
+ * lines keep the health wording.
+ */
+export function disclaimerFor(line: string | undefined): string {
+  return line === 'biographies'
+    ? 'This educational comic is based on publicly available information, books, interviews and ' +
+        'published reporting. It is not an official publication of, or endorsed by, the people or ' +
+        'organisations it describes. Some scenes are reconstructed to explain documented events; ' +
+        'direct quotations are identified in the source notes.'
+    : 'For awareness & education — not a substitute for professional advice.'
+}
+
 export function ComicDocxButton({ comic, draftHtml }: { comic: Comic; draftHtml: string }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -88,7 +104,7 @@ export function ComicDocxButton({ comic, draftHtml }: { comic: Comic; draftHtml:
           border: { bottom: { style: BorderStyle.SINGLE, size: 6, color: ACCENT, space: 1 } },
           children: [
             new TextRun({
-              text: 'For awareness & education — not a substitute for professional advice.',
+              text: disclaimerFor(comic.line),
               italics: true,
               size: 18,
               color: '666666',
