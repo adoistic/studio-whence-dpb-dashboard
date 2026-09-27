@@ -224,6 +224,55 @@ it('renders the corrections counts', () => {
   expect(panel.textContent).toMatch(/1 raised with Diamond/i)
 })
 
+// The ledger publishes more states than the first three. A row the list did not
+// know used to vanish while still counting towards the total, so the tab said
+// "83 corrections" and showed 78. Every row must be listed, whatever its state.
+it('lists pending-art and to-raise rows and counts them in the summary', () => {
+  render(
+    <VersionTimeline
+      changelog={[{ note: 'x' }]}
+      corrections={{
+        items: [
+          { id: 'a', source: 'portal', summary: 'done one', state: 'applied' },
+          { id: 'b', source: 'register', summary: 'art still to draw', state: 'pending-art' },
+          { id: 'c', source: 'register', summary: 'question we owe', state: 'to-raise' },
+        ],
+        counts: { applied: 1, raisedWithDiamond: 0, needsDecision: 0, pendingArt: 1, toRaise: 1 },
+        total: 3,
+      }}
+    />,
+  )
+  fireEvent.click(screen.getByRole('tab', { name: /corrections/i }))
+  const panel = screen.getByRole('tabpanel')
+  const rows = panel.querySelectorAll('li')
+  expect(rows.length).toBe(3)
+  // unresolved before applied
+  expect(rows[2].textContent).toContain('done one')
+  expect(panel.textContent).toMatch(/1 art in progress/i)
+  expect(panel.textContent).toMatch(/1 to ask Diamond/i)
+  expect(within(rows[0]).getByText(/to ask diamond|art in progress/i)).toBeInTheDocument()
+})
+
+it('still lists a row whose state it has never seen', () => {
+  render(
+    <VersionTimeline
+      changelog={[{ note: 'x' }]}
+      corrections={{
+        items: [
+          // a state a newer ledger might publish before this page learns it
+          { id: 'z', source: 'portal', summary: 'future state row', state: 'on-hold' as never },
+        ],
+        counts: { applied: 0, raisedWithDiamond: 0, needsDecision: 0 },
+        total: 1,
+      }}
+    />,
+  )
+  fireEvent.click(screen.getByRole('tab', { name: /corrections/i }))
+  const row = within(screen.getByRole('tabpanel')).getByRole('listitem')
+  expect(row.textContent).toContain('future state row')
+  expect(row.textContent).toMatch(/on hold/i)
+})
+
 it('hides the Corrections tab when the ledger is empty', () => {
   render(
     <VersionTimeline

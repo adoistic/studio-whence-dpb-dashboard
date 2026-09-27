@@ -44,11 +44,17 @@ export interface Comic {
       page?: number
       raised?: string
       summary: string
-      state: 'applied' | 'raised-with-diamond' | 'needs-decision'
+      state: 'applied' | 'raised-with-diamond' | 'needs-decision' | 'pending-art' | 'to-raise'
       done?: string
       note?: string
     }>
-    counts: { applied: number; raisedWithDiamond: number; needsDecision: number }
+    counts: {
+      applied: number
+      raisedWithDiamond: number
+      needsDecision: number
+      pendingArt?: number
+      toRaise?: number
+    }
     total: number
   }
   sources_count?: number

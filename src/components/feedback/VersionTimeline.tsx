@@ -82,29 +82,52 @@ function ChangelogList({ entries }: { entries: ChangelogEntry[] }) {
 
 // Unresolved first: a reviewer reading the book wants what is still open, not
 // the archive of what has already been fixed.
-const STATE_ORDER: CorrectionState[] = ['needs-decision', 'raised-with-diamond', 'applied']
+const STATE_ORDER: CorrectionState[] = [
+  'needs-decision',
+  'to-raise',
+  'raised-with-diamond',
+  'pending-art',
+  'applied',
+]
 
 const STATE_LABEL: Record<CorrectionState, string> = {
   'needs-decision': 'Needs decision',
+  'to-raise': 'To ask Diamond',
   'raised-with-diamond': 'Raised with Diamond',
+  'pending-art': 'Art in progress',
   applied: 'Applied',
 }
 
 const STATE_PILL: Record<CorrectionState, string> = {
   'needs-decision': 'border-brand-gold text-brand-gold',
+  'to-raise': 'border-brand-gold text-brand-gold',
   'raised-with-diamond': 'border-brand-slate text-brand-slate',
+  'pending-art': 'border-brand-slate text-brand-slate',
   applied: 'border-brand-pale-dusk text-brand-slate',
 }
 
+// A state this page has not learnt yet ("on-hold") still gets a readable pill.
+const labelFor = (state: string) =>
+  STATE_LABEL[state as CorrectionState] ??
+  state.replace(/-/g, ' ').replace(/^./, (c) => c.toUpperCase())
+const pillFor = (state: string) =>
+  STATE_PILL[state as CorrectionState] ?? 'border-brand-slate text-brand-slate'
+
 function CorrectionsList({ corrections }: { corrections: Corrections }) {
   const { counts } = corrections
-  const rows = STATE_ORDER.flatMap((state) =>
-    corrections.items.filter((item) => item.state === state),
-  )
+  // Every row is listed. Known states in STATE_ORDER, then anything newer, then
+  // applied last — a row must never vanish just because its state is unfamiliar.
+  const rank = (state: string) => {
+    const i = STATE_ORDER.indexOf(state as CorrectionState)
+    return i === -1 ? STATE_ORDER.length - 1.5 : i
+  }
+  const rows = [...corrections.items].sort((a, b) => rank(a.state) - rank(b.state))
   const summary = (
     [
       [counts.needsDecision, 'needs decision'],
+      [counts.toRaise ?? 0, 'to ask Diamond'],
       [counts.raisedWithDiamond, 'raised with Diamond'],
+      [counts.pendingArt ?? 0, 'art in progress'],
       [counts.applied, 'applied'],
     ] as const
   )
@@ -131,9 +154,9 @@ function CorrectionsList({ corrections }: { corrections: Corrections }) {
             )}
             <span className="min-w-[12rem] flex-1">{item.summary}</span>
             <span
-              className={`shrink-0 rounded-full border px-2.5 py-0.5 font-sans text-[0.62rem] uppercase tracking-label ${STATE_PILL[item.state]}`}
+              className={`shrink-0 rounded-full border px-2.5 py-0.5 font-sans text-[0.62rem] uppercase tracking-label ${pillFor(item.state)}`}
             >
-              {STATE_LABEL[item.state]}
+              {labelFor(item.state)}
             </span>
             {item.note && (
               <span className="w-full font-sans text-[0.72rem] text-brand-slate">{item.note}</span>
