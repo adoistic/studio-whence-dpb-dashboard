@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { comicPageKeys, comicWebPageKeys, webVariantKey } from '@/lib/comicPageKeys'
+import { comicPageKeys, comicPdfKeys, comicWebPageKeys, webVariantKey } from '@/lib/comicPageKeys'
 import type { Comic } from '@/types/content'
 
 const base: Comic = {
@@ -43,5 +43,35 @@ describe('comicWebPageKeys', () => {
       'images/comics/biographies/01-the-comic/pages/web/page-01.jpg',
       'images/comics/biographies/01-the-comic/pages/web/page-02.jpg',
     ])
+  })
+})
+
+describe('comicPdfKeys', () => {
+  const ic = 'artifacts/comics/biographies/01-the-comic/inside-covers'
+  test('book order: cover, inside front, pages, inside back', () => {
+    // Diamond, 30 Sep 2026: the downloaded PDF had no inside covers.
+    const c: Comic = {
+      ...base,
+      pages: { hasPages: true, count: 2, coverKey: 'images/comics/biographies/01-the-comic/cover.jpg' },
+      insideCovers: { language: 'English', images: [
+        { key: `${ic}/inside-back-cover.png`, label: 'Inside back cover' },
+        { key: `${ic}/inside-front-cover.png`, label: 'Inside front cover' },
+      ] },
+    }
+    expect(comicPdfKeys(c)).toEqual([
+      'images/comics/biographies/01-the-comic/cover.jpg',
+      `${ic}/inside-front-cover.png`,
+      'images/comics/biographies/01-the-comic/pages/page-01.jpg',
+      'images/comics/biographies/01-the-comic/pages/page-02.jpg',
+      `${ic}/inside-back-cover.png`,
+    ])
+  })
+  test('no inside covers → same as comicPageKeys', () => {
+    const c: Comic = { ...base, pages: { hasPages: true, count: 2, coverKey: null } }
+    expect(comicPdfKeys(c)).toEqual(comicPageKeys(c))
+  })
+  test('no pages → empty, even with inside covers', () => {
+    const c: Comic = { ...base, insideCovers: { language: 'English', images: [{ key: `${ic}/a.png`, label: 'Inside front cover' }] } }
+    expect(comicPdfKeys(c)).toEqual([])
   })
 })

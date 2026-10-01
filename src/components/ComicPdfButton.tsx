@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { PDFDocument } from 'pdf-lib'
 import type { Comic } from '@/types/content'
-import { comicPageKeys, webVariantKey } from '@/lib/comicPageKeys'
+import { comicPdfKeys, webVariantKey } from '@/lib/comicPageKeys'
 import { resolveUrls } from '@/lib/dataApi'
 import { fetchPagesWithFallback } from '@/lib/exportFetch'
 import { previewPageJpeg } from '@/lib/watermark'
@@ -31,15 +31,47 @@ export async function buildComicPdf(
   images: { bytes: Uint8Array; type: string }[],
 ): Promise<Uint8Array> {
   const pdf = await PDFDocument.create()
+  const embeddedAll = []
   for (const img of images) {
     const usePng = isPng(img.bytes) || (!isJpg(img.bytes) && img.type.includes('png'))
-    const embedded = usePng
+    embeddedAll.push(usePng
       ? await pdf.embedPng(img.bytes)
-      : await pdf.embedJpg(img.bytes)
-    const page = pdf.addPage([embedded.width, embedded.height])
-    page.drawImage(embedded, { x: 0, y: 0, width: embedded.width, height: embedded.height })
+      : await pdf.embedJpg(img.bytes))
   }
+  const sizes = pdfPageSizes(embeddedAll.map((e) => ({ width: e.width, height: e.height })))
+  embeddedAll.forEach((embedded, i) => {
+    const [w, h] = sizes[i]
+    const page = pdf.addPage([w, h])
+    page.drawImage(embedded, { x: 0, y: 0, width: w, height: h })
+  })
   return pdf.save()
+}
+
+/** One page size per plate, normalised to the book's own interior trim.
+ *
+ * The reference is the most common pixel size, which is the interior page. A
+ * plate within 1% of its shape (an inside cover rendered at 2016x2822 beside
+ * 1429x2000 pages) gets the reference size exactly; any other plate keeps its
+ * own shape at the reference height. Sizing each page off its own pixels made
+ * a same-shaped plate at a different resolution a different page size, which a
+ * client reads as a defect (Diamond, 30 Sep 2026: "one approved size
+ * throughout"). Pure. */
+export function pdfPageSizes(dims: { width: number; height: number }[]): [number, number][] {
+  if (dims.length === 0) return []
+  const counts = new Map<string, number>()
+  for (const d of dims) counts.set(`${d.width}x${d.height}`, (counts.get(`${d.width}x${d.height}`) ?? 0) + 1)
+  let ref = dims[0]
+  let best = 0
+  for (const d of dims) {
+    const n = counts.get(`${d.width}x${d.height}`) ?? 0
+    if (n > best) { best = n; ref = d }
+  }
+  const refRatio = ref.height / ref.width
+  return dims.map((d) => {
+    const ratio = d.height / d.width
+    if (Math.abs(ratio - refRatio) / refRatio <= 0.01) return [ref.width, ref.height]
+    return [(d.width * ref.height) / d.height, ref.height]
+  })
 }
 
 /** What a download contains. `low` and `watermarked` are both low-resolution;
@@ -62,7 +94,9 @@ export function ComicPdfButton({ comic }: { comic: Comic }) {
       // Resolve the masters always, plus the web variants when we want the small
       // ones, then fall back at FETCH time — `/resolve` signs a URL whether or
       // not the object exists, so a missing web variant only shows up on fetch.
-      const masterKeys = comicPageKeys(comic)
+      // Book order, inside covers included (comicPdfKeys). Inside covers have no
+      // web variant; the fetch falls back to the master for them.
+      const masterKeys = comicPdfKeys(comic)
       const pairs = masterKeys.map((masterKey) => ({
         webKey: webVariantKey(masterKey), masterKey,
       }))
@@ -73,7 +107,8 @@ export function ComicPdfButton({ comic }: { comic: Comic }) {
       type PageBytes = { bytes: Uint8Array; type: string }
       let images: PageBytes[] = fetched
         .filter((b): b is Uint8Array => b !== null)
-        .map((bytes) => ({ bytes, type: 'image/jpeg' }))
+        // Inside covers are PNG; pages are JPEG. Name the real format.
+        .map((bytes) => ({ bytes, type: isPng(bytes) ? 'image/png' : 'image/jpeg' }))
       if (images.length === 0) throw new Error('no pages could be fetched')
       if (images.length < masterKeys.length) {
         throw new Error(
