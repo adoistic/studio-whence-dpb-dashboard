@@ -92,9 +92,15 @@ export function parseBookModel(text: string | null | undefined): BookModel | nul
   }
 }
 
-/** The visible text of a block, citation markers removed. */
+/** The visible text of a block: citation markers removed, *italic* markers dropped (they render
+ *  as italics, so a reader's selection never contains the asterisks). */
 export function blockText(block: BookBlock): string {
-  return (block.parts ?? []).map((p) => ('t' in p ? p.t : '')).join('')
+  return (block.parts ?? []).map((p) => ('t' in p ? p.t : '')).join('').replace(/\*([^*\n]+)\*/g, '$1')
+}
+
+/** A text part as runs: the manuscript marks titles as *Empire of AI*. */
+export function inlineRuns(text: string): { text: string; italic: boolean }[] {
+  return text.split(/\*([^*\n]+)\*/).map((t, i) => ({ text: t, italic: i % 2 === 1 })).filter((r) => r.text)
 }
 
 export const SHELF_LABEL: Record<string, string> = {

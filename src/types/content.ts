@@ -74,6 +74,8 @@ export interface Comic {
   chapterCount?: number
   /** R2 key of the reader model; defaults to drafts/{line}/{slug}/manuscript.json. */
   manuscriptKey?: string
+  /** The typeset book (tools/book_typeset.py in the content repo), gated under artifacts/. */
+  downloads?: Partial<Record<'pdf' | 'docx', { key: string; filename?: string; bytes?: number }>>
   art_style?: string
   language?: string
   // Future-proofing (not yet in data)

@@ -21,7 +21,7 @@ const para = (c: number, p: number, words: string, cite = true) => ({
 })
 
 const SAMPLE =
-  'This is placeholder prose for layout testing only. It runs long enough to wrap across several lines ' +
+  'This is placeholder prose for *layout testing* only. It runs long enough to wrap across several lines ' +
   'so that the measure, the leading and the first-line indent can be judged at a glance, and it carries a ' +
   'source marker at the end the way a real paragraph would.'
 
@@ -72,7 +72,12 @@ const threads: Thread[] = [
   },
 ]
 
-const comic = { title: model.title, line: model.line, slug: model.slug, status: 'draft', format: 'prose', version: 3, series: 'sample-shelf', subject_slug: null } as unknown as Comic
+const comic = {
+  title: model.title, line: model.line, slug: model.slug, status: 'draft', format: 'prose', version: 3,
+  series: 'sample-shelf', subject_slug: null,
+  downloads: { pdf: { key: 'artifacts/comics/books-sample/sample-book/book/sample.pdf', bytes: 535000 },
+               docx: { key: 'artifacts/comics/books-sample/sample-book/book/sample.docx', bytes: 302000 } },
+} as unknown as Comic
 
 export default function DevBookPreview() {
   if (process.env.NODE_ENV === 'production') return null

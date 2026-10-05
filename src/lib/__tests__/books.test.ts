@@ -4,7 +4,7 @@ import { describe, expect, test, vi } from 'vitest'
 // helpers under test are pure, so stub the app the same way surface.test.ts does.
 vi.mock('@/lib/firebase', () => ({ app: {}, auth: {}, db: {}, googleProvider: {} }))
 import {
-  blockText, formatWords, isBook, isBooksLine, locatePassage, manuscriptKeyFor, parseBookModel,
+  blockText, formatWords, inlineRuns, isBook, isBooksLine, locatePassage, manuscriptKeyFor, parseBookModel,
   parsePassageRef, passageAnchor, passageOrder, readingTime, type BookModel,
 } from '@/lib/books'
 import { categoryOfLineSlug, surfaceOfLineSlug } from '@/lib/surface'
@@ -47,6 +47,13 @@ describe('reader model', () => {
   test('block text drops citation markers', () => {
     expect(blockText({ kind: 'para', parts: [{ t: 'The lab opened' }, { cite: 1 }, { t: ' in December.' }] }))
       .toBe('The lab opened in December.')
+  })
+
+  test('italic markers render as runs and never reach the selection text', () => {
+    expect(inlineRuns('Hao, in *Empire of AI*, says')).toEqual([
+      { text: 'Hao, in ', italic: false }, { text: 'Empire of AI', italic: true }, { text: ', says', italic: false },
+    ])
+    expect(blockText({ kind: 'para', parts: [{ t: 'In *Supremacy* Olson writes' }] })).toBe('In Supremacy Olson writes')
   })
 
   test('formats words and reading time', () => {

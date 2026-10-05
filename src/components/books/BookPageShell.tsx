@@ -8,10 +8,11 @@ import { useComicFeedback, type Author } from '@/lib/feedback'
 import { visibleTo, type Thread } from '@/lib/feedbackTypes'
 import { useGatedText } from '@/lib/useGatedText'
 import {
-  blockText, formatWords, manuscriptKeyFor, parseBookModel, passageAnchor, readingTime, SHELF_LABEL,
+  blockText, formatWords, inlineRuns, manuscriptKeyFor, parseBookModel, passageAnchor, readingTime, SHELF_LABEL,
   locatePassage, type BookChapter, type BookModel,
 } from '@/lib/books'
 import { BookMargin, type OpenCite, type Pending } from '@/components/books/BookMargin'
+import { BookDownloads } from '@/components/books/BookDownloads'
 
 const STATUS_LABEL: Record<string, string> = {
   draft: 'Draft', 'in-review': 'In review', approved: 'Approved', published: 'Published',
@@ -174,6 +175,9 @@ export function BookDocument({
           {comic.version ? <span>Version {comic.version}</span> : null}
           {model.updated && <span>Updated {model.updated}</span>}
         </div>
+        <div className="mt-5">
+          <BookDownloads comic={comic} />
+        </div>
       </header>
 
       <div className="mx-auto grid max-w-[1400px] gap-10 px-6 pb-32 lg:grid-cols-[210px_minmax(0,1fr)_340px]">
@@ -308,7 +312,9 @@ function Chapter({
                   {p.cite}
                 </button>
               ) : (
-                <span key={j}>{p.t}</span>
+                <span key={j}>
+                  {inlineRuns(p.t).map((r, k) => (r.italic ? <em key={k}>{r.text}</em> : <span key={k}>{r.text}</span>))}
+                </span>
               ),
             )}
             {notes > 0 && b.id && (
