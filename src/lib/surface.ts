@@ -8,6 +8,7 @@ import { chunk } from '@/lib/visibleCatalog'
 import type { AllowStatus } from '@/lib/auth'
 import type { Allocation } from '@/lib/allocation'
 import type { Coverage, CoverageLine, Figure, Line } from '@/types/content'
+import { BOOKS_LINE_PREFIX } from '@/lib/books'
 
 // ─── What a surface is ────────────────────────────────────────────────────────
 //
@@ -17,22 +18,27 @@ import type { Coverage, CoverageLine, Figure, Line } from '@/types/content'
 // a person may ALREADY see — never a permission. Access decisions stay entirely
 // with the allocation + the Firestore rules, which this file does not touch.
 
-export type Surface = 'comics' | 'manga'
+// A third surface, books, holds prose: the same research written as full-length
+// books, read as a document and reviewed by comment and suggestion
+// (docs/superpowers/specs/2026-10-05-books-surface-design.md in the content repo).
+export type Surface = 'comics' | 'manga' | 'books'
 
-export const SURFACES: readonly Surface[] = ['comics', 'manga'] as const
+export const SURFACES: readonly Surface[] = ['comics', 'manga', 'books'] as const
 
 export const SURFACE_LABEL: Record<Surface, string> = {
   comics: 'Comics',
   manga: 'Manga',
+  books: 'Books',
 }
 
 export const SURFACE_BLURB: Record<Surface, string> = {
   comics: 'Every comic line in production, with research, scripts and finished pages.',
   manga: 'The manga saga, in volumes.',
+  books: 'The research, written as books. Read, comment and suggest edits.',
 }
 
 export function isSurface(v: unknown): v is Surface {
-  return v === 'comics' || v === 'manga'
+  return v === 'comics' || v === 'manga' || v === 'books'
 }
 
 // ─── A line declares the surface; everything beneath it inherits ──────────────
@@ -52,15 +58,22 @@ export function isSurface(v: unknown): v is Surface {
 // carry an "Indic" without sharing a key, and a category can exist on one
 // surface and not the other.
 export const MANGA_LINE_PREFIX = 'manga-'
+// Books follow the same scheme: `books-biographies`, `books-indic`, … (the prefix
+// lives in the pure books module so it can be read without Firestore).
+export { BOOKS_LINE_PREFIX }
 
 export function surfaceOfLineSlug(slug: string | null | undefined): Surface {
   if (!slug) return 'comics'
-  return slug.startsWith(MANGA_LINE_PREFIX) ? 'manga' : 'comics'
+  if (slug.startsWith(MANGA_LINE_PREFIX)) return 'manga'
+  if (slug.startsWith(BOOKS_LINE_PREFIX)) return 'books'
+  return 'comics'
 }
 
-/** The category part of a line slug: `manga-indic` → `indic`. */
+/** The category part of a line slug: `manga-indic` → `indic`, `books-biographies` → `biographies`. */
 export function categoryOfLineSlug(slug: string): string {
-  return slug.startsWith(MANGA_LINE_PREFIX) ? slug.slice(MANGA_LINE_PREFIX.length) : slug
+  if (slug.startsWith(MANGA_LINE_PREFIX)) return slug.slice(MANGA_LINE_PREFIX.length)
+  if (slug.startsWith(BOOKS_LINE_PREFIX)) return slug.slice(BOOKS_LINE_PREFIX.length)
+  return slug
 }
 
 export function surfaceOfLine(line: Pick<Line, 'slug'> & { surface?: string }): Surface {

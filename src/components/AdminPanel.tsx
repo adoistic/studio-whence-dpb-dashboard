@@ -114,9 +114,10 @@ function SurfaceScope({
 }) {
   const current: 'both' | Surface = surfaces?.length === 1 ? surfaces[0] : 'both'
   const options: { key: 'both' | Surface; label: string; value: Surface[] | null }[] = [
-    { key: 'both', label: 'Both', value: null },
+    { key: 'both', label: 'All', value: null },
     { key: 'comics', label: SURFACE_LABEL.comics, value: ['comics'] },
     { key: 'manga', label: SURFACE_LABEL.manga, value: ['manga'] },
+    { key: 'books', label: SURFACE_LABEL.books, value: ['books'] },
   ]
   return (
     <span role="group" aria-label={`Surfaces ${email} moderates`} className="inline-flex gap-1">

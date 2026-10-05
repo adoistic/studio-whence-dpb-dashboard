@@ -8,6 +8,8 @@ import { personDocToRow } from '@/lib/people'
 import { LinePageShell } from '@/components/LinePageShell'
 import { LoadingState, ErrorState, NotFoundState } from '@/components/QuietStates'
 import { INTROS } from '@/lib/intros'
+import { BooksLineShell } from '@/components/books/BooksLineShell'
+import { isBooksLine } from '@/lib/books'
 
 // Read the first path segment of the browser URL as the line slug. This single
 // page is served for every /<line> URL via the Firebase Hosting rewrite
@@ -66,6 +68,9 @@ export default function LinePage() {
 
   // INTROS[slug] is typed non-undefined (tsconfig has no noUncheckedIndexedAccess),
   // but at runtime an unknown slug yields undefined — the guard is load-bearing.
+  // A books line is a shelf, not a production line: no people tables or pipeline.
+  if (isBooksLine(slug)) return <BooksLineShell line={line} />
+
   const Intro = INTROS[slug]
   return <LinePageShell line={line} introMdx={Intro ? <Intro /> : null} people={peopleRows} />
 }

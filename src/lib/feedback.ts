@@ -5,7 +5,7 @@ import {
   doc, serverTimestamp, type QueryConstraint, type QuerySnapshot,
 } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
-import { groupThreads, type FeedbackNode, type Thread, type Status, type Anchor, type Category } from '@/lib/feedbackTypes'
+import { groupThreads, type FeedbackNode, type Thread, type Status, type Anchor, type Category, type Suggestion } from '@/lib/feedbackTypes'
 
 export interface Live<T> { data: T; loading: boolean; error?: Error }
 export interface Author { email: string; name: string; role: string }
@@ -104,11 +104,14 @@ export function addComment(
     lang: string
     /** Who it is for: that same code, or 'all'. */
     langScope: string
+    /** A prose book's proposed edit (exact replacement wording). */
+    suggestion?: Suggestion
   },
   author: Author,
 ) {
   return addDoc(collection(db, 'feedback'), {
     comicId: input.comicId, line: input.line, parentId: null, anchors: input.anchors,
+    ...(input.suggestion ? { suggestion: input.suggestion } : {}),
     authorEmail: author.email, authorName: author.name, authorRole: author.role,
     body: input.body, status: 'open', category: input.category ?? 'fact',
     comicVersion: input.comicVersion, hidden: false,

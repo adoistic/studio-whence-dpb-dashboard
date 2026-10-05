@@ -779,3 +779,126 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
+
+/* ── The books surface ───────────────────────────────────────────────────────
+   Paper and ink for prose: a warm book stock behind a white page, so the
+   document reads as a manuscript rather than a web page. Body text is set in
+   Literata (a face drawn for long-form reading); headings keep the house
+   serif. Sizes and measure follow book typesetting: ~66 characters a line,
+   first-line indents after the opening paragraph, a centred break mark. */
+.surface-books {
+  --book-stock: #f3eee4;
+  --book-ink: #22201f;
+  background: var(--book-stock);
+}
+.book-page {
+  box-shadow: 0 1px 0 rgba(30, 26, 58, 0.06), 0 12px 32px -18px rgba(30, 26, 58, 0.25);
+  color: var(--book-ink);
+}
+.book-logline {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: 1.2rem;
+  line-height: 1.5;
+  color: var(--color-brand-umber);
+  margin-bottom: 3rem;
+}
+.book-chapter + .book-chapter {
+  margin-top: 5rem;
+  padding-top: 4rem;
+  border-top: 1px solid rgba(123, 108, 93, 0.18);
+}
+.book-chapter-number {
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-brand-gold);
+}
+.book-chapter-title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  font-size: 2.1rem;
+  line-height: 1.1;
+  margin: 0.6rem 0 2.4rem;
+  color: var(--color-brand-deep);
+}
+.book-para,
+.book-epigraph {
+  position: relative;
+  font-family: 'Literata', Georgia, serif;
+  font-size: 1.06rem;
+  line-height: 1.72;
+  hyphens: auto;
+}
+.book-para + .book-para {
+  text-indent: 1.6em;
+}
+.book-para-first::first-line {
+  font-variant-caps: small-caps;
+  letter-spacing: 0.02em;
+}
+.book-epigraph {
+  font-style: italic;
+  color: var(--color-brand-umber);
+  margin: 0 0 2rem 2rem;
+  padding-left: 1rem;
+  border-left: 2px solid rgba(196, 162, 101, 0.6);
+}
+.book-break {
+  text-align: center;
+  letter-spacing: 0.5em;
+  color: var(--color-brand-umber);
+  margin: 1.8rem 0;
+}
+.book-cite {
+  user-select: none;
+  vertical-align: super;
+  font-family: var(--font-sans);
+  font-size: 0.62rem;
+  line-height: 0;
+  margin-left: 0.12em;
+  padding: 0 0.15em;
+  color: var(--color-brand-indigo);
+  text-indent: 0;
+  border-radius: 2px;
+}
+.book-cite:hover,
+.book-cite:focus-visible {
+  background: rgba(59, 54, 100, 0.12);
+  outline: none;
+}
+.book-has-notes {
+  background: linear-gradient(transparent 0, rgba(196, 162, 101, 0.13) 0);
+  box-shadow: -0.75rem 0 0 rgba(196, 162, 101, 0.13), 0.75rem 0 0 rgba(196, 162, 101, 0.13);
+}
+.book-note-pin {
+  user-select: none;
+  position: absolute;
+  top: 0.25rem;
+  right: -2.6rem;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  background: var(--color-brand-gold);
+  color: white;
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  line-height: 1.4rem;
+  text-indent: 0;
+  text-align: center;
+}
+@media (max-width: 767px) {
+  .book-note-pin { right: -1.2rem; }
+}
+.book-flash {
+  animation: book-flash 1.6s ease-out;
+}
+@keyframes book-flash {
+  0% { background-color: rgba(196, 162, 101, 0.45); }
+  100% { background-color: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .book-flash { animation: none; background-color: rgba(196, 162, 101, 0.25); }
+}

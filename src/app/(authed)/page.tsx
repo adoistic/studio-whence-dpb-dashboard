@@ -10,6 +10,7 @@ import { StatusWorkbookButton } from '@/components/StatusWorkbookButton'
 import { useCoverage, useHeadline, useLines } from '@/lib/catalog'
 import { filterCoverageBySurface, surfaceIndex, useActiveSurface } from '@/lib/surface'
 import { MangaBackdrop } from '@/components/MangaBackdrop'
+import { BooksHome } from '@/components/books/BooksHome'
 import { useResolved } from '@/lib/useResolved'
 import { HERO_BACKDROP, SAMPLE_PAGES } from '@/lib/images'
 import type { ActivityEntry } from '@/types/content'
@@ -25,7 +26,14 @@ import type { ActivityEntry } from '@/types/content'
 // rather than a zero. (Adnan spotted it, 2026-09-16.)
 const WORDS_ON_FILE = 10_000_000
 
+// The books surface has its own home: shelves of books rather than the comics
+// coverage roll-up, which knows nothing of books (see BooksHome).
 export default function Home() {
+  const { surface } = useActiveSurface()
+  return surface === 'books' ? <BooksHome /> : <ComicsHome />
+}
+
+function ComicsHome() {
   const { data: meta } = useHeadline()
   const { data: allLines } = useLines()
   // The studio-status roll-up (meta/coverage) drives the coverage overview and

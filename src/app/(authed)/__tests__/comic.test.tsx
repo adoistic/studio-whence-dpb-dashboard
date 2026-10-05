@@ -10,6 +10,9 @@ vi.mock('@/lib/catalog', () => ({ useComic: () => mockUseComic() }))
 vi.mock('@/components/ComicPageShell', () => ({
   ComicPageShell: ({ comic }: { comic: { title: string } }) => <div>{comic.title}</div>,
 }))
+vi.mock('@/components/books/BookPageShell', () => ({
+  BookPageShell: ({ comic }: { comic: { title: string } }) => <div>book:{comic.title}</div>,
+}))
 
 const comic = {
   title: 'The Sky-High Dreamer', slug: '01-the-sky-high-dreamer',
@@ -28,6 +31,13 @@ describe('ComicPage — data-driven /<line>/<slug> routing', () => {
     mockUseComic = () => ({ data: comic, loading: false })
     render(<ComicPage />)
     expect(screen.getByText('The Sky-High Dreamer')).toBeInTheDocument()
+  })
+
+  test('a prose book (format "prose") renders the book shell, not the comic shell', () => {
+    setPathname('/books-biographies/openai')
+    mockUseComic = () => ({ data: { ...comic, line: 'books-biographies', slug: 'openai', title: 'OpenAI', format: 'prose' }, loading: false })
+    render(<ComicPage />)
+    expect(screen.getByText('book:OpenAI')).toBeInTheDocument()
   })
 
   test('missing comic (useComic error) → not found', () => {

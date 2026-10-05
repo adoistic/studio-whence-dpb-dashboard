@@ -67,6 +67,10 @@ vi.mock('@/components/LinePageShell', () => ({
   ),
 }))
 
+vi.mock('@/components/books/BooksLineShell', () => ({
+  BooksLineShell: ({ line }: { line: { title: string } }) => <div>shelf:{line.title}</div>,
+}))
+
 // Stub the intro registry — the page guards on it, so an empty map is fine.
 vi.mock('@/lib/intros', () => ({ INTROS: {} }))
 
@@ -113,6 +117,13 @@ beforeEach(() => {
 // ─── Tests ──────────────────────────────────────────────────────────────────
 
 describe('LinePage — data-driven /line routing', () => {
+  test('a books-<category> line renders the books shelf, not the production line page', () => {
+    setPathname('/books-biographies')
+    mockUseLines = () => loaded([...lineDocs, { slug: 'books-biographies', title: 'Biographies', subtitle: '' }] as unknown as Line[])
+    render(<LinePage />)
+    expect(screen.getByText('shelf:Biographies')).toBeInTheDocument()
+  })
+
   test('renders LinePageShell for the line named by the URL slug', () => {
     setPathname('/biographies')
     mockUseLines = () => loaded(lineDocs)

@@ -8,7 +8,7 @@ import { db } from '@/lib/firebase'
 import { toMillis } from '@/lib/feedbackTypes'
 // Type-only, so this does not create a cycle with surface.ts (which imports
 // normalizeEmail from here).
-import type { Surface } from '@/lib/surface'
+import { SURFACES, type Surface } from '@/lib/surface'
 
 // ─── Shared async one-shot (mirrors catalog.ts useAsync) ─────────────────────────
 
@@ -86,7 +86,7 @@ export function useMembers(refreshKey: number): Async<Member[]> {
       .map((d) => {
         const data = d.data() as { role?: unknown; surfaces?: unknown }
         const raw: unknown[] = Array.isArray(data.surfaces) ? data.surfaces : []
-        const surfaces = (['comics', 'manga'] as const).filter((s) => raw.includes(s))
+        const surfaces = SURFACES.filter((s) => raw.includes(s))
         return {
           email: d.id,
           ...(data as object),

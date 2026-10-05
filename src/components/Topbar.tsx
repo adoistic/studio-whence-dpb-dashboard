@@ -250,7 +250,7 @@ export function Topbar() {
                 <div className="my-1 h-px bg-brand-pale-dusk" aria-hidden="true" />
                 <div
                   role="group"
-                  aria-label="Switch between comics and manga"
+                  aria-label="Switch between comics, manga and books"
                   className="flex gap-1 px-1 py-1"
                 >
                   {(availableSurfaces ?? []).map((s) => (

@@ -68,6 +68,12 @@ export interface Comic {
   imprint?: string
   format?: string
   max_text_lines_per_page?: number
+  // Books surface (format === 'prose'): a manuscript, read as a document.
+  shelf?: 'nonfiction' | 'novelised' | string
+  wordCount?: number
+  chapterCount?: number
+  /** R2 key of the reader model; defaults to drafts/{line}/{slug}/manuscript.json. */
+  manuscriptKey?: string
   art_style?: string
   language?: string
   // Future-proofing (not yet in data)

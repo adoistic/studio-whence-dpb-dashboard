@@ -30,13 +30,23 @@ export const STATUS_COLOR: Record<Status, { hex: string; label: string }> = {
   wont_fix:    { hex: '#c2603a', label: "Won't fix" },   // muted red/clay
 }
 
-export type AnchorKind = 'page' | 'panel' | 'beat' | 'box'
+export type AnchorKind = 'page' | 'panel' | 'beat' | 'box' | 'passage'
 
 export interface Anchor {
   kind: AnchorKind
   // page: "p13" · panel: "p13.pl1" · beat: "p13.pl1.b2" | "p13.pl1.art" · box: "p13.b3"
+  // passage (a prose book): "c3.p12" — chapter 3, paragraph 12
   ref: string
+  /** For a passage anchor this holds the CHAPTER number, so page-keyed consumers
+   *  still get a sensible group; read `chapter`/`para` for book anchors. */
   page: number
+  /** Passage anchors only. */
+  chapter?: number
+  para?: number
+  /** Passage anchors only: the exact words selected. Re-anchoring after the text
+   *  changes searches for these, so a comment follows its words when a
+   *  paragraph is inserted above it, and shows as outdated when they are gone. */
+  quote?: string
   panel?: number // absent for page and box anchors
   /** Present only for box anchors — one balloon/caption in a TRANSLATED script.
    *  Kept distinct from a beat because translation boxes do not map onto
@@ -47,6 +57,7 @@ export interface Anchor {
 
 /** Short chip label for an anchor, distinct by kind. */
 export function anchorLabel(a: Anchor): string {
+  if (a.kind === 'passage') return `Ch ${a.chapter ?? a.page} ¶${a.para ?? '?'}`
   if (a.kind === 'page') return `Page ${a.page}`
   if (a.kind === 'panel') return `Panel ${a.panel} · p${a.page}`
   if (a.kind === 'box') return `Box ${a.box} · p${a.page}`
@@ -78,9 +89,18 @@ export interface FeedbackNode {
   hidden: boolean
   /** Approval gate. Missing is treated as a draft for display; seeded/backfilled docs are `true`. */
   published?: boolean
+  /** A proposed edit to a prose book: replace `from` (the selected words) with
+   *  `to`, exactly as written. Applied to the manuscript master in the content
+   *  repo, never in the portal — the repo stays the single source of truth. */
+  suggestion?: Suggestion
   createdAt: unknown
   updatedAt?: unknown
   editedAt?: unknown | null
+}
+
+export interface Suggestion {
+  from: string
+  to: string
 }
 
 /** A comment is a draft until explicitly published (a moderator approving it). */

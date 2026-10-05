@@ -2,6 +2,8 @@
 
 import { useComic } from '@/lib/catalog'
 import { ComicPageShell } from '@/components/ComicPageShell'
+import { BookPageShell } from '@/components/books/BookPageShell'
+import { isBook } from '@/lib/books'
 import { LoadingState, NotFoundState } from '@/components/QuietStates'
 
 // Read the first two path segments of the browser URL as <line>/<comic-slug>.
@@ -25,5 +27,9 @@ export default function ComicPage() {
   if (error || !comic)
     return <NotFoundState title="Comic not found" detail={`No comic matches “${lineSlug}/${comicSlug}”.`} />
 
+  // A prose book is a comic doc with format 'prose'; it reads as a document, not
+  // a page gallery, so it gets its own shell. Branching here, before either
+  // shell mounts, keeps ComicPageShell's unconditional hooks untouched.
+  if (isBook(comic)) return <BookPageShell comic={comic} />
   return <ComicPageShell comic={comic} />
 }

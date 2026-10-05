@@ -56,10 +56,10 @@ export default function ChooseSurface() {
     <main className="mx-auto max-w-[1200px] px-6 py-20 md:py-28">
       <SectionHead kicker="Studio Whence" title="Where would you like to start?" />
       <p className="mt-4 max-w-xl font-serif leading-relaxed text-brand-umber">
-        You have access to both. Pick one to begin; you can switch at any time from the menu.
+        You have access to more than one. Pick one to begin; you can switch at any time from the menu.
       </p>
 
-      <div className="mt-12 grid gap-6 md:grid-cols-2">
+      <div className={`mt-12 grid gap-6 ${available.length > 2 ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
         {available.map((surface) => (
           <button
             key={surface}
@@ -68,7 +68,7 @@ export default function ChooseSurface() {
             className="group flex flex-col items-start gap-3 rounded-xl border border-brand-pale-dusk bg-white/60 p-8 text-left transition-colors duration-200 hover:border-brand-indigo/40 hover:bg-white"
           >
             <span className="font-sans text-[0.7rem] uppercase tracking-label text-brand-gold">
-              {surface === 'manga' ? 'New' : 'In production'}
+              {surface === 'comics' ? 'In production' : 'New'}
             </span>
             <span className="font-serif text-3xl font-light text-brand-indigo">
               {SURFACE_LABEL[surface]}
