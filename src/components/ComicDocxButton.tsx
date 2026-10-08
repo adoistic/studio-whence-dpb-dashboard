@@ -43,11 +43,16 @@ export function readerNoteFor(comic: Pick<Comic, 'line' | 'readerNote'>): string
 /**
  * The inside covers, as printed: Diamond reviews this Word file as the master and
  * checks it against the inside covers (SC-16, SC-17, SC-18 on Djokovic; AC-12 on
- * Serena). Fetched from the doc pack's own inside-covers.md, so the two can never
- * say different things. Returns null when the book has none or it cannot be read.
+ * Serena). Fetched from the doc pack, so the two can never say different things.
+ * Returns null when the book has none or it cannot be read.
  */
 async function fetchInsideCovers(comic: Comic): Promise<string | null> {
-  const item = comic.docs?.items.find((i) => i.type === 'inside-covers')
+  // The as-printed text (generated from the cover renderer's own specs) is what Diamond
+  // checks against; inside-covers.md is the writer's working copy, used only when a
+  // book's pack predates the printed item.
+  const items = comic.docs?.items ?? []
+  const item =
+    items.find((i) => i.type === 'inside-covers-printed') ?? items.find((i) => i.type === 'inside-covers')
   if (!item) return null
   try {
     const urls = await resolveUrls([item.downloadKey])
