@@ -24,6 +24,9 @@ export interface Comic {
   target_length_pages?: number
   target_age?: string
   narrator?: string
+  // The book's own approved reader note (script front matter `reader_note:`),
+  // printed by the Word export in place of the line default when present.
+  readerNote?: string
   created?: string
   updated?: string
   changelog?: ChangelogEntry[]
