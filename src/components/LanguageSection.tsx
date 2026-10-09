@@ -36,6 +36,15 @@ export function LanguageSection({ comic }: { comic: Comic }) {
                   Download as PPT (editable, {t.language})
                 </button>
               )}
+              {t.indesign && (
+                <button
+                  type="button"
+                  onClick={() => downloadKey(t.indesign!.key, t.indesign!.filename)}
+                  className="rounded-full border border-brand-indigo px-5 py-2 font-sans text-[0.72rem] font-semibold uppercase tracking-label text-brand-indigo transition-opacity hover:opacity-80"
+                >
+                  Download InDesign (editable, {t.language})
+                </button>
+              )}
               {t.blank && (
                 <button
                   type="button"

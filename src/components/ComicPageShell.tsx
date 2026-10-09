@@ -18,6 +18,7 @@ import { AboutTheBook } from '@/components/AboutTheBook'
 import { ComicReader } from '@/components/ComicReader'
 import { ComicPdfButton } from '@/components/ComicPdfButton'
 import { ComicPptButton } from '@/components/ComicPptButton'
+import { ComicInDesignButton } from '@/components/ComicInDesignButton'
 import { ComicCmykButton } from '@/components/ComicCmykButton'
 import { ComicDocxButton } from '@/components/ComicDocxButton'
 import { ComicPanelExportButton } from '@/components/ComicPanelExportButton'
@@ -358,6 +359,7 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
                   <>
                     <ComicPdfButton comic={comic} />
                     <ComicPptButton comic={comic} />
+                    <ComicInDesignButton comic={comic} />
                     <ComicCmykButton comic={comic} />
                     <ComicExportButton
                       comic={comic}

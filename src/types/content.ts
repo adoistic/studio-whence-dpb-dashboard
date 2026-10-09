@@ -110,6 +110,15 @@ export interface Comic {
     bytes: number
     filename: string
   }
+  // The same editable deck as InDesign design files (.indd + .idml + Links/), zipped, at
+  // artifacts/comics/{line}/{slug}/{slug}-indesign.zip. Built by the pipeline's
+  // deck_to_indesign.py and published only after it matches the deck PDF glyph for glyph.
+  // Drives the "Download InDesign (editable)" button beside the PPT one.
+  indesign?: {
+    key: string
+    bytes: number
+    filename: string
+  }
   // The editable decks rasterised to PAGE IMAGES, one set per published
   // language, at images/comics/{line}/{slug}/deck/{code}/page-NN.jpg with a
   // web/ variant beside it — the same shape as a comic's own pages, so the
@@ -192,6 +201,7 @@ export interface Comic {
     language: string
     script?: { key: string; bytes: number }
     editablePpt?: { key: string; bytes: number; filename: string }
+    indesign?: { key: string; bytes: number; filename: string }
     blank?: { key: string; bytes: number; filename: string }
   }[]
   // Candidate front-cover designs (gated artifacts/comics/…/cover-options/ keys)
