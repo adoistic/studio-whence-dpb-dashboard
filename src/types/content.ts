@@ -119,6 +119,15 @@ export interface Comic {
     bytes: number
     filename: string
   }
+  // ONE InDesign document holding every language of the comic: the shared artwork on a locked
+  // "Art" layer plus one text layer and one paragraph style per language. Each language is checked
+  // against its own PDF. Drives "Download InDesign — all languages, one file".
+  indesignAll?: {
+    key: string
+    bytes: number
+    filename: string
+    languages: string[]
+  }
   // The editable decks rasterised to PAGE IMAGES, one set per published
   // language, at images/comics/{line}/{slug}/deck/{code}/page-NN.jpg with a
   // web/ variant beside it — the same shape as a comic's own pages, so the

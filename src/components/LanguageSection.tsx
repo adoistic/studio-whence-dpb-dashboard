@@ -42,7 +42,7 @@ export function LanguageSection({ comic }: { comic: Comic }) {
                   onClick={() => downloadKey(t.indesign!.key, t.indesign!.filename)}
                   className="rounded-full border border-brand-indigo px-5 py-2 font-sans text-[0.72rem] font-semibold uppercase tracking-label text-brand-indigo transition-opacity hover:opacity-80"
                 >
-                  Download InDesign (editable, {t.language})
+                  Download InDesign — {t.language} only
                 </button>
               )}
               {t.blank && (

@@ -5,7 +5,7 @@ import type { Comic } from '@/types/content'
 const resolveUrls = vi.fn()
 vi.mock('@/lib/dataApi', () => ({ resolveUrls: (keys: string[]) => resolveUrls(keys) }))
 
-import { ComicInDesignButton } from '@/components/ComicInDesignButton'
+import { ComicInDesignAllButton, ComicInDesignButton } from '@/components/ComicInDesignButton'
 
 const baseComic: Comic = {
   title: 'Nole',
@@ -38,10 +38,26 @@ describe('ComicInDesignButton', () => {
     })
 
     render(<ComicInDesignButton comic={comic} />)
-    fireEvent.click(screen.getByRole('button', { name: /download indesign/i }))
+    fireEvent.click(screen.getByRole('button', { name: /download indesign — english only/i }))
 
     await waitFor(() => expect(downloaded).toBe('01-nole-InDesign.zip'))
     expect(resolveUrls).toHaveBeenCalledWith([key])
     expect(fetchMock).toHaveBeenCalledWith('https://r2.example/presigned')
+  })
+
+  test('the all-languages file is labelled as one document with a layer per language', async () => {
+    const key = 'artifacts/comics/biographies/01-nole/01-nole-indesign-all-languages.zip'
+    const comic: Comic = { ...baseComic, indesignAll: { key, bytes: 38000000, filename: '01-nole-InDesign-ALL-LANGUAGES.zip', languages: ['English', 'Hindi'] } }
+    resolveUrls.mockResolvedValue({ [key]: 'https://r2.example/presigned' })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, blob: async () => new Blob(['zip']) }))
+    vi.stubGlobal('URL', { ...URL, createObjectURL: vi.fn(() => 'blob:mock'), revokeObjectURL: vi.fn() })
+    let downloaded = ''
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      downloaded = this.download
+    })
+    render(<ComicInDesignAllButton comic={comic} />)
+    expect(screen.getByText(/a layer per language \(English, Hindi\)/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /all languages, one file/i }))
+    await waitFor(() => expect(downloaded).toBe('01-nole-InDesign-ALL-LANGUAGES.zip'))
   })
 })
