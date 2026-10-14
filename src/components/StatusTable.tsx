@@ -590,10 +590,11 @@ export function StatusTable({
       <p className="mt-6 max-w-3xl font-sans text-[0.72rem] leading-relaxed text-brand-slate">
         <strong className="font-semibold text-brand-indigo">Pages.</strong> A book bills its{' '}
         <strong className="font-semibold text-brand-indigo">script</strong> pages from the day the script exists,
-        plus a standard <strong className="font-semibold text-brand-indigo">eight extras</strong> (front cover, back
-        cover, the inside covers and four activity pages). The moment production goes past the plan, the{' '}
+        plus the <strong className="font-semibold text-brand-indigo">extras actually made</strong> (front cover,
+        back cover, the inside covers and activity pages) — a book with fewer extras bills fewer. The moment
+        production goes past the plan, the{' '}
         <strong className="font-semibold text-brand-indigo">produced count takes over</strong> — a book scripted at
-        48 that grows to 52 bills 52 + 8 = 60, automatically. Generated counts the pages that actually exist today;
+        48 that grows to 52 bills 52 plus its extras, automatically. Generated counts the pages that actually exist today;
         hover any page number for the split.
       </p>
       <p className="mt-3 max-w-3xl font-sans text-[0.72rem] leading-relaxed text-brand-slate">

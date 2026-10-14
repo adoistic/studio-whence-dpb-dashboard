@@ -273,6 +273,11 @@ export function usePricing(refreshKey = 0): Async<PricingConfig> {
               : DEFAULT_RATE_PER_PAGE,
             lines: raw.lines ?? {},
             comics: raw.comics ?? {},
+            // Carried through so extraPagesRuleFor sees them. Dropped here before
+            // 14 Oct 2026, so the stored standard was never read and every book
+            // billed the hard-coded figure whatever the pricing record said.
+            standardExtraPages: raw.standardExtraPages,
+            extraPages: raw.extraPages,
             updatedAt: raw.updatedAt,
             updatedBy: raw.updatedBy,
           },

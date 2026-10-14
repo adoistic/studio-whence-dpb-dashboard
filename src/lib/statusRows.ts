@@ -191,7 +191,12 @@ export function pageBreakdown(c: Comic): PageBreakdown {
 // This is the single place the billing rule lives. pageBreakdown stays the
 // truth about what exists; the two must not be conflated.
 
-/** Cover + back cover + IFC + IBC + four activity pages. */
+/**
+ * Cover + back cover + IFC + IBC + four activity pages — the fallback floor when the
+ * pricing record sets none. The record (`pricing/config.standardExtraPages`) is set
+ * to 0 since 14 Oct 2026: extras bill exactly as produced (Adnan: "bill only what is
+ * produced; if a book has less it has less").
+ */
 export const STANDARD_EXTRA_PAGES = 8
 
 export interface BilledPages {

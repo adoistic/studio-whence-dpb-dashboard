@@ -544,3 +544,27 @@ describe('usePricing degradation', () => {
     expect(result.current.data?.lines.indic).toBe(400)
   })
 })
+
+describe('extras bill as made when the pricing record says so', () => {
+  beforeEach(() => {
+    mockGetDoc.mockReset()
+  })
+
+  it('carries standardExtraPages from the stored record (it was dropped before 14 Oct 2026)', async () => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => ({ defaultRatePerPage: 250, lines: {}, comics: {}, currency: 'INR', standardExtraPages: 0 }),
+    })
+    const { result } = renderHook(() => usePricing())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.data?.standardExtraPages).toBe(0)
+  })
+
+  it('with a floor of 0, a book bills only the extras it has — fewer extras bill fewer', () => {
+    const cfg: PricingConfig = { ...CFG, standardExtraPages: 0 }
+    const book = comic({ target_length_pages: 33, pages: { hasPages: true, count: 33, coverKey: 'c.jpg' } })
+    const billed = billedPagesFor(book, cfg)
+    expect(billed.extras).toBe(pageBreakdown(book).extras)
+    expect(billed.total).toBe(33 + pageBreakdown(book).extras)
+  })
+})

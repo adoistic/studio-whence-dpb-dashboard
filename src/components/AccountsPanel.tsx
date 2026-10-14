@@ -426,7 +426,7 @@ function WipSection({ rows, currency }: { rows: StatusTableRow[]; currency: stri
     <>
       <SectionHead
         title="Work in progress"
-        caption="Every book not yet invoiced, rolled up by line. Their invoice value counts from the script (plus the standard extras), so this is what the pipeline will bill."
+        caption="Every book not yet invoiced, rolled up by line. Their invoice value counts from the script plus the extras made so far, so this is what the pipeline will bill."
       />
       <div className="mt-3 overflow-x-auto rounded-xl border border-brand-pale-dusk bg-white">
         <table className="w-full min-w-[900px] border-collapse">
@@ -583,7 +583,7 @@ export function AccountsPanel({
         <strong className="font-semibold text-brand-indigo">Invoices generated</strong> are books marked invoiced on
         the Approved-for-invoice tab, valued exactly as on the table (pages × rate, GST 18%, TDS 2% of the base).{' '}
         <strong className="font-semibold text-brand-indigo">Work in progress</strong> is every other book — its
-        invoice value counts from the script plus the standard extras, per the billing rule.
+        invoice value counts from the script plus the extras made so far, per the billing rule.
       </p>
     </main>
   )
