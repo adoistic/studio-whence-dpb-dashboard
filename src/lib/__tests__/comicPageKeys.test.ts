@@ -70,6 +70,24 @@ describe('comicPdfKeys', () => {
     const c: Comic = { ...base, pages: { hasPages: true, count: 2, coverKey: null } }
     expect(comicPdfKeys(c)).toEqual(comicPageKeys(c))
   })
+  test('the Hindi edition\'s inside covers stay out of the English PDF', () => {
+    // Diamond, 6 Oct 2026 (Maradona A-C01): the English PDF printed the Hindi pair.
+    const c: Comic = {
+      ...base,
+      pages: { hasPages: true, count: 1, coverKey: null },
+      insideCovers: { language: 'English', images: [
+        { key: `${ic}/inside-front-cover.png`, label: 'Inside front cover' },
+        { key: `${ic}/inside-back-cover.png`, label: 'Inside back cover' },
+        { key: `${ic}/inside-front-cover-hi.png`, label: 'Hindi edition — inside front cover' },
+        { key: `${ic}/inside-back-cover-hi.png`, label: 'Hindi edition — inside back cover' },
+      ] },
+    }
+    expect(comicPdfKeys(c)).toEqual([
+      `${ic}/inside-front-cover.png`,
+      'images/comics/biographies/01-the-comic/pages/page-01.jpg',
+      `${ic}/inside-back-cover.png`,
+    ])
+  })
   test('no pages → empty, even with inside covers', () => {
     const c: Comic = { ...base, insideCovers: { language: 'English', images: [{ key: `${ic}/a.png`, label: 'Inside front cover' }] } }
     expect(comicPdfKeys(c)).toEqual([])

@@ -28,7 +28,14 @@ export function comicPageKeys(comic: Comic): string[] {
 export function comicPdfKeys(comic: Comic): string[] {
   const keys = comicPageKeys(comic)
   if (keys.length === 0) return keys
-  const imgs = comic.insideCovers?.images ?? []
+  // A block in the book's own language can also carry the Hindi edition's inside
+  // covers (`…-hi.png`, labelled "Hindi edition — …"). Those belong to the Hindi
+  // edition, not this PDF: Diamond, 6 Oct 2026 (Maradona A-C01), found the English
+  // PDF printing the Hindi inside front and back covers on six books.
+  const blockLang = (comic.insideCovers?.language ?? 'English').toLowerCase()
+  const otherEdition = (i: { key: string; label: string }) =>
+    !blockLang.includes('hindi') && (/-hi(-latn)?\.(png|jpe?g|webp)$/i.test(i.key) || /^hindi edition/i.test(i.label))
+  const imgs = (comic.insideCovers?.images ?? []).filter((i) => !otherEdition(i))
   const isFront = (i: { key: string; label: string }) => /front/i.test(i.label) || /inside-front/i.test(i.key)
   const isBack = (i: { key: string; label: string }) => /back/i.test(i.label) || /inside-back/i.test(i.key)
   const front = imgs.filter(isFront).map((i) => i.key)
