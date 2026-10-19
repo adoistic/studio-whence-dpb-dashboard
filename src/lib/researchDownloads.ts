@@ -19,9 +19,14 @@
  * or changed after the bundles were built (or before they ever were) is assembled in
  * the browser from the same gated per-file keys, in the same shape, so the download
  * never depends on the bundles being current.
+ *
+ * PDFs are typeset beside the bundles (content repo `tools/research_pdf`): a file, a
+ * source and the whole subject, set to be read, with "For internal use of Diamond
+ * Books only" on the cover and every page. A browser cannot typeset one, so a PDF is
+ * offered only while its bundle is current and is simply not shown otherwise.
  */
 
-import type { Figure, ResearchSource } from '@/types/content'
+import type { Figure, ResearchPdf, ResearchSource } from '@/types/content'
 import { resolveUrls } from '@/lib/dataApi'
 import { downloadKey, downloadZip, safeFilename, saveText, uniquePaths, ZIP_FILE_MAX, ZIP_FOLDER_MAX, type ZipItem, type ZipProgress } from '@/lib/downloads'
 
@@ -259,4 +264,62 @@ export async function downloadFigureResearch(
     readme: (failed) => figureReadme(figure, sources, failed),
     readmePath: `${safeFilename(figureName(figure))} — research/README.md`,
   })
+}
+
+// ─── PDFs ─────────────────────────────────────────────────────────────────────
+
+/** The source's typeset PDF, while its bundle still describes the source. */
+export function sourcePdf(source: ResearchSource): ResearchPdf | null {
+  const pdf = source.bundle?.pdf
+  return sourceBundleIsCurrent(source) && pdf?.key ? pdf : null
+}
+
+/** The key of one file's PDF: a one-file source's is the source's own; a file of a
+ *  longer source has its own, beside the source's (`…/sources/<slug>/files/0003.pdf`). */
+export function filePdfKey(source: ResearchSource, fileIndex: number): string | null {
+  const pdf = sourcePdf(source)
+  if (!pdf || fileIndex < 0 || fileIndex >= source.files.length) return null
+  if (source.files.length === 1) return pdf.format === 'zip' ? null : pdf.key
+  if (source.bundle?.filePdfs !== source.files.length) return null
+  return `${pdf.key.replace(/\.pdf(\.zip)?$/, '')}/files/${pad(fileIndex + 1, 4)}.pdf`
+}
+
+export function sourcePdfName(source: ResearchSource): string {
+  const title = safeFilename(sourceTitle(source))
+  return source.bundle?.pdf?.format === 'zip' ? `${title} (PDF).zip` : `${title}.pdf`
+}
+
+export function filePdfName(source: ResearchSource, fileIndex: number): string {
+  return fileDownloadName(source, fileIndex).replace(/\.md$/, '.pdf')
+}
+
+export async function downloadSourcePdf(source: ResearchSource): Promise<void> {
+  const pdf = sourcePdf(source)
+  if (!pdf) throw new Error('no PDF for this source yet')
+  await downloadKey(pdf.key, sourcePdfName(source))
+}
+
+export async function downloadFilePdf(source: ResearchSource, fileIndex: number): Promise<void> {
+  const key = filePdfKey(source, fileIndex)
+  if (!key) throw new Error('no PDF for this file yet')
+  await downloadKey(key, filePdfName(source, fileIndex))
+}
+
+/** The subject's PDF, while it still describes the live source list. */
+export function figurePdf(figure: Figure, sources: ResearchSource[]): ResearchPdf | null {
+  const p = figure.researchPdf
+  if (!p?.key) return null
+  const listed = sources.reduce((n, s) => n + s.files.length, 0)
+  return p.files === listed && (p.sources === undefined || p.sources === sources.length) ? p : null
+}
+
+export function figurePdfName(figure: Figure, pdf: ResearchPdf): string {
+  const name = safeFilename(figureName(figure))
+  return pdf.format === 'zip' ? `${name} — research (PDF).zip` : `${name} — research.pdf`
+}
+
+export async function downloadFigurePdf(figure: Figure, sources: ResearchSource[]): Promise<void> {
+  const pdf = figurePdf(figure, sources)
+  if (!pdf) throw new Error('no PDF for this subject yet')
+  await downloadKey(pdf.key, figurePdfName(figure, pdf))
 }

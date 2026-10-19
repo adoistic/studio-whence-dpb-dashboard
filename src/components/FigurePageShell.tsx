@@ -10,14 +10,20 @@ import { mergeCasts } from '@/lib/castModel'
 import { useSubjectCasts } from '@/lib/casts'
 import { formatBytes, type ZipProgress } from '@/lib/downloads'
 import {
+  downloadFigurePdf,
   downloadFigureResearch,
+  downloadFilePdf,
   downloadResearchFile,
   downloadSourceMarkdown,
+  downloadSourcePdf,
   downloadSourceZip,
   figureName,
+  figurePdf,
   figureZipIsCurrent,
+  filePdfKey,
   researchKeyOf,
   sourceBundleIsCurrent,
+  sourcePdf,
 } from '@/lib/researchDownloads'
 
 // Subject sub-part source kinds (Indic characters + future original IP): the
@@ -47,6 +53,8 @@ const ICON_BTN =
   'flex h-6 w-6 shrink-0 items-center justify-center rounded text-brand-slate transition-colors hover:bg-brand-pale-dusk/60 hover:text-brand-indigo disabled:opacity-40'
 const CHIP =
   'rounded border border-brand-pale-dusk px-1.5 py-0.5 font-sans text-[0.58rem] uppercase tracking-label text-brand-slate transition-colors hover:border-brand-indigo hover:text-brand-indigo disabled:opacity-40'
+const PDF_MINI =
+  'flex h-6 shrink-0 items-center justify-center rounded px-1.5 font-sans text-[0.55rem] font-semibold uppercase tracking-label text-brand-slate transition-colors hover:bg-brand-pale-dusk/60 hover:text-brand-indigo disabled:opacity-40'
 
 function DownloadGlyph() {
   return (
@@ -57,10 +65,10 @@ function DownloadGlyph() {
 }
 
 // A selectable research leaf (a chapter file or a podcast transcript), with its own
-// download beside it.
+// downloads beside it: the Markdown, and the typeset PDF when one is built.
 function FileItem({
-  label, active, onSelect, onDownload,
-}: { label: string; active: boolean; onSelect: () => void; onDownload?: () => void }) {
+  label, active, onSelect, onDownload, onPdf,
+}: { label: string; active: boolean; onSelect: () => void; onDownload?: () => void; onPdf?: () => void }) {
   return (
     <li className="group flex items-center gap-1">
       <button
@@ -84,6 +92,17 @@ function FileItem({
           className={`${ICON_BTN} md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100`}
         >
           <DownloadGlyph />
+        </button>
+      )}
+      {onPdf && (
+        <button
+          type="button"
+          onClick={onPdf}
+          aria-label={`Download ${label} as PDF`}
+          title="Download as a typeset PDF"
+          className={`${PDF_MINI} md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100`}
+        >
+          PDF
         </button>
       )}
     </li>
@@ -196,6 +215,10 @@ export function FigurePageShell({
   }
   const fileDownload = (s: ResearchSource, i: number) => () =>
     run(`${s.slug}#${i}`, () => downloadResearchFile(s, i))
+  const filePdf = (s: ResearchSource, i: number) =>
+    filePdfKey(s, i) ? () => run(`${s.slug}#${i}.pdf`, () => downloadFilePdf(s, i)) : undefined
+  const wholePdf = (s: ResearchSource) =>
+    sourcePdf(s) ? () => run(`${s.slug}.pdf`, () => downloadSourcePdf(s)) : undefined
   const sourceActions = (s: ResearchSource) => (
     <>
       <button
@@ -218,10 +241,25 @@ export function FigurePageShell({
       >
         .zip
       </button>
+      {sourcePdf(s) && (
+        <button
+          type="button"
+          className={CHIP}
+          disabled={!!busy}
+          onClick={() => run(`${s.slug}.pdf`, () => downloadSourcePdf(s))}
+          title={s.bundle?.pdf?.format === 'zip'
+            ? 'Too long for one PDF: each file typeset as its own PDF, zipped'
+            : `The whole ${s.kind === 'book' ? 'book' : 'source'}, typeset as one PDF`}
+          aria-label={`Download ${s.title} as PDF`}
+        >
+          .pdf
+        </button>
+      )}
     </>
   )
   const totalFiles = sources.reduce((n, s) => n + s.files.length, 0)
   const zipCurrent = figureZipIsCurrent(figure, sources)
+  const allPdf = figurePdf(figure, sources)
 
   return (
     <div>
@@ -308,6 +346,25 @@ export function FigurePageShell({
                   {sources.length} sources · {totalFiles} files · one zip, a folder per source
                   {zipCurrent && figure.researchZip?.bytes ? ` · ${formatBytes(figure.researchZip.bytes)}` : ''}
                 </p>
+                {allPdf && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={!!busy}
+                      onClick={() => run('all.pdf', () => downloadFigurePdf(figure, sources))}
+                      className="mt-1 inline-flex items-center justify-center gap-2 rounded-md border border-brand-indigo px-3 py-2 font-sans text-[0.68rem] font-semibold uppercase tracking-label text-brand-indigo transition-colors hover:bg-brand-pale-dusk/60 disabled:opacity-50"
+                    >
+                      <DownloadGlyph />
+                      {busy === 'all.pdf' ? 'Preparing…' : allPdf.format === 'zip' ? 'Download all as PDFs' : 'Download all as one PDF'}
+                    </button>
+                    <p className="font-sans text-[0.6rem] uppercase tracking-label text-brand-slate">
+                      {allPdf.format === 'zip'
+                        ? 'a typeset PDF per source, zipped'
+                        : `typeset to read${allPdf.pages ? ` · ${allPdf.pages.toLocaleString()} pages` : ''}`}
+                      {` · ${formatBytes(allPdf.bytes)}`}
+                    </p>
+                  </>
+                )}
                 {(busy || notice) && (
                   <p role="status" aria-live="polite" className="font-serif text-sm text-brand-umber">
                     {busy
@@ -345,6 +402,7 @@ export function FigurePageShell({
                           onDownload={s.files.length > 1
                             ? () => run(`${s.slug}.md`, () => downloadSourceMarkdown(figure, s))
                             : fileDownload(s, 0)}
+                          onPdf={s.files.length > 1 ? wholePdf(s) : filePdf(s, 0)}
                         />
                       )
                     })}
@@ -357,7 +415,7 @@ export function FigurePageShell({
                   <CollapsibleGroup
                     key={book.slug}
                     title={book.title}
-                    meta={`book · ${book.words.toLocaleString()} words${sourceBundleIsCurrent(book) && book.bundle?.zip?.bytes ? ` · ${formatBytes(book.bundle.zip.bytes)} zip` : ''}`}
+                    meta={`book · ${book.words.toLocaleString()} words${sourcePdf(book)?.pages ? ` · ${sourcePdf(book)!.pages!.toLocaleString()} pages` : ''}${sourceBundleIsCurrent(book) && book.bundle?.zip?.bytes ? ` · ${formatBytes(book.bundle.zip.bytes)} zip` : ''}`}
                     open={!collapsed[book.slug]}
                     onToggle={() => toggle(book.slug)}
                     hasActive={book.files.some((f) => f.path === selected)}
@@ -370,6 +428,7 @@ export function FigurePageShell({
                         active={selected === file.path}
                         onSelect={() => setSelected(file.path)}
                         onDownload={fileDownload(book, i)}
+                        onPdf={filePdf(book, i)}
                       />
                     ))}
                   </CollapsibleGroup>
@@ -396,6 +455,7 @@ export function FigurePageShell({
                           onDownload={t.files.length > 1
                             ? () => run(`${t.slug}.md`, () => downloadSourceMarkdown(figure, t))
                             : fileDownload(t, 0)}
+                          onPdf={t.files.length > 1 ? wholePdf(t) : filePdf(t, 0)}
                         />
                       )
                     })}
@@ -423,6 +483,7 @@ export function FigurePageShell({
                           active={selected === file.path}
                           onSelect={() => setSelected(file.path)}
                           onDownload={fileDownload(s, i)}
+                          onPdf={filePdf(s, i)}
                         />
                       ))}
                     </CollapsibleGroup>

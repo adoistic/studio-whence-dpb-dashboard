@@ -8,6 +8,12 @@ vi.mock('@/lib/dataApi', () => ({ resolveUrls: async () => ({}) }))
 
 import type { Figure, ResearchSource } from '@/types/content'
 import {
+  figurePdf,
+  figurePdfName,
+  filePdfKey,
+  filePdfName,
+  sourcePdf,
+  sourcePdfName,
   figureZipIsCurrent,
   figureZipItems,
   fileDownloadName,
@@ -94,5 +100,49 @@ describe('freshness', () => {
     expect(figureZipIsCurrent({ ...figure, researchZip: { key: 'z', bytes: 9, files: 4, sources: 2 } }, [book, talk])).toBe(true)
     expect(figureZipIsCurrent({ ...figure, researchZip: { key: 'z', bytes: 9, files: 4, sources: 3 } }, [book, talk])).toBe(false)
     expect(figureZipIsCurrent({ ...figure, researchZip: { key: 'z', bytes: 9, files: 3, sources: 2 } }, [book, talk])).toBe(false)
+  })
+})
+
+describe('PDFs', () => {
+  const B = 'bundles/research/biographies/dhirubhai-ambani/sources'
+  const withPdf: ResearchSource = {
+    ...book,
+    bundle: { files: 3, filePdfs: 3, pdf: { key: `${B}/polyester-prince.pdf`, bytes: 9, pages: 120, format: 'pdf' } },
+  }
+
+  test('a source PDF is offered only while its bundle still describes the source', () => {
+    expect(sourcePdf(withPdf)?.key).toBe(`${B}/polyester-prince.pdf`)
+    expect(sourcePdf({ ...withPdf, files: withPdf.files.slice(0, 2) })).toBeNull()
+    expect(sourcePdf(book)).toBeNull()
+  })
+
+  test("a file's PDF sits beside its source's, numbered in reading order", () => {
+    expect(filePdfKey(withPdf, 0)).toBe(`${B}/polyester-prince/files/0001.pdf`)
+    expect(filePdfKey(withPdf, 2)).toBe(`${B}/polyester-prince/files/0003.pdf`)
+    expect(filePdfKey(withPdf, 3)).toBeNull()
+    // without a count for every file, no key is guessed
+    expect(filePdfKey({ ...withPdf, bundle: { ...withPdf.bundle!, filePdfs: undefined } }, 0)).toBeNull()
+  })
+
+  test("a one-file source's PDF is the file's, unless it is a zip of PDFs", () => {
+    const t = { ...talk, bundle: { files: 1, pdf: { key: 'bundles/research/m/x/sources/ani-45.pdf', bytes: 5, format: 'pdf' as const } } }
+    expect(filePdfKey(t, 0)).toBe('bundles/research/m/x/sources/ani-45.pdf')
+    expect(filePdfKey({ ...t, bundle: { ...t.bundle, pdf: { ...t.bundle.pdf, format: 'zip' as const } } }, 0)).toBeNull()
+  })
+
+  test('a source too long for one PDF downloads as a zip of PDFs, and its files still have their own', () => {
+    const long = { ...withPdf, bundle: { ...withPdf.bundle!, pdf: { key: `${B}/polyester-prince.pdf.zip`, bytes: 9, format: 'zip' as const } } }
+    expect(sourcePdfName(long)).toBe('The Polyester Prince (PDF).zip')
+    expect(filePdfKey(long, 1)).toBe(`${B}/polyester-prince/files/0002.pdf`)
+    expect(sourcePdfName(withPdf)).toBe('The Polyester Prince.pdf')
+    expect(filePdfName(withPdf, 1)).toBe('The Polyester Prince — Intro.pdf')
+  })
+
+  test('the subject PDF is used while it matches the live source list', () => {
+    const f = { ...figure, researchPdf: { key: 'bundles/research/biographies/dhirubhai-ambani/all.pdf', bytes: 1, pages: 300, format: 'pdf' as const, files: 4, sources: 2 } }
+    expect(figurePdf(f, [book, talk])?.pages).toBe(300)
+    expect(figurePdf(f, [book])).toBeNull()
+    expect(figurePdfName(f, f.researchPdf)).toBe('Dhirubhai Ambani — research.pdf')
+    expect(figurePdfName(f, { ...f.researchPdf, format: 'zip' })).toBe('Dhirubhai Ambani — research (PDF).zip')
   })
 })

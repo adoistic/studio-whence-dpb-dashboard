@@ -295,6 +295,14 @@ export interface ResearchBundleFile {
   bytes: number
 }
 
+/** A typeset PDF of research (content repo `tools/research_pdf`). `format` is 'zip'
+ *  when the source or subject is too long for one PDF (over a million words) and the
+ *  key holds a zip of whole PDFs instead. */
+export interface ResearchPdf extends ResearchBundleFile {
+  pages?: number
+  format?: 'pdf' | 'zip'
+}
+
 export interface ResearchSource {
   slug: string
   // book / transcript (biographies) · topic-note (cite-driven) · the Subject
@@ -310,6 +318,11 @@ export interface ResearchSource {
   bundle?: {
     md?: ResearchBundleFile
     zip?: ResearchBundleFile
+    // The source typeset as one PDF (or, past a million words, a zip of its files' PDFs).
+    pdf?: ResearchPdf
+    // Each listed file's own PDF sits at `<pdf key without .pdf>/files/NNNN.pdf`
+    // (1-based, listing order). Written only when every listed file has one.
+    filePdfs?: number
     files: number
     missing?: number
     generatedAt?: string
@@ -351,6 +364,13 @@ export interface Figure {
   researchZip?: {
     key: string
     bytes: number
+    files: number
+    sources?: number
+    missing?: number
+    generatedAt?: string
+  }
+  // The same, typeset as one PDF (or, past a million words, a zip of PDFs).
+  researchPdf?: ResearchPdf & {
     files: number
     sources?: number
     missing?: number
