@@ -3,6 +3,8 @@
 import type { Comic } from '@/types/content'
 import { SectionHead } from '@/components/SectionHead'
 import { downloadKey } from '@/lib/downloadDoc'
+import { currentTrims } from '@/lib/indesignTrims'
+import { TrimButtons } from '@/components/ComicInDesignButton'
 
 /**
  * Per-comic LANGUAGE downloads: for each translated edition, the translated
@@ -45,6 +47,11 @@ export function LanguageSection({ comic }: { comic: Comic }) {
                   Download InDesign — {t.language} only
                 </button>
               )}
+              <TrimButtons
+                trims={currentTrims(t.indesign)}
+                what={`InDesign — ${t.language} only`}
+                onDownload={(tr) => downloadKey(tr.key, tr.filename || `${t.language}-InDesign-6.25x9in.zip`)}
+              />
               {t.blank && (
                 <button
                   type="button"

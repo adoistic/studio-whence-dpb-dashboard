@@ -118,6 +118,10 @@ export interface Comic {
     key: string
     bytes: number
     filename: string
+    deckKey?: string
+    deckBytes?: number
+    // The same edition set at a print trim (6.25 × 9 in), keyed "450x648" (points).
+    trims?: Record<string, InDesignTrim>
   }
   // ONE InDesign document holding every language of the comic: the shared artwork on a locked
   // "Art" layer plus one text layer and one paragraph style per language. Each language is checked
@@ -127,6 +131,8 @@ export interface Comic {
     bytes: number
     filename: string
     languages: string[]
+    decks?: { key: string; bytes: number }[]
+    trims?: Record<string, InDesignTrim>
   }
   // The editable decks rasterised to PAGE IMAGES, one set per published
   // language, at images/comics/{line}/{slug}/deck/{code}/page-NN.jpg with a
@@ -210,7 +216,10 @@ export interface Comic {
     language: string
     script?: { key: string; bytes: number }
     editablePpt?: { key: string; bytes: number; filename: string }
-    indesign?: { key: string; bytes: number; filename: string }
+    indesign?: {
+      key: string; bytes: number; filename: string
+      deckKey?: string; deckBytes?: number; trims?: Record<string, InDesignTrim>
+    }
     blank?: { key: string; bytes: number; filename: string }
   }[]
   // Candidate front-cover designs (gated artifacts/comics/…/cover-options/ keys)
@@ -287,6 +296,22 @@ export interface CoverChoice {
 export interface ResearchFile {
   path: string
   title: string
+}
+
+/** An InDesign edition set again at a print trim (6.25 × 9 in): the deck's page scaled once and
+ *  centred, checked glyph by glyph against the deck's PDF set the same way. Built by the content
+ *  repo's `tools/indesign_from_portal.py --trim`; see `lib/indesignTrims.ts`. */
+export interface InDesignTrim {
+  key: string
+  bytes: number
+  filename?: string
+  label?: string          // "6.25 × 9 in"
+  width?: number          // inches
+  height?: number
+  deckKey?: string
+  deckBytes?: number
+  decks?: { key: string; bytes: number }[]   // an all-languages file records every deck
+  built?: string
 }
 
 /** A pre-built download in R2 (`bundles/research/…`), gated like the research it holds. */
