@@ -65,7 +65,11 @@ vi.mock('@aws-sdk/client-s3', () => {
 // registry before each test and dynamically re-import — so every test starts
 // with a fresh, uncached client and a fresh `__configs` record.
 
-type PresignGet = (key: string, expiresIn?: number) => Promise<string>
+type PresignGet = (
+  key: string,
+  expiresIn?: number,
+  opts?: { downloadName?: string }
+) => Promise<string>
 type GetObject = (
   key: string
 ) => Promise<{ body: Buffer; contentType: string | undefined }>
@@ -141,6 +145,32 @@ describe('presignGet', () => {
     expect(options).toEqual({ expiresIn: 300 })
   })
 
+  test('without a downloadName the command carries no ResponseContentDisposition', async () => {
+    await presignGet('images/x.jpg')
+    await presignGet('images/x.jpg', 600, {})
+    await presignGet('images/x.jpg', 600, { downloadName: '' })
+    for (const [, command] of getSignedUrl.mock.calls) {
+      const input = (command as { input: Record<string, unknown> }).input
+      expect(input).toEqual({ Bucket: 'studio-whence-dpb', Key: 'images/x.jpg' })
+      expect('ResponseContentDisposition' in input).toBe(false)
+    }
+  })
+
+  test('a downloadName sets ResponseContentDisposition (RFC 6266 attachment) and keeps the TTL', async () => {
+    await presignGet('artifacts/characters/indic/sita/sita-young.png', undefined, {
+      downloadName: 'Sītā (young).png',
+    })
+    const [, command, options] = getSignedUrl.mock.calls[0]
+    expect(command).toBeInstanceOf(FakeGetObjectCommand)
+    expect((command as { input: Record<string, unknown> }).input).toEqual({
+      Bucket: 'studio-whence-dpb',
+      Key: 'artifacts/characters/indic/sita/sita-young.png',
+      ResponseContentDisposition:
+        `attachment; filename="S_t_ (young).png"; filename*=UTF-8''S%C4%ABt%C4%81%20%28young%29.png`,
+    })
+    expect(options).toEqual({ expiresIn: 600 })
+  })
+
   test('builds the S3Client from R2_* env (endpoint, region auto, creds)', async () => {
     await presignGet('images/y.png')
     expect(s3ClientConfigs.length).toBe(1)
@@ -173,6 +203,74 @@ describe('presignGet', () => {
     // client() throws synchronously (before getSignedUrl), so we use the
     // synchronous .toThrow form — not .rejects.toThrow.
     expect(() => presignGetFresh('images/x.jpg')).toThrow(/R2 not configured/)
+  })
+})
+
+describe('contentDisposition', () => {
+  let contentDisposition: (name: string) => string
+
+  beforeEach(async () => {
+    vi.resetModules()
+    contentDisposition = (await import('../r2')).contentDisposition
+  })
+
+  test('a plain ASCII name: both forms are the name itself', () => {
+    expect(contentDisposition('rama-boy.png')).toBe(
+      `attachment; filename="rama-boy.png"; filename*=UTF-8''rama-boy.png`
+    )
+  })
+
+  test('diacritics + an em dash: ASCII fallback uses _, filename* is UTF-8 percent-encoded', () => {
+    expect(contentDisposition('Rāmāyaṇa — Sītā.png')).toBe(
+      `attachment; filename="R_m_ya_a _ S_t_.png"; ` +
+        `filename*=UTF-8''R%C4%81m%C4%81ya%E1%B9%87a%20%E2%80%94%20S%C4%ABt%C4%81.png`
+    )
+  })
+
+  test('quotes and backslashes never reach the quoted-string', () => {
+    expect(contentDisposition('He said "hi" \\ ok.png')).toBe(
+      `attachment; filename="He said _hi_ _ ok.png"; filename*=UTF-8''He%20said%20%22hi%22%20%5C%20ok.png`
+    )
+  })
+
+  test('an em dash alone', () => {
+    expect(contentDisposition('a — b.png')).toBe(
+      `attachment; filename="a _ b.png"; filename*=UTF-8''a%20%E2%80%94%20b.png`
+    )
+  })
+
+  test("RFC 5987 encodes ' ( ) * (encodeURIComponent leaves them bare)", () => {
+    expect(contentDisposition("it's (1)*.png")).toBe(
+      `attachment; filename="it's (1)*.png"; filename*=UTF-8''it%27s%20%281%29%2A.png`
+    )
+  })
+
+  test('CR/LF and other controls cannot inject a header line', () => {
+    const value = contentDisposition('a\r\nSet-Cookie: x=1\t.png')
+    expect(value).not.toMatch(/[\r\n\t]/)
+    expect(value).toBe(
+      `attachment; filename="a__Set-Cookie: x=1_.png"; filename*=UTF-8''a%0D%0ASet-Cookie%3A%20x%3D1%09.png`
+    )
+  })
+
+  test('an astral character is ONE fallback underscore, four UTF-8 bytes in filename*', () => {
+    expect(contentDisposition('😀x.png')).toBe(
+      `attachment; filename="_x.png"; filename*=UTF-8''%F0%9F%98%80x.png`
+    )
+  })
+
+  test('a lone surrogate does not throw (becomes U+FFFD)', () => {
+    expect(contentDisposition('a\uD800b.png')).toBe(
+      `attachment; filename="a_b.png"; filename*=UTF-8''a%EF%BF%BDb.png`
+    )
+  })
+
+  test('Devanagari survives in filename* byte for byte', () => {
+    const name = 'राम.png'
+    const value = contentDisposition(name)
+    const star = value.split("filename*=UTF-8''")[1]
+    expect(decodeURIComponent(star)).toBe(name)
+    expect(value).toContain('filename="___.png"')
   })
 })
 

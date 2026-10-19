@@ -75,8 +75,16 @@ const RESOLVE_BATCH = 50
  * Resolve R2 keys to presigned URLs. Empty input short-circuits to {} with no
  * request. Automatically chunks into batches of ≤50 keys (the server-side
  * cap) and merges the results transparently. Throws on any non-ok response.
+ *
+ * `download` maps a key to the filename it should SAVE as. Those keys come back
+ * presigned with `Content-Disposition: attachment`, so opening the URL downloads
+ * the file under that name — the `download` attribute on a link is ignored for a
+ * cross-origin URL, which is why a plain presigned link only opens the image.
  */
-export async function resolveUrls(keys: string[]): Promise<Record<string, string>> {
+export async function resolveUrls(
+  keys: string[],
+  opts: { download?: Record<string, string> } = {},
+): Promise<Record<string, string>> {
   if (keys.length === 0) return {}
   const batches: string[][] = []
   for (let i = 0; i < keys.length; i += RESOLVE_BATCH) {
@@ -84,10 +92,13 @@ export async function resolveUrls(keys: string[]): Promise<Record<string, string
   }
   const maps = await Promise.all(
     batches.map(async (batch) => {
+      const download = opts.download
+        ? Object.fromEntries(batch.filter((k) => opts.download![k]).map((k) => [k, opts.download![k]]))
+        : undefined
       const res = await authedFetch('/resolve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keys: batch }),
+        body: JSON.stringify(download && Object.keys(download).length ? { keys: batch, download } : { keys: batch }),
       })
       if (!res.ok) throw new Error(`resolve failed: ${res.status}`)
       const data = (await res.json()) as { urls?: Record<string, string> }

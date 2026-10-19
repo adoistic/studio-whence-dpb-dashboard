@@ -34,9 +34,12 @@ import { rewriteMedikidzHtml } from "./medikidzSite";
  *                        from a HARD-CODED key. Never goes through safeKey/presign
  *                        (a presigned content.json would be fetchable unauth'd for
  *                        the TTL window — see keys.ts).
- *   POST /resolve      → body `{ keys: string[] }`; each key is validated via
- *                        `safeKey(k, RESOLVE_PREFIXES)`, invalid keys are dropped,
- *                        survivors are presigned. Returns `{ urls: { key: url } }`.
+ *   POST /resolve      → body `{ keys: string[], download?: { [key]: filename } }`;
+ *                        each key is validated via `safeKey(k, RESOLVE_PREFIXES)`,
+ *                        invalid keys are dropped, survivors are presigned. A
+ *                        survivor named in `download` is presigned as an
+ *                        attachment under that (sanitised) file name. Returns
+ *                        `{ urls: { key: url } }`.
  *   GET  /read?key=    → `safeKey(key, READ_PREFIXES)`; the object bytes are served
  *                        INLINE (proxied text), not presigned.
  *
@@ -83,6 +86,33 @@ function applyCors(req: Request, res: Response): void {
  */
 function routeOf(path: string): string {
   return path.replace(/\/+$/, "").split("/").pop() ?? "";
+}
+
+/** The longest download name `/resolve` will put in a Content-Disposition. */
+const MAX_DOWNLOAD_NAME = 180;
+
+/**
+ * Clean a client-supplied download name for `/resolve`, or return null to
+ * ignore it (the key is then presigned exactly as without one).
+ *
+ * Removes control characters (C0, DEL, C1), the bidi embedding / override /
+ * isolate controls that can make a name display differently from what it is,
+ * and `/` `\`; trims; keeps at most 180 characters (code points, so a
+ * surrogate pair is never split). Anything that is not a string, or nothing
+ * left after cleaning, is ignored. The name only labels the saved file — it
+ * never decides which object is signed or who may sign it.
+ */
+function sanitizeDownloadName(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  let name = raw
+    .replace(/[\u0000-\u001F\u007F-\u009F\u202A-\u202E\u2066-\u2069]/g, "")
+    .replace(/[/\\]/g, "")
+    .trim();
+  const chars = Array.from(name);
+  if (chars.length > MAX_DOWNLOAD_NAME) {
+    name = chars.slice(0, MAX_DOWNLOAD_NAME).join("").trim();
+  }
+  return name.length > 0 ? name : null;
 }
 
 export const dataApi = onRequest(
@@ -146,7 +176,8 @@ export const dataApi = onRequest(
         parsed = undefined;
       }
     }
-    const keys = (parsed as { keys?: unknown } | undefined)?.keys;
+    const body = parsed as { keys?: unknown; download?: unknown } | undefined;
+    const keys = body?.keys;
     if (!Array.isArray(keys)) {
       res.status(400).json({ error: "keys must be an array" });
       return;
@@ -155,6 +186,15 @@ export const dataApi = onRequest(
       res.status(400).json({ error: "too many keys" });
       return;
     }
+
+    // Optional `download` map, `{ [key]: file name }`, looked up by the
+    // validated key. Anything but a plain object is ignored — like a bad key,
+    // it never fails the batch.
+    const download = body?.download;
+    const downloadNames =
+      download !== null && typeof download === "object" && !Array.isArray(download)
+        ? (download as Record<string, unknown>)
+        : null;
 
     // Validate + drop invalid keys (don't fail the whole batch for one bad key).
     let validKeys = keys
@@ -187,7 +227,19 @@ export const dataApi = onRequest(
 
     try {
       const entries = await Promise.all(
-        validKeys.map(async (k) => [k, await presignGet(k)] as const)
+        validKeys.map(async (k) => {
+          // A key named in `download` is signed as an attachment under that
+          // name. Only keys that passed validation AND the allocation gate get
+          // here, so a download entry can label a URL but never add one.
+          const name =
+            downloadNames && Object.hasOwn(downloadNames, k)
+              ? sanitizeDownloadName(downloadNames[k])
+              : null;
+          const url = name
+            ? await presignGet(k, undefined, { downloadName: name })
+            : await presignGet(k);
+          return [k, url] as const;
+        })
       );
       const urls: Record<string, string> = {};
       for (const [k, url] of entries) urls[k] = url;

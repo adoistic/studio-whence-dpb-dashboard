@@ -259,6 +259,27 @@ service cloud.firestore {
         allow write: if false;
       }
     }
+    // ── Work casts (the Characters tab; written only by the publish pipeline's
+    //    Admin SDK, tools/publish_work_casts.py, which bypasses rules) ──
+    // One doc per comic, `casts/{line}__{slug}`, plus `casts/{line}__library`
+    // for a line's sheets staged on no page yet. Each doc carries its comic's
+    // own `line`, `subject_slug` and `program_slug`, so the read rule is the
+    // comics rule verbatim: a member only ever receives the cast of a comic
+    // they are allocated, and every Characters view is a union of those. A
+    // library doc is reached by a line grant, or a program grant when the doc
+    // names the line's one programme. The sheet bytes stay gated separately:
+    // the Function presigns them through castIndex/{line}.
+    match /casts/{c} {
+      allow read: if isAllowlisted()
+        && comicAllowed(c, resource.data.line, resource.data.get('subject_slug', ''), resource.data.get('program_slug', ''));
+      allow write: if false;
+    }
+    // ── Cast gate index (function-only) ──
+    // `castIndex/{line}` maps every character to the comics that stage it,
+    // INCLUDING comics the reader is not allocated, so no client may read it.
+    // The dataApi Function reads it through the Admin SDK (which bypasses
+    // rules) to decide whether a member may presign a character sheet.
+    match /castIndex/{l} { allow read, write: if false; }
     // ── AI conversations (captured ChatGPT/Gemini/… transcripts attached to a
     //    line/comic; written only by the capture Admin SDK, which bypasses rules) ──
     // Visibility mirrors the LOCKED decision: line-attached → any allowlisted

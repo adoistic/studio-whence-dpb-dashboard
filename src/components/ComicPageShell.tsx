@@ -14,6 +14,8 @@ import { InsideCovers } from '@/components/InsideCovers'
 import { BackCover } from '@/components/BackCover'
 import { Activities } from '@/components/Activities'
 import { CharacterGrid } from '@/components/CharacterGrid'
+import { WorkCharacters } from '@/components/WorkCharacters'
+import { useCasts } from '@/lib/casts'
 import { AboutTheBook } from '@/components/AboutTheBook'
 import { ComicReader } from '@/components/ComicReader'
 import { ComicPdfButton } from '@/components/ComicPdfButton'
@@ -126,7 +128,15 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
   // but no `figures/{slug}` doc — every Indic epic, for one — could never show
   // its characters at all. The cast is a property of the comic, so the strip
   // now appears for either reason.
-  const hasCast = (comic.characters?.people?.length ?? 0) > 0
+  // The comic's cast doc (`casts/{line}__{slug}`, one small read) drives the
+  // Characters tab; the older per-comic `characters` block stays only as a
+  // fallback for a book whose cast has not been published in the new shape.
+  const castLoad = useCasts([`${comic.line}__${comic.slug}`])
+  const cast = castLoad.data?.[0] ?? null
+  const castList = useMemo(() => (cast ? [cast] : []), [cast])
+  const legacyCount = comic.characters ? comic.characters.count || comic.characters.people.length : 0
+  const castCount = cast?.people.length ? cast.counts?.characters || cast.people.length : 0
+  const hasCast = castCount > 0 || legacyCount > 0
 
   // ── Comic PDF ⇄ A+ Modules view ──────────────────────────────────────────
   // The "Read the comic" section toggles between the page reader (PDF) and the
@@ -246,7 +256,7 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
           figureSlug={hasFigure ? figureSlug : null}
           comics={comics}
           active={tab}
-          characterCount={hasCast ? comic.characters!.count || comic.characters!.people.length : undefined}
+          characterCount={hasCast ? castCount || legacyCount : undefined}
           onCharacters={() => setTab('characters')}
         />
       )}
@@ -254,7 +264,13 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
       {/* ── Characters tab ─────────────────────────────────────────── */}
       {tab === 'characters' && (
         <main className="mx-auto max-w-[1100px] px-6 pb-24">
-          <CharacterGrid comic={comic} />
+          {castCount > 0 ? (
+            <div className="pt-12">
+              <WorkCharacters casts={castList} title={comic.title} />
+            </div>
+          ) : (
+            <CharacterGrid comic={comic} />
+          )}
         </main>
       )}
 

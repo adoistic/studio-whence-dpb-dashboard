@@ -74,6 +74,29 @@ R2, built by the content repo's `tools/build_search_index.py` and published by
 - `NEXT_PUBLIC_SEARCH_API_URL` is inlined at BUILD time — a build without it
   ships a search box that silently fails.
 
+## Characters tab + downloads (2026-10-19)
+
+Every work (comic, subject, programme, `/characters`) has a Characters tab built
+by ONE component, `WorkCharacters`, over per-comic cast docs:
+
+- **`casts/{line}__{slug}`** — one doc per published comic (plus `{line}__library`
+  for sheets staged on no page yet), written by the content repo's
+  `tools/publish_work_casts.py`. Read rule = the comics rule, so every view is a
+  union (`castModel.mergeCasts`) of casts the viewer may already read. Identity
+  is `(line, id)`; shared IP has line `shared`.
+- **`castIndex/{line}`** — function-only (rules deny clients). `dataApi` reads it
+  to decide whether a MEMBER may presign `artifacts/characters/{line}/{id}/…`.
+- **Downloads** — `lib/downloads.ts`: one file = `/resolve` with a `download`
+  name (R2 `Content-Disposition: attachment`) + a link click; many files = a
+  client-zip stream (File System Access API where present, else a Blob).
+  Character sheets are zipped in the browser; research uses pre-built
+  `bundles/research/{line}/{figure}/…` (content repo
+  `tools/publish_research_bundles.py`, pointers `figures/*.researchZip` and
+  `sources/*.bundle`) and assembles in the browser when a bundle is stale.
+- `bundles/` is presign-only (RESOLVE_PREFIXES), parsed by `scopeOfKey` as the
+  figure's research scope. Zip entry names are capped (folder 60, file 80) so
+  Windows' built-in unzip never meets a path over 260 characters.
+
 ## Deploy
 `npm run build && firebase deploy --only hosting` (also `firestore:rules` when rules change).
 Firebase **Storage is intentionally not used** — gated assets go through the

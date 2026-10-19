@@ -426,6 +426,241 @@ describe("POST /resolve", () => {
     expect(res.jsonBody).toEqual({ urls: {} });
     expect(presignGet).not.toHaveBeenCalled();
   });
+
+  test("a bundles/ key is presignable (research downloads)", async () => {
+    authorize.mockResolvedValue({ email: "x@thothica.com", moderator: true });
+    presignGet.mockImplementation(async (k: string) => `https://signed/${k}`);
+    const key = "bundles/research/biographies/steve-jobs/all.zip";
+    const res = new FakeRes();
+    await handler(
+      makeReq({
+        method: "POST",
+        path: "/resolve",
+        authorization: "Bearer tok",
+        body: { keys: [key] },
+      }),
+      res
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.jsonBody).toEqual({ urls: { [key]: `https://signed/${key}` } });
+  });
+});
+
+// ─── POST /resolve — download names (Content-Disposition) ─────────────────────
+
+describe("POST /resolve — download names", () => {
+  const SHEET = "artifacts/characters/indic/sita/sita-young.png";
+  const THUMB = "artifacts/characters/indic/sita/web/sita-young.jpg";
+
+  function resolveReq(body: unknown) {
+    return makeReq({
+      method: "POST",
+      path: "/resolve",
+      authorization: "Bearer tok",
+      body,
+    });
+  }
+
+  /** The (key → args) presignGet was called with, for assertions. */
+  function presignArgs(): Record<string, unknown[]> {
+    const out: Record<string, unknown[]> = {};
+    for (const call of presignGet.mock.calls) out[call[0] as string] = call;
+    return out;
+  }
+
+  beforeEach(() => {
+    presignGet.mockImplementation(
+      async (k: string, _ttl?: number, opts?: { downloadName?: string }) =>
+        opts?.downloadName ? `https://signed/${k}#as=${opts.downloadName}` : `https://signed/${k}`
+    );
+  });
+
+  test("a key named in `download` is presigned with that name; others exactly as before", async () => {
+    authorize.mockResolvedValue({ email: "a@thothica.com", moderator: true });
+    const res = new FakeRes();
+    await handler(
+      resolveReq({ keys: [SHEET, THUMB], download: { [SHEET]: "Sītā (young) — sheet.png" } }),
+      res
+    );
+    expect(res.statusCode).toBe(200);
+    // Response shape is unchanged: { urls: { key: url } }.
+    expect(res.jsonBody).toEqual({
+      urls: {
+        [SHEET]: `https://signed/${SHEET}#as=Sītā (young) — sheet.png`,
+        [THUMB]: `https://signed/${THUMB}`,
+      },
+    });
+    const args = presignArgs();
+    expect(args[SHEET]).toEqual([SHEET, undefined, { downloadName: "Sītā (young) — sheet.png" }]);
+    // No entry → called with the key alone, as before this change.
+    expect(args[THUMB]).toEqual([THUMB]);
+  });
+
+  test("the name is sanitised: controls, bidi overrides and / \\ removed, then trimmed", async () => {
+    authorize.mockResolvedValue({ email: "a@thothica.com", moderator: true });
+    await handler(
+      resolveReq({
+        keys: [SHEET],
+        download: { [SHEET]: "  ../a/b\\c\u0000\r\n\u202Ed\u0085.png\t " },
+      }),
+      new FakeRes()
+    );
+    expect(presignArgs()[SHEET]).toEqual([SHEET, undefined, { downloadName: "..abcd.png" }]);
+  });
+
+  test("the name is capped at 180 characters, never splitting a surrogate pair", async () => {
+    authorize.mockResolvedValue({ email: "a@thothica.com", moderator: true });
+    await handler(
+      resolveReq({
+        keys: [SHEET, THUMB],
+        download: { [SHEET]: "x".repeat(200) + ".png", [THUMB]: "😀".repeat(200) },
+      }),
+      new FakeRes()
+    );
+    const args = presignArgs();
+    expect(args[SHEET][2]).toEqual({ downloadName: "x".repeat(180) });
+    const emoji = (args[THUMB][2] as { downloadName: string }).downloadName;
+    expect(Array.from(emoji)).toHaveLength(180);
+    expect(emoji).toBe("😀".repeat(180));
+  });
+
+  test("an entry that is empty after cleaning, or not a string, is ignored", async () => {
+    authorize.mockResolvedValue({ email: "a@thothica.com", moderator: true });
+    const keys = [
+      "images/a.png",
+      "images/b.png",
+      "images/c.png",
+      "images/d.png",
+      "images/e.png",
+    ];
+    const res = new FakeRes();
+    await handler(
+      resolveReq({
+        keys,
+        download: {
+          "images/a.png": "   ",
+          "images/b.png": " /\\\r\n ",
+          "images/c.png": 42,
+          "images/d.png": { name: "x.png" },
+          "images/e.png": null,
+        },
+      }),
+      res
+    );
+    expect(res.statusCode).toBe(200);
+    expect(Object.keys((res.jsonBody as { urls: object }).urls)).toHaveLength(5);
+    for (const k of keys) expect(presignArgs()[k]).toEqual([k]);
+  });
+
+  test("a `download` that is not a plain object is ignored; the batch still resolves", async () => {
+    authorize.mockResolvedValue({ email: "a@thothica.com", moderator: true });
+    for (const download of [[SHEET, "x.png"], "x.png", null, 7]) {
+      presignGet.mockClear();
+      const res = new FakeRes();
+      await handler(resolveReq({ keys: [SHEET], download }), res);
+      expect(res.statusCode).toBe(200);
+      expect(res.jsonBody).toEqual({ urls: { [SHEET]: `https://signed/${SHEET}` } });
+      expect(presignArgs()[SHEET]).toEqual([SHEET]);
+    }
+  });
+
+  test("a `download` entry can never add a key: names for keys not requested sign nothing", async () => {
+    authorize.mockResolvedValue({ email: "a@thothica.com", moderator: true });
+    const res = new FakeRes();
+    await handler(
+      resolveReq({
+        keys: [THUMB],
+        download: { [SHEET]: "sheet.png", "research/x.md": "x.md" },
+      }),
+      res
+    );
+    expect(res.jsonBody).toEqual({ urls: { [THUMB]: `https://signed/${THUMB}` } });
+    expect(presignGet).toHaveBeenCalledTimes(1);
+  });
+
+  test("a `download` entry for an INVALID key produces no URL", async () => {
+    authorize.mockResolvedValue({ email: "a@thothica.com", moderator: true });
+    const res = new FakeRes();
+    await handler(
+      resolveReq({
+        keys: ["secrets/x", "../content.json", "content.json"],
+        download: { "secrets/x": "x.txt", "../content.json": "c.json", "content.json": "c.json" },
+      }),
+      res
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.jsonBody).toEqual({ urls: {} });
+    expect(presignGet).not.toHaveBeenCalled();
+  });
+
+  test("member: a `download` entry for a key they are NOT allowed produces no URL", async () => {
+    authorize.mockResolvedValue({ email: "m@gmail.com", moderator: false });
+    getAllocation.mockResolvedValue({
+      lines: [],
+      figures: [],
+      figures_effective: [],
+      comics: ["indic__01-bala"],
+      programs: [],
+    });
+    const allowed = THUMB;
+    const denied = "artifacts/characters/indic/bhishma/bhishma-old.png";
+    isKeyAllowedForMember.mockImplementation(async (k: string) => k === allowed);
+    const res = new FakeRes();
+    await handler(
+      resolveReq({
+        keys: [allowed, denied],
+        download: { [allowed]: "Sita.jpg", [denied]: "Bhishma.png" },
+      }),
+      res
+    );
+    expect(res.statusCode).toBe(200);
+    expect(res.jsonBody).toEqual({
+      urls: { [allowed]: `https://signed/${allowed}#as=Sita.jpg` },
+    });
+    expect(presignGet).toHaveBeenCalledTimes(1);
+    expect(presignArgs()[denied]).toBeUndefined();
+  });
+
+  test("member: the allocation gate still sees every key exactly once", async () => {
+    authorize.mockResolvedValue({ email: "m@gmail.com", moderator: false });
+    isKeyAllowedForMember.mockResolvedValue(false);
+    const res = new FakeRes();
+    await handler(resolveReq({ keys: [SHEET], download: { [SHEET]: "Sita.png" } }), res);
+    expect(res.jsonBody).toEqual({ urls: {} });
+    expect(isKeyAllowedForMember).toHaveBeenCalledTimes(1);
+    expect(isKeyAllowedForMember.mock.calls[0][0]).toBe(SHEET);
+    expect(presignGet).not.toHaveBeenCalled();
+  });
+
+  test("the 50-key cap still holds when a `download` map is sent", async () => {
+    authorize.mockResolvedValue({ email: "a@thothica.com", moderator: true });
+    const keys = Array.from({ length: 51 }, (_, i) => `images/${i}.png`);
+    const download = Object.fromEntries(keys.map((k) => [k, `${k}.png`]));
+    const res = new FakeRes();
+    await handler(resolveReq({ keys, download }), res);
+    expect(res.statusCode).toBe(400);
+    expect(res.jsonBody).toEqual({ error: "too many keys" });
+    expect(presignGet).not.toHaveBeenCalled();
+  });
+
+  test("a string JSON body carrying `download` is parsed and honoured", async () => {
+    authorize.mockResolvedValue({ email: "a@thothica.com", moderator: true });
+    const res = new FakeRes();
+    await handler(
+      resolveReq(JSON.stringify({ keys: [SHEET], download: { [SHEET]: "Sītā.png" } })),
+      res
+    );
+    expect(res.jsonBody).toEqual({ urls: { [SHEET]: `https://signed/${SHEET}#as=Sītā.png` } });
+  });
+
+  test("presignGet throwing for a named key → 500, as for any key", async () => {
+    authorize.mockResolvedValue({ email: "a@thothica.com", moderator: true });
+    presignGet.mockRejectedValue(new Error("r2 down"));
+    const res = new FakeRes();
+    await handler(resolveReq({ keys: [SHEET], download: { [SHEET]: "Sita.png" } }), res);
+    expect(res.statusCode).toBe(500);
+    expect(res.jsonBody).toEqual({ error: "resolve failed" });
+  });
 });
 
 // ─── GET /read ───────────────────────────────────────────────────────────────

@@ -289,6 +289,12 @@ export interface ResearchFile {
   title: string
 }
 
+/** A pre-built download in R2 (`bundles/research/…`), gated like the research it holds. */
+export interface ResearchBundleFile {
+  key: string
+  bytes: number
+}
+
 export interface ResearchSource {
   slug: string
   // book / transcript (biographies) · topic-note (cite-driven) · the Subject
@@ -297,6 +303,17 @@ export interface ResearchSource {
   title: string
   words: number
   files: ResearchFile[]
+  // The source as ONE Markdown file and as a zip of its files, built by the content
+  // repo's publish_research_bundles.py. `files` is how many files the source listed
+  // when they were built: the portal uses the bundle only while that still equals
+  // `files.length`, and otherwise assembles the download itself.
+  bundle?: {
+    md?: ResearchBundleFile
+    zip?: ResearchBundleFile
+    files: number
+    missing?: number
+    generatedAt?: string
+  }
 }
 
 export interface Figure {
@@ -328,6 +345,17 @@ export interface Figure {
   variations?: { label: string; stage?: string; key: string; bytes?: number }[]
   // Cross-work links: the same being appearing in other programs.
   alsoIn?: { program: string; line: string; slug: string }[]
+  // Every source of this subject as one zip, a folder per kind and per source
+  // (publish_research_bundles.py). Used while `files` and `sources` still match the
+  // live source list; otherwise the portal builds the zip itself.
+  researchZip?: {
+    key: string
+    bytes: number
+    files: number
+    sources?: number
+    missing?: number
+    generatedAt?: string
+  }
 }
 
 export interface Program {

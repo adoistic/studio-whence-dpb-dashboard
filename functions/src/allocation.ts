@@ -12,16 +12,35 @@
  *
  * Two responsibilities:
  *   1. `scopeOfKey` — a PURE parser mapping an R2 object key → the work scope it
- *      belongs to (`{ line?, subject?, comicId? }`). No I/O.
- *   2. `getAllocation` / `comicMeta` / `figureProgram` / `isKeyAllowedForMember`
- *      — the Firestore reads + the allow decision. Fail-closed: an
- *      unattributable scope, a missing allocation doc, or an empty scope all DENY.
+ *      belongs to (`{ line?, subject?, comicId?, character? }`). No I/O.
+ *   2. `getAllocation` / `comicMeta` / `figureProgram` / `castIndex` /
+ *      `isKeyAllowedForMember` — the Firestore reads + the allow decision.
+ *      Fail-closed: an unattributable scope, a missing allocation doc, or an
+ *      empty scope all DENY.
+ *
+ * Two key shapes are decided differently from the rest:
+ *   - CHARACTER SHEETS, `artifacts/characters/{line}/{id}/…` (full sheet
+ *     `{stage}.png`, thumbnail `web/{stage}.jpg`; `line` is `shared` for
+ *     studio / Diamond IP such as Little Chanakya) → `{ line, character }`. A
+ *     character belongs to no single comic, so a member may presign its sheets
+ *     when they hold the line (never the `shared` pseudo-line), or when they
+ *     may see ANY comic that stages the character. Which comics stage it comes
+ *     from the function-only gate index `castIndex/{line}` (firestore.rules
+ *     denies every client read of it), written by the content repo's
+ *     `tools/publish_work_casts.py` beside the per-comic `casts/*` docs.
+ *   - RESEARCH BUNDLES, `bundles/research/{line}/{figure}/…` (one source as
+ *     `.md` or `.zip`, or the figure's whole library as `all.zip`) → the
+ *     research scope `{ line, subject: figure }`, decided exactly like that
+ *     figure's `research/…` keys. Every other `bundles/…` shape → `{}` (deny).
  *
  * Read budget: the allocation doc is read ONCE per request (in `index.ts`) and
  * passed in here. Only a comic key triggers a second read (the comic doc, to
  * learn its subject/program for the figure/program-grant tests) and only a
  * research key with a program grant triggers a figure-doc read. So ≤2
- * Firestore reads per key.
+ * Firestore reads per key. A character key reads `castIndex/{line}` only when
+ * no line grant already allows it, and that read is cached per instance (5 min
+ * when found, 1 min when absent, one shared in-flight read per line), so a
+ * `/resolve` batch of 50 thumbnails costs at most one index read per line.
  */
 
 import { getFirestore } from 'firebase-admin/firestore'
@@ -32,8 +51,22 @@ export interface KeyScope {
   line?: string
   subject?: string
   comicId?: string
+  /** `artifacts/characters/{line}/{id}/…` → the character id. Always paired
+   * with `line`; decided through `castIndex/{line}`, never by the research or
+   * comic branches. */
+  character?: string
   /** `docs/methodology/…` → readable by ANY authed member (no allocation needed). */
   methodology?: boolean
+}
+
+/** `castIndex/{line}` — the gate index for that line's character sheets.
+ *
+ * `comics` maps each comicId (`{line}__{slug}`) to its subject (`s`) and
+ * program (`p`) slugs; `chars` maps each character id to the comicIds that
+ * stage it. For the `shared` pseudo-line the comicIds span every line. */
+export interface CastIndex {
+  comics: Record<string, { s?: string | null; p?: string | null }>
+  chars: Record<string, string[]>
 }
 
 /** A member's allocation grants. Missing fields default to empty arrays.
@@ -54,11 +87,19 @@ export interface Allocation {
 }
 
 /** Injectable Firestore readers so the allow logic is unit-testable without a
- * live Admin SDK. Both default to the real Firestore in `isKeyAllowedForMember`. */
+ * live Admin SDK. All three default to the real Firestore in
+ * `isKeyAllowedForMember`. */
 export interface AllocationDeps {
   comicMeta: (comicId: string) => Promise<{ subject: string | null; program: string | null }>
   figureProgram: (slug: string) => Promise<string | null>
+  /** The line's cast index, or `null` when it is absent. */
+  castIndex: (line: string) => Promise<CastIndex | null>
 }
+
+/** The pseudo-line holding studio / Diamond IP characters (Little Chanakya and
+ * his cast). Nobody is granted it as a line: its sheets are reachable only
+ * through the comics that stage them. */
+const SHARED_CAST_LINE = 'shared'
 
 /**
  * Parse an R2 object key into the work scope it belongs to. PURE — no I/O.
@@ -76,6 +117,14 @@ export interface AllocationDeps {
  *       indic/other: `research/indic/<Epic>/characters/{name}/…` or `…/core/…`
  *         → line = first segment after `research/`; subject = segment after
  *           `characters/` if present, else none.
+ *   - `bundles/research/{line}/{figure}/{file…}` (pre-built research downloads)
+ *       → { line, subject: figure } — a RESEARCH scope, no comicId. Any other
+ *         `bundles/…` shape, or one missing the line, figure or file segment
+ *         → `{}` (deny).
+ *   - `artifacts/characters/{line}/{id}/{file…}` (character sheets and their
+ *       `web/` thumbnails) → { line, character: id }. Matched before the
+ *       generic `characters/{name}` marker below; missing the line, the id or
+ *       the file segment → `{}` (deny).
  *   - `images/{rel}` and `artifacts/{rel}`: parse the same way — look for a
  *       `_books/{subject}` segment, a `drafts/{line}/{slug}` shape, or a
  *       `_comics/` marker. If a line/subject can't be attributed → `{}` (deny).
@@ -138,10 +187,38 @@ export function scopeOfKey(key: string): KeyScope {
     return { line, comicId: `${line}__${slug}` }
   }
 
+  // ── bundles/research/{line}/{figure}/… (pre-built research downloads) ────
+  //   `sources/{source}.md`, `sources/{source}.zip` or `all.zip`. A RESEARCH
+  //   scope (no comicId), so the research branch of isKeyAllowedForMember
+  //   decides it exactly as it decides the figure's `research/…` keys: a line
+  //   grant, figures_effective, or a program grant through figureProgram.
+  //   `bundles` is a top-level prefix of its own and is matched here, before
+  //   the shared rel-path markers below can misread it. Every other shape —
+  //   another bundle kind, a missing line/figure/file segment, the
+  //   `bundles/research/_state.json` bookkeeping file — is `{}` (deny).
+  if (top === 'bundles') {
+    if (parts[1] === 'research' && parts.length >= 5) {
+      return { line: parts[2], subject: parts[3] }
+    }
+    return {}
+  }
+
   // ── research / images / artifacts / … shared rel-path parsing ───────────
   // `rel` is everything after the top-level bucket prefix.
   const rel = parts.slice(1)
   if (rel.length === 0) return {}
+
+  // ── artifacts/characters/{line}/{id}/… (character sheets) ────────────────
+  //   `{stage}.png` is the full sheet, `web/{stage}.jpg` its thumbnail; `line`
+  //   is `shared` for studio / Diamond IP. Matched BEFORE the generic
+  //   `characters/{name}` marker below, which would read this shape as
+  //   `{ line: 'characters', subject: <line> }` — the parse that refused every
+  //   member all character art. Requires the line, the id AND a file segment
+  //   after them; anything shorter is `{}` (deny).
+  if (top === 'artifacts' && rel[0] === 'characters') {
+    if (rel.length >= 4) return { line: rel[1], character: rel[2] }
+    return {}
+  }
 
   // ── images/comics/{line}/{slug}/… (rendered comic cover + pages) ─────────
   // The reader/PDF read these gated keys. `comics` (no underscore) is distinct
@@ -264,6 +341,150 @@ export async function figureProgram(slug: string): Promise<string | null> {
   return typeof data.program_slug === 'string' ? data.program_slug : null
 }
 
+// ── castIndex/{line} — read once, then reused per instance ──────────────────
+
+/** A found index is reused for 5 minutes before it is read again. */
+const CAST_INDEX_TTL_MS = 5 * 60 * 1000
+/** An absent index is remembered as absent for 1 minute. */
+const CAST_INDEX_MISS_TTL_MS = 60 * 1000
+/** At most this many lines are held at once. The line comes from the
+ * requested key, so this bounds what a stream of made-up lines can occupy. */
+const CAST_INDEX_CACHE_MAX = 64
+/** Only a plausible document id is ever read. This keeps '.', reserved
+ * `__…__` ids and absurd lengths away from Firestore; such a line has no
+ * index, which denies. */
+const CAST_INDEX_LINE_RE = /^[A-Za-z0-9][A-Za-z0-9_-]{0,99}$/
+
+interface CastIndexCacheEntry {
+  value: Promise<CastIndex | null>
+  expiresAt: number
+}
+
+const castIndexCache = new Map<string, CastIndexCacheEntry>()
+
+/** Drop every cached cast index. For tests, and for forcing a re-read. */
+export function clearCastIndexCache(): void {
+  castIndexCache.clear()
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null && !Array.isArray(v)
+}
+
+/** Make room before an insert: expired entries go first, then the oldest. */
+function pruneCastIndexCache(now: number): void {
+  if (castIndexCache.size < CAST_INDEX_CACHE_MAX) return
+  for (const [line, entry] of castIndexCache) {
+    if (entry.expiresAt <= now) castIndexCache.delete(line)
+  }
+  while (castIndexCache.size >= CAST_INDEX_CACHE_MAX) {
+    const oldest = castIndexCache.keys().next().value
+    if (oldest === undefined) break
+    castIndexCache.delete(oldest)
+  }
+}
+
+/** One Firestore read of `castIndex/{line}`, coerced to the CastIndex shape
+ * (a non-object `comics` / `chars` becomes `{}`; entries are re-checked where
+ * they are used). `null` when the doc is absent. */
+async function readCastIndex(line: string): Promise<CastIndex | null> {
+  const snap = await getFirestore().collection('castIndex').doc(line).get()
+  if (!snap.exists) return null
+  const data = (snap.data?.() ?? {}) as { comics?: unknown; chars?: unknown }
+  return {
+    comics: isRecord(data.comics) ? (data.comics as CastIndex['comics']) : {},
+    chars: isRecord(data.chars) ? (data.chars as CastIndex['chars']) : {},
+  }
+}
+
+/**
+ * Read `castIndex/{line}` → the line's CastIndex, or `null` when absent.
+ *
+ * Cached in module memory per line: a found index for 5 minutes, an absent one
+ * for 1 minute. Concurrent callers share ONE in-flight read, which matters
+ * because `/resolve` checks up to 50 keys in parallel. A read that throws is
+ * not cached — the callers waiting on it deny, and the next request retries.
+ */
+export function castIndex(line: string): Promise<CastIndex | null> {
+  if (typeof line !== 'string' || !CAST_INDEX_LINE_RE.test(line)) {
+    return Promise.resolve(null)
+  }
+  const now = Date.now()
+  const hit = castIndexCache.get(line)
+  if (hit && hit.expiresAt > now) return hit.value
+  if (hit) castIndexCache.delete(line)
+  pruneCastIndexCache(now)
+
+  // In flight: the TTL is a placeholder that keeps concurrent callers on this
+  // one read; the real expiry is set when the read settles.
+  const entry: CastIndexCacheEntry = {
+    value: Promise.resolve(null),
+    expiresAt: now + CAST_INDEX_TTL_MS,
+  }
+  entry.value = readCastIndex(line).then(
+    (index) => {
+      entry.expiresAt = Date.now() + (index ? CAST_INDEX_TTL_MS : CAST_INDEX_MISS_TTL_MS)
+      return index
+    },
+    (err: unknown) => {
+      if (castIndexCache.get(line) === entry) castIndexCache.delete(line)
+      throw err
+    }
+  )
+  castIndexCache.set(line, entry)
+  return entry.value
+}
+
+/**
+ * The CHARACTER branch of `isKeyAllowedForMember` (members only; moderators
+ * never reach this module).
+ *
+ *   1. A grant on the character's own line allows — that covers the line's
+ *      library sheets too. The `shared` pseudo-line is never matched this way.
+ *   2. Otherwise read `castIndex/{line}` and allow when the member may see ANY
+ *      comic that stages the character, each comic tested the way
+ *      `comicAllowed` in firestore.rules tests it: the comic id, the comic's
+ *      own line (the part of the id before `__`), its subject against RAW
+ *      `figures`, its program against `programs`.
+ *   3. Otherwise deny — also on a missing index, an unknown character, a
+ *      malformed entry, or a read that throws.
+ */
+async function isCharacterAllowedForMember(
+  line: string | undefined,
+  character: string,
+  alloc: Allocation,
+  deps: AllocationDeps
+): Promise<boolean> {
+  if (!line || !character) return false
+  if (line !== SHARED_CAST_LINE && alloc.lines.includes(line)) return true
+
+  let index: CastIndex | null
+  try {
+    index = await deps.castIndex(line)
+  } catch {
+    return false
+  }
+  if (!index || !isRecord(index.chars) || !Object.hasOwn(index.chars, character)) {
+    return false
+  }
+  const comicIds: unknown = index.chars[character]
+  if (!Array.isArray(comicIds)) return false
+  const comics = isRecord(index.comics) ? index.comics : {}
+
+  for (const comicId of comicIds) {
+    if (typeof comicId !== 'string' || comicId.length === 0) continue
+    if (alloc.comics.includes(comicId)) return true
+    const sep = comicId.indexOf('__')
+    const comicLine = sep > 0 ? comicId.slice(0, sep) : ''
+    if (comicLine && alloc.lines.includes(comicLine)) return true
+    const meta: unknown = Object.hasOwn(comics, comicId) ? comics[comicId] : undefined
+    if (!isRecord(meta)) continue
+    if (typeof meta.s === 'string' && meta.s && alloc.figures.includes(meta.s)) return true
+    if (typeof meta.p === 'string' && meta.p && alloc.programs.includes(meta.p)) return true
+  }
+  return false
+}
+
 /**
  * Decide whether a member with allocation `alloc` may fetch the R2 object `key`.
  *
@@ -283,16 +504,22 @@ export async function figureProgram(slug: string): Promise<string | null> {
  *       `alloc.figures_effective` includes `scope.subject` (so a comic grant
  *       unlocks the figure's research library), OR
  *       `alloc.programs` includes the figure's `program_slug` (figure-doc
- *       lookup; mirrors the rules' figureResearchAllowed).
+ *       lookup; mirrors the rules' figureResearchAllowed). Research bundles
+ *       (`bundles/research/{line}/{figure}/…`) take this branch.
+ *
+ *   - CHARACTER scope (carries `character`): a grant on the character's line
+ *       (never `shared`), else any comic that stages it per `castIndex/{line}`
+ *       — see isCharacterAllowedForMember.
  *
  * Fail-closed: empty scope `{}` → deny; missing `alloc` → deny.
  * Read budget: ≤1 extra read (the comic doc for comic keys, the figure doc for
- * research keys), and only when the cheap list grants didn't already allow.
+ * research keys, the cached cast index for character keys), and only when the
+ * cheap list grants didn't already allow.
  */
 export async function isKeyAllowedForMember(
   key: string,
   alloc: Allocation | null,
-  deps: AllocationDeps = { comicMeta, figureProgram }
+  deps: AllocationDeps = { comicMeta, figureProgram, castIndex }
 ): Promise<boolean> {
   if (!alloc) return false
   const scope = scopeOfKey(key)
@@ -302,6 +529,13 @@ export async function isKeyAllowedForMember(
   if (scope.methodology) return true
   // Empty scope → unattributable → deny.
   if (!scope.line && !scope.subject && !scope.comicId) return false
+
+  // ── CHARACTER scope (a character sheet): decided by the cast index ──
+  // Checked BEFORE the comic/research branches, which know nothing of the
+  // cast index (and whose line test would let a `shared` line grant through).
+  if (scope.character !== undefined) {
+    return isCharacterAllowedForMember(scope.line, scope.character, alloc, deps)
+  }
 
   // ── COMIC-keyed scope (carries a comicId): RAW `figures`, not figures_effective ──
   if (scope.comicId) {

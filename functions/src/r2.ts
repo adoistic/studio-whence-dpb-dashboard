@@ -5,6 +5,8 @@
  * `authorize` + `safeKey` have passed) so the browser can fetch the asset
  * directly from R2 for a short window — no proxying of large binaries through
  * the function. URLs expire after `expiresIn` seconds (default 600 / 10 min).
+ * A URL presigned with a `downloadName` makes R2 answer with
+ * `Content-Disposition: attachment` under that name (see `contentDisposition`).
  *
  * Cloudflare R2 speaks the S3 API, so we use `@aws-sdk/client-s3` with R2's
  * S3-compatible endpoint, region `auto`, and the R2 access-key credentials.
@@ -51,22 +53,60 @@ function client(): S3Client {
 }
 
 /**
+ * Build an RFC 6266 `Content-Disposition: attachment` value for a download
+ * name, carrying both forms browsers read:
+ *
+ *   attachment; filename="<ascii fallback>"; filename*=UTF-8''<RFC 5987>
+ *
+ * The fallback (for clients that ignore `filename*`) is the name with every
+ * character outside printable ASCII, and every `"` and `\`, replaced by `_` —
+ * so it is a valid quoted-string with nothing to escape, and a CR/LF can never
+ * reach the header. `filename*` is the exact UTF-8 name, percent-encoded to
+ * RFC 5987's `attr-char` set (encodeURIComponent leaves `'()*` bare, and those
+ * are not attr-chars, so they are encoded too). A lone surrogate, which
+ * encodeURIComponent would throw on, becomes U+FFFD first.
+ */
+export function contentDisposition(name: string): string {
+  const wellFormed = name.replace(
+    /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g,
+    '\uFFFD'
+  )
+  const ascii = wellFormed.replace(/[^\x20-\x7E]|["\\]/gu, '_')
+  const encoded = encodeURIComponent(wellFormed).replace(
+    /['()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`
+  )
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encoded}`
+}
+
+/**
  * Generate a short-lived presigned GET URL for an R2 object key.
+ *
+ * With `opts.downloadName`, the URL also carries a signed
+ * `response-content-disposition`, so R2 serves the object as an attachment
+ * under that name and a click saves the file instead of opening it. (The
+ * `<a download>` attribute is ignored cross-origin, and R2 is another origin.)
  *
  * @param key       The R2 object key (already validated via `safeKey`).
  * @param expiresIn TTL in seconds (default 600 / 10 min).
+ * @param opts      `downloadName`: the file name to save under.
  * @returns         A presigned URL the client can GET directly from R2.
  */
 export function presignGet(
   key: string,
-  expiresIn: number = DEFAULT_EXPIRES_IN
+  expiresIn: number = DEFAULT_EXPIRES_IN,
+  opts?: { downloadName?: string }
 ): Promise<string> {
   // client() throws if any R2 env var is absent — must be called first so the
   // env guard runs before we read R2_BUCKET for the command.
   const s3 = client()
+  const downloadName = opts?.downloadName
   const command = new GetObjectCommand({
     Bucket: process.env.R2_BUCKET!,
     Key: key,
+    ...(downloadName
+      ? { ResponseContentDisposition: contentDisposition(downloadName) }
+      : {}),
   })
   return getSignedUrl(s3, command, { expiresIn })
 }

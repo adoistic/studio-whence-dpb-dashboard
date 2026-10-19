@@ -18,13 +18,23 @@
 
 import { randomUUID } from "crypto";
 
-/** Prefixes presignable through `/resolve`. `content.json` is deliberately absent. */
+/** Prefixes presignable through `/resolve`. `content.json` is deliberately absent.
+ *
+ * `bundles/` holds the pre-built research downloads
+ * (`bundles/research/{line}/{figure}/sources/{source}.{md,zip}` and
+ * `bundles/research/{line}/{figure}/all.zip`). They are presign-only: a zip is
+ * binary and a whole-figure bundle can run to megabytes, so they are NOT in
+ * READ_PREFIXES and are never proxied inline through `/read`. Which member may
+ * presign one is decided per key by the allocation gate (allocation.ts parses
+ * `bundles/research/{line}/{figure}/…` as that figure's research scope; every
+ * other `bundles/…` shape is unattributable and denied). */
 export const RESOLVE_PREFIXES = [
   'research/',
   'drafts/',
   'images/',
   'artifacts/',
   'docs/',
+  'bundles/',
 ] as const;
 
 /** Prefixes readable through `/read` (proxied text). Narrower than resolve.

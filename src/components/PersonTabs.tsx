@@ -8,22 +8,28 @@ const ACTIVE = 'text-brand-indigo border-b-2 border-brand-gold'
 const INACTIVE = 'text-brand-slate hover:text-brand-indigo border-b-2 border-transparent'
 
 export function PersonTabs({
-  figureSlug, comics, active, characterCount, onCharacters,
+  figureSlug, comics, active, characterCount, onCharacters, onResearch,
 }: {
   figureSlug: string | null
   comics: PersonComic[]
   active: 'research' | 'comics' | 'characters'
-  /** How many characters this comic stages. Absent = no catalog published yet,
-   *  and the tab stays hidden rather than opening onto an empty page. */
+  /** How many characters this comic (or this subject's books) stage. Absent = no
+   *  cast published yet, and the tab stays hidden rather than opening onto an
+   *  empty page. */
   characterCount?: number
   onCharacters?: () => void
+  /** On the subject page itself the Research tab is a view, not a link: going
+   *  back to it from Characters must not reload the page. */
+  onResearch?: () => void
 }) {
   const top = furthestComic(comics)
   return (
     <div className="border-b border-brand-pale-dusk">
       <nav aria-label="Person sections" className="mx-auto flex max-w-[1100px] items-end gap-7 px-6">
         {/* Research tab */}
-        {active === 'research' || !figureSlug ? (
+        {active !== 'research' && onResearch ? (
+          <button type="button" onClick={onResearch} className={`${TAB} ${INACTIVE} py-3`}>Research</button>
+        ) : active === 'research' || !figureSlug ? (
           <span className={`${TAB} ${active === 'research' ? ACTIVE : 'text-brand-slate'} py-3`} aria-current={active === 'research' ? 'page' : undefined}>
             Research
           </span>

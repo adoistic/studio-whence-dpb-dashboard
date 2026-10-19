@@ -29,6 +29,10 @@ vi.mock('next/link', () => ({
 // filters to this figure's subject_slug, rather than a subject-scoped useComics.
 let mockComics: () => { data: unknown[] | null }
 vi.mock('@/lib/visibleCatalog', () => ({ useVisibleComics: () => mockComics() }))
+// The subject's book casts (Characters tab) and the gated presign used by the
+// research downloads — inert here; this file pins the research reader.
+vi.mock('@/lib/casts', () => ({ useCasts: () => ({ data: [], loading: false }) }))
+vi.mock('@/lib/dataApi', () => ({ resolveUrls: async () => ({}) }))
 vi.mock('@/lib/auth', () => ({
   useUser: () => ({ user: { email: 'mod@x.com' }, loading: false }),
   useAllowStatus: () => 'admin',
@@ -94,17 +98,17 @@ describe('FigurePageShell', () => {
     render(<FigurePageShell figure={figure} />)
     expect(screen.getByRole('heading', { name: /dhirubhai ambani/i })).toBeInTheDocument()
     expect(screen.getByText('The Polyester Prince')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /intro/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^intro/i })).toBeInTheDocument()
     expect(screen.getByText(/^reader:research\/biographies\/.*01-intro\.md$/)).toBeInTheDocument()
   })
   test('selecting a file passes its research key to the reader', () => {
     render(<FigurePageShell figure={figure} />)
-    fireEvent.click(screen.getByRole('button', { name: /intro/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^intro/i }))
     expect(screen.getByText(/^reader:research\/biographies\/.*01-intro\.md$/)).toBeInTheDocument()
   })
   test('the active file button is marked aria-current="page"', () => {
     render(<FigurePageShell figure={figure} />)
-    const button = screen.getByRole('button', { name: /intro/i })
+    const button = screen.getByRole('button', { name: /^intro/i })
     fireEvent.click(button)
     expect(button).toHaveAttribute('aria-current', 'page')
   })
@@ -116,28 +120,28 @@ describe('FigurePageShell', () => {
   test('all transcripts are grouped under one "Podcasts" group, labeled by source title', () => {
     render(<FigurePageShell figure={figureWithPodcasts} />)
     // The book group still renders on its own.
-    expect(screen.getByRole('button', { name: /the polyester prince/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^the polyester prince/i })).toBeInTheDocument()
     // One "Podcasts" group header.
-    expect(screen.getByRole('button', { name: /podcasts/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^podcasts/i })).toBeInTheDocument()
     // Both transcripts appear, labeled by their podcast/source title — not "Transcript".
-    expect(screen.getByRole('button', { name: /ANI Podcast Ep 45/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Bush Center Forum/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^ANI Podcast Ep 45/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Bush Center Forum/i })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^transcript$/i })).not.toBeInTheDocument()
   })
 
   test('collapsing a book group hides its chapter children, expanding restores them', () => {
     render(<FigurePageShell figure={figure} />)
-    expect(screen.getByRole('button', { name: /intro/i })).toBeInTheDocument()
-    const header = screen.getByRole('button', { name: /the polyester prince/i })
+    expect(screen.getByRole('button', { name: /^intro/i })).toBeInTheDocument()
+    const header = screen.getByRole('button', { name: /^the polyester prince/i })
     fireEvent.click(header)
-    expect(screen.queryByRole('button', { name: /intro/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^intro/i })).not.toBeInTheDocument()
     fireEvent.click(header)
-    expect(screen.getByRole('button', { name: /intro/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^intro/i })).toBeInTheDocument()
   })
 
   test('selecting a podcast transcript drives the reader with that transcript path', () => {
     render(<FigurePageShell figure={figureWithPodcasts} />)
-    fireEvent.click(screen.getByRole('button', { name: /Bush Center Forum/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Bush Center Forum/i }))
     expect(screen.getByText('reader:research/p/b.md')).toBeInTheDocument()
   })
 

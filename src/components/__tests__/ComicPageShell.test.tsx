@@ -35,6 +35,9 @@ vi.mock('@/lib/auth', () => ({
 // fetch so the test tree never initializes Firebase. readMarkdown only fires on
 // hover, which this test doesn't trigger.
 vi.mock('@/lib/dataApi', () => ({ readMarkdown: async () => '' }))
+// The comic's cast doc (Characters tab) — none published in these fixtures, so
+// the tab falls back to the comic's own `characters` block exactly as before.
+vi.mock('@/lib/casts', () => ({ useCasts: () => ({ data: [], loading: false }) }))
 
 // CoverOptions has its own tests. Mock it here so this shell test does not
 // initialize the cover-choice Firestore hook.

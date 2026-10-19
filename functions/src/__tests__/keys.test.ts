@@ -153,4 +153,37 @@ describe('safeKey', () => {
   test('panels/ rejects double-encoded traversal that survives one decode', () => {
     expect(safeKey('panels/%2e%2e/secrets/x.json', READ_PREFIXES)).toBeNull()
   })
+
+  // ── bundles/ (pre-built research downloads): presign-only ────────────────
+  test('bundles/ is presignable via /resolve (whole-figure zip, per-source md + zip)', () => {
+    for (const k of [
+      'bundles/research/biographies/steve-jobs/all.zip',
+      'bundles/research/biographies/steve-jobs/sources/isaacson.md',
+      'bundles/research/biographies/steve-jobs/sources/isaacson.zip',
+    ]) {
+      expect(safeKey(k, RESOLVE_PREFIXES)).toBe(k)
+    }
+  })
+
+  test('bundles/ is NOT readable inline via /read (never proxied)', () => {
+    expect(READ_PREFIXES).not.toContain('bundles/')
+    expect(
+      safeKey('bundles/research/biographies/steve-jobs/sources/isaacson.md', READ_PREFIXES)
+    ).toBeNull()
+  })
+
+  test('bundles/ is NOT writable via /upload-url', () => {
+    expect(safeKey('bundles/research/biographies/steve-jobs/all.zip', WRITE_PREFIXES)).toBeNull()
+  })
+
+  test('bundles/ traversal is rejected via /resolve (literal and double-encoded)', () => {
+    expect(safeKey('bundles/../content.json', RESOLVE_PREFIXES)).toBeNull()
+    expect(safeKey('bundles/%2e%2e/content.json', RESOLVE_PREFIXES)).toBeNull()
+    expect(safeKey('bundles/research/../../secrets/x', RESOLVE_PREFIXES)).toBeNull()
+  })
+
+  test('bundles/ needs the trailing slash (bundles-evil/ and a bare bundles are rejected)', () => {
+    expect(safeKey('bundles-evil/x.zip', RESOLVE_PREFIXES)).toBeNull()
+    expect(safeKey('bundles', RESOLVE_PREFIXES)).toBeNull()
+  })
 })

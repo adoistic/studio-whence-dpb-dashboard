@@ -1,5 +1,5 @@
 import { describe, test, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { PersonTabs } from '../PersonTabs'
 
 vi.mock('next/link', () => ({
@@ -35,5 +35,22 @@ describe('PersonTabs', () => {
     expect(screen.getByRole('link', { name: /research/i })).toHaveAttribute('href', '/figures/jrd-tata')
     // The edition switcher moved out of the tab strip into ComicEditions (the body band).
     expect(screen.queryByRole('tablist', { name: /editions/i })).toBeNull()
+  })
+  test('on the subject page, Characters and Research are views, not page loads', () => {
+    const onCharacters = vi.fn()
+    const onResearch = vi.fn()
+    const { rerender } = render(
+      <PersonTabs figureSlug="krishna" comics={comics} active="research" characterCount={12}
+        onCharacters={onCharacters} onResearch={onResearch} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /characters/i }))
+    expect(onCharacters).toHaveBeenCalled()
+    rerender(
+      <PersonTabs figureSlug="krishna" comics={comics} active="characters" characterCount={12}
+        onCharacters={onCharacters} onResearch={onResearch} />,
+    )
+    expect(screen.queryByRole('link', { name: /research/i })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /research/i }))
+    expect(onResearch).toHaveBeenCalled()
   })
 })

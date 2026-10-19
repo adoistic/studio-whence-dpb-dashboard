@@ -1,52 +1,52 @@
 'use client'
 
 /**
- * /characters — every character in the studio, drawn and undrawn.
+ * /characters — every character in the studio, drawn, not drawn yet and generalised.
  *
- * The per-comic cast lives on each comic page (`CharacterGrid`). This is the
- * repo-wide roster: what the art department still owes, in one list, for the
- * surface being browsed.
+ * The same `WorkCharacters` view every work has, over the casts of every comic the
+ * viewer may see on the active surface. A comic page shows its own cast, a programme
+ * the union of its books; this is the union of everything — the list the art
+ * department works from.
  *
- * SURFACE SEPARATION is the point of the plumbing here, not a detail. The two
- * surfaces are separate bodies of work — `manga/indic`'s Ram is a different
- * character from Indic's Ram, with a different design and a different book — so
- * a manga character must never turn up in a comics-surface listing or the
- * reverse. It is enforced three times over:
+ * SURFACE SEPARATION is kept, not loosened. The two surfaces are separate bodies of
+ * work — `manga-indic`'s Rama is a different character from Indic's Rama, with a
+ * different design — so a cast is listed only on the surface its comic's line belongs
+ * to (`useSurfaceCasts`). Identity is `(line, id)`, so the two Ramas can never merge
+ * even if both were in view. Shared IP (Little Chanakya and the Little Chanakya &
+ * Friends cast) carries the line `shared` and merges into ONE entry across every book
+ * that stages it, which is what keeps Pihu from reading as drawn under one line and
+ * owed under another.
  *
- *   1. `useLines()` is already surface-scoped at the catalog choke point.
- *   2. `rosterLineSlugs` re-derives the slugs from the active surface, so only
- *      that surface's roster docs are ever READ.
- *   3. `selectCharacters` drops any person whose own line resolves elsewhere.
- *
- * The one doc read on BOTH surfaces is `meta/characters_shared`: Little Chanakya
- * and the Little Chanakya & Friends cast are studio/Diamond IP with a single
- * locked design, so they are published once and belong to every surface. That
- * is an explicit third value (`surface: 'both'`), not a hole in the split — no
- * `manga-*` line can produce it.
- *
- * Access itself is untouched by any of this — it stays with the allocation and
- * the Firestore rules, exactly as `surface.ts` says.
+ * Access is untouched by any of this: a member only ever receives the casts of the
+ * comics they are allocated (the `casts` rule is the comics rule).
  */
 
 import { useMemo } from 'react'
 import { useLines } from '@/lib/catalog'
-import { rosterLineSlugs, SHARED_LINE, useCharacterRosters } from '@/lib/characters'
+import { useSurfaceCasts } from '@/lib/casts'
 import { SURFACE_LABEL, useActiveSurface } from '@/lib/surface'
-import { CharacterRoster } from '@/components/CharacterRoster'
-import { SectionHead } from '@/components/SectionHead'
-import { ErrorState, LoadingState } from '@/components/QuietStates'
+import { useVisibleComics } from '@/lib/visibleCatalog'
+import { useUser, useAllowStatus, canModerate } from '@/lib/auth'
+import { WorkCharacters } from '@/components/WorkCharacters'
 
 export default function CharactersPage() {
-  const { data: lines, loading: linesLoading } = useLines()
+  const { data: lines } = useLines()
   const { surface } = useActiveSurface()
-
-  const slugs = useMemo(() => rosterLineSlugs(lines, surface), [lines, surface])
-  const { data: rosters, loading, error } = useCharacterRosters(slugs)
+  const { user, loading: authLoading } = useUser()
+  const status = useAllowStatus(user, authLoading)
+  const canMod = canModerate(status)
+  const email = user?.email ?? null
+  // A member reads casts by comic id; a moderator lists them all in one query, so
+  // their comics scan is skipped (the member path with no email returns at once).
+  const visible = useVisibleComics(false, canMod ? null : email)
+  const visibleIds = useMemo(
+    () => (canMod ? [] : visible.data ? visible.data.map((c) => `${c.line}__${c.slug}`) : null),
+    [canMod, visible.data],
+  )
+  const casts = useSurfaceCasts(canMod, visibleIds, surface)
 
   const lineTitles = useMemo(() => {
-    // `shared` is a filing location, not a browsable line, so it never comes
-    // from the catalog and is titled here for the badges that mention it.
-    const map: Record<string, string> = { [SHARED_LINE]: 'Shared cast' }
+    const map: Record<string, string> = {}
     for (const l of lines ?? []) map[l.slug] = l.title
     return map
   }, [lines])
@@ -62,29 +62,23 @@ export default function CharactersPage() {
             Every character
           </h1>
           <p className="mt-5 max-w-2xl font-serif text-lg leading-relaxed text-brand-pale-dusk/80">
-            Every character our books stage, and every version each one needs.
-            The ones nobody has drawn yet are here too — that is the list the art
-            department works from.
+            Every character our books stage, and every version each one needs. The ones
+            nobody has drawn yet are here too, and so are the unnamed roles and crowds.
+            That is the list the art department works from.
           </p>
         </div>
       </section>
 
       <main className="mx-auto max-w-[1200px] px-6 pb-24 pt-14">
-        {linesLoading || loading ? (
-          <LoadingState />
-        ) : error ? (
-          <ErrorState />
-        ) : (rosters?.length ?? 0) === 0 ? (
-          <div className="flex flex-col gap-4">
-            <SectionHead kicker="Characters" title="No roster published yet" />
-            <p className="max-w-xl font-serif text-brand-umber">
-              The character roster is built by the production pipeline. Nothing has
-              been published for this surface yet.
-            </p>
-          </div>
-        ) : (
-          <CharacterRoster rosters={rosters} surface={surface} lineTitles={lineTitles} />
-        )}
+        <WorkCharacters
+          casts={casts.data}
+          loading={casts.loading || authLoading}
+          title="Studio Whence"
+          showComics
+          showLineFilter
+          lineTitles={lineTitles}
+          emptyNote="No cast has been published for this surface yet."
+        />
       </main>
     </div>
   )

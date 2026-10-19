@@ -1,17 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { Comic, Figure, Program } from '@/types/content'
 import { ComicsTable } from '@/components/ComicsTable'
 import { PeopleTable } from '@/components/PeopleTable'
 import { SectionHead } from '@/components/SectionHead'
+import { WorkCharacters } from '@/components/WorkCharacters'
+import { useCasts } from '@/lib/casts'
 import { derivePeople } from '@/lib/people'
 
+type Tab = 'comics' | 'characters' | 'subjects'
+
 // The Program page (Line → Program → Subject), general across every line. A
-// masthead + a pill tab bar (Comics · Characters). Comics tab reuses the comic
-// table; Characters tab reuses the People table over the program's cast. The
-// Research/Library tab + the per-Subject Design (bible + variation gallery) land
-// in Phase B; this is the navigable skeleton.
+// masthead + a pill tab bar:
+//   Comics      the programme's books (the comic table);
+//   Characters  every character those books stage — drawn, not drawn yet and
+//               generalised — with their sheets, downloadable one by one, as a
+//               selection or all at once (WorkCharacters over the books' casts);
+//   Subjects    the research subjects, each linking to its dossier (the People
+//               table that used to sit under "Characters").
 export function ProgramPageShell({
   program,
   comics,
@@ -21,9 +28,23 @@ export function ProgramPageShell({
   comics: Comic[]
   figures: Figure[]
 }) {
-  const hasChars = figures.length > 0
-  const [tab, setTab] = useState<'comics' | 'characters'>('comics')
+  const [tab, setTab] = useState<Tab>('comics')
   const peopleRows = derivePeople(figures, comics)
+
+  // The cast of every book the viewer can see in this programme, plus the line's
+  // cast library (sheets staged on no page yet). Loaded only once the tab is
+  // opened, so the Comics view never pays for it.
+  const castIds = useMemo(
+    () => (tab === 'characters' ? [...comics.map((c) => `${c.line}__${c.slug}`), `${program.line}__library`] : []),
+    [tab, comics, program.line],
+  )
+  const casts = useCasts(castIds)
+
+  const tabs: { key: Tab; label: string }[] = [
+    { key: 'comics', label: 'Comics' },
+    { key: 'characters', label: 'Characters' },
+    ...(figures.length > 0 ? [{ key: 'subjects' as const, label: 'Subjects' }] : []),
+  ]
 
   return (
     <div>
@@ -60,48 +81,54 @@ export function ProgramPageShell({
       {/* ── Body ───────────────────────────────────────────────────────── */}
       <main className="mx-auto max-w-[1200px] px-6">
         <section className="flex flex-col gap-8 pb-24 pt-16">
-          {hasChars && (
-            <div
-              role="tablist"
-              aria-label="Program view"
-              className="inline-flex items-center gap-0.5 self-start rounded-full border border-brand-pale-dusk bg-brand-threshold/70 p-0.5 font-sans"
-            >
-              {(
-                [
-                  { key: 'comics', label: 'Comics' },
-                  { key: 'characters', label: 'Characters' },
-                ] as const
-              ).map(({ key, label }) => {
-                const active = tab === key
-                return (
-                  <button
-                    key={key}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => setTab(key)}
-                    className={`rounded-full px-4 py-1.5 font-sans text-[0.72rem] font-semibold uppercase tracking-label transition-colors ${
-                      active
-                        ? 'bg-brand-indigo text-brand-pale-dusk shadow-sm'
-                        : 'text-brand-slate hover:text-brand-indigo'
-                    }`}
-                  >
-                    {label}
-                  </button>
-                )
-              })}
-            </div>
-          )}
+          <div
+            role="tablist"
+            aria-label="Program view"
+            className="inline-flex items-center gap-0.5 self-start rounded-full border border-brand-pale-dusk bg-brand-threshold/70 p-0.5 font-sans"
+          >
+            {tabs.map(({ key, label }) => {
+              const active = tab === key
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTab(key)}
+                  className={`rounded-full px-4 py-1.5 font-sans text-[0.72rem] font-semibold uppercase tracking-label transition-colors ${
+                    active
+                      ? 'bg-brand-indigo text-brand-pale-dusk shadow-sm'
+                      : 'text-brand-slate hover:text-brand-indigo'
+                  }`}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
 
-          {!hasChars || tab === 'comics' ? (
+          {tab === 'comics' && (
             <>
               <SectionHead kicker="In production" title="Comics" />
               <ComicsTable comics={comics} filename={`${program.line}-${program.slug}-comics.csv`} />
             </>
-          ) : (
+          )}
+          {tab === 'characters' && (
             <>
               <SectionHead kicker="The cast" title="Characters" />
-              <PeopleTable people={peopleRows} filename={`${program.line}-${program.slug}-characters.csv`} />
+              <WorkCharacters
+                casts={casts.data}
+                loading={casts.loading}
+                title={program.title}
+                program={program.slug}
+                showComics
+              />
+            </>
+          )}
+          {tab === 'subjects' && (
+            <>
+              <SectionHead kicker="The library" title="Subjects" />
+              <PeopleTable people={peopleRows} filename={`${program.line}-${program.slug}-subjects.csv`} />
             </>
           )}
         </section>

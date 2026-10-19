@@ -1132,3 +1132,121 @@ describe('firestore.rules — diamondApprovals (the sign-off ledger)', () => {
     )
   })
 })
+
+describe('firestore.rules — work casts (casts/*) and the cast gate index (castIndex/*)', () => {
+  // Grants (seeded in the top-level beforeAll):
+  //   member@dpb.in       lines ['biographies'], figures ['sachin-tendulkar'],
+  //                       comics ['indic__01-ramayana'] (indic line NOT granted)
+  //   comicmember@dpb.in  comics ['biographies__c1'] only
+  //   progmember@dpb.in   programs ['cricket-legends'] only
+  //   noalloc@dpb.in      allowlisted, no allocation doc
+  const subAdmin    = () => env.authenticatedContext('ca-sa', { email: 'sub@dpb.in' }).firestore()
+  const admin       = () => env.authenticatedContext('ca-ad', { email: 'adnan@thothica.com' }).firestore()
+  const member      = () => env.authenticatedContext('ca-m', { email: 'member@dpb.in' }).firestore()
+  const comicMember = () => env.authenticatedContext('ca-cm', { email: 'comicmember@dpb.in' }).firestore()
+  const progMember  = () => env.authenticatedContext('ca-pm', { email: 'progmember@dpb.in' }).firestore()
+  const noAlloc     = () => env.authenticatedContext('ca-n', { email: 'noalloc@dpb.in' }).firestore()
+  const stranger    = () => env.authenticatedContext('ca-s', { email: 'nope@gmail.com' }).firestore()
+  const suspended   = () => env.authenticatedContext('ca-x', { email: 'banned@thothica.com' }).firestore()
+  const signedOut   = () => env.unauthenticatedContext().firestore()
+
+  const cast = (comicId: string, subject: string, program: string, library = false) => ({
+    comicId, line: comicId.split('__')[0], slug: comicId.split('__')[1], title: comicId,
+    subject_slug: subject, program_slug: program, library,
+    source: library ? 'library' : 'roster', generatedAt: '2026-10-19',
+    counts: { characters: 0, named: 0, generalized: 0, shared: 0, drawn: 0, undrawn: 0, versions: 0, versionsDrawn: 0 },
+    people: [],
+  })
+
+  beforeAll(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const db = ctx.firestore()
+      await setDoc(doc(db, 'casts/biographies__c1'), cast('biographies__c1', 'sachin-tendulkar', ''))
+      await setDoc(doc(db, 'casts/biographies__c2'), cast('biographies__c2', 'sachin-tendulkar', ''))
+      await setDoc(doc(db, 'casts/biographies__cricketc'), cast('biographies__cricketc', 'kapil-dev', 'cricket-legends'))
+      await setDoc(doc(db, 'casts/awareness__y'), cast('awareness__y', 'bar', ''))
+      await setDoc(doc(db, 'casts/indic__01-ramayana'), cast('indic__01-ramayana', 'ram', ''))
+      // A line's library: sheets staged on no page yet. A line with several
+      // programmes names none ('') on it, so only a line grant reaches it.
+      await setDoc(doc(db, 'casts/biographies__library'), cast('biographies__library', '', '', true))
+      await setDoc(doc(db, 'castIndex/biographies'), {
+        comics: { 'biographies__c1': { s: 'sachin-tendulkar', p: '' } },
+        chars: { 'sachin-tendulkar': ['biographies__c1'] },
+      })
+    })
+  })
+
+  // ── casts: moderators ──
+  it('a moderator reads any cast doc, library included (bypass)', async () => {
+    for (const db of [subAdmin(), admin()]) {
+      await assertSucceeds(getDoc(doc(db, 'casts/awareness__y')))
+      await assertSucceeds(getDoc(doc(db, 'casts/biographies__c2')))
+      await assertSucceeds(getDoc(doc(db, 'casts/biographies__library')))
+    }
+  })
+  it('a moderator can list the whole casts collection', async () => {
+    await assertSucceeds(getDocs(collection(subAdmin(), 'casts')))
+  })
+
+  // ── casts: members, exactly the comics rule ──
+  it('a member with the COMIC grant reads that comic’s cast', async () => {
+    await assertSucceeds(getDoc(doc(comicMember(), 'casts/biographies__c1')))
+    // indic line NOT granted, but indic__01-ramayana is granted by id.
+    await assertSucceeds(getDoc(doc(member(), 'casts/indic__01-ramayana')))
+  })
+  it('a comic grant does NOT reach a sibling comic’s cast (no figures_effective cascade)', async () => {
+    await assertFails(getDoc(doc(comicMember(), 'casts/biographies__c2')))
+  })
+  it('a LINE grant (and a RAW figure grant) reads the line’s casts', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'casts/biographies__c2')))
+    await assertSucceeds(getDoc(doc(member(), 'casts/biographies__cricketc')))
+  })
+  it('a PROGRAM grant reads the program’s casts and nothing else', async () => {
+    await assertSucceeds(getDoc(doc(progMember(), 'casts/biographies__cricketc')))
+    await assertFails(getDoc(doc(progMember(), 'casts/biographies__c1')))
+    await assertFails(getDoc(doc(progMember(), 'casts/awareness__y')))
+  })
+  it('a member WITHOUT any matching grant is denied', async () => {
+    await assertFails(getDoc(doc(member(), 'casts/awareness__y')))
+    await assertFails(getDoc(doc(comicMember(), 'casts/awareness__y')))
+    await assertFails(getDoc(doc(comicMember(), 'casts/indic__01-ramayana')))
+  })
+  it('a member with NO allocation doc is denied every cast', async () => {
+    await assertFails(getDoc(doc(noAlloc(), 'casts/biographies__c1')))
+    await assertFails(getDoc(doc(noAlloc(), 'casts/biographies__library')))
+  })
+  it('the line library is reached by a line grant, not by one comic of the line', async () => {
+    await assertSucceeds(getDoc(doc(member(), 'casts/biographies__library')))
+    await assertFails(getDoc(doc(comicMember(), 'casts/biographies__library')))
+    await assertFails(getDoc(doc(progMember(), 'casts/biographies__library')))
+  })
+  it('a member cannot list the whole casts collection (only per-comic gets)', async () => {
+    await assertFails(getDocs(collection(member(), 'casts')))
+  })
+  it('strangers, suspended and signed-out users read no cast', async () => {
+    await assertFails(getDoc(doc(stranger(), 'casts/biographies__c1')))
+    await assertFails(getDoc(doc(suspended(), 'casts/biographies__c1')))
+    await assertFails(getDoc(doc(signedOut(), 'casts/biographies__c1')))
+  })
+  it('no client writes a cast — not even the admin (Admin SDK only)', async () => {
+    const patch = cast('biographies__c1', 'sachin-tendulkar', '')
+    await assertFails(setDoc(doc(admin(), 'casts/biographies__c1'), patch))
+    await assertFails(setDoc(doc(subAdmin(), 'casts/biographies__c1'), patch))
+    await assertFails(setDoc(doc(member(), 'casts/biographies__c1'), patch))
+    await assertFails(setDoc(doc(admin(), 'casts/biographies__new'), patch))
+    await assertFails(deleteDoc(doc(admin(), 'casts/biographies__c1')))
+  })
+
+  // ── castIndex: function-only ──
+  it('NOBODY reads castIndex — admin, moderator, members, strangers, signed-out', async () => {
+    for (const db of [admin(), subAdmin(), member(), comicMember(), progMember(), noAlloc(), stranger(), signedOut()]) {
+      await assertFails(getDoc(doc(db, 'castIndex/biographies')))
+    }
+    await assertFails(getDocs(collection(admin(), 'castIndex')))
+  })
+  it('NOBODY writes castIndex', async () => {
+    await assertFails(setDoc(doc(admin(), 'castIndex/biographies'), { comics: {}, chars: {} }))
+    await assertFails(setDoc(doc(subAdmin(), 'castIndex/indic'), { comics: {}, chars: {} }))
+    await assertFails(deleteDoc(doc(admin(), 'castIndex/biographies')))
+  })
+})
