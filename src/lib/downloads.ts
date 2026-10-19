@@ -300,7 +300,8 @@ export async function downloadZip(
       await stream.pipeTo(writable, { signal: opts.signal })
       return { failed, cancelled: false, streamedToDisk: true }
     }
-    const blob = await new Response(stream).blob()
+    // Typed, so a browser that names a download from its type (Safari) keeps the .zip.
+    const blob = await new Response(stream, { headers: { 'Content-Type': 'application/zip' } }).blob()
     if (opts.signal?.aborted) return { failed, cancelled: true, streamedToDisk: false }
     ;(opts.sink ?? saveBlob)(blob, filename)
     return { failed, cancelled: false, streamedToDisk: false }

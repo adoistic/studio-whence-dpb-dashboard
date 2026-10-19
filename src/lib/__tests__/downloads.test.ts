@@ -64,6 +64,7 @@ describe('downloadZip', () => {
       readmePath: 'Work/README.md',
     })
     expect(result.cancelled).toBe(false)
+    expect(saved!.type).toBe('application/zip')
     expect(result.failed.sort()).toEqual(['Work/Hidden.png', 'Work/Sita/Sita — Main look.png'])
     const files = await zipped()
     expect(files['Work/Rāma/Rāma — Boy.png']).toBe('bytes of rama-boy.png')
