@@ -18,10 +18,16 @@
  * re-encoding — so building a 170-page book costs the downloads and little else, and
  * the file is a tenth of the PNG originals. A version published before the print copies
  * existed falls back to its thumbnail, then to the sheet itself.
+ *
+ * NAMES KEEP THEIR DIACRITICS. The text is set in Noto Sans (two Latin-only subsets of
+ * about 95 KB each, `public/fonts/`, OFL), fetched only when a PDF is built, so
+ * "Rāmāyaṇa" and "Lakṣmaṇa" print as written (Adnan, 2026-10-19). If the fonts cannot
+ * be fetched the PDF is still built, in Helvetica with the diacritics folded.
  */
 
 import { resolveUrls } from '@/lib/dataApi'
 import type { WorkCharacter, WorkVersion } from '@/lib/castModel'
+import type { PDFFont } from 'pdf-lib'
 
 export interface PdfEntry {
   character: WorkCharacter
@@ -50,6 +56,42 @@ export function pdfText(s: string | undefined | null): string {
     .replace(/[–]/g, '-')
     .replace(/[·•]/g, '·')
     .replace(/[^\x20-\x7e -ÿ—…]/g, '')
+}
+
+/**
+ * Text a Unicode font can set: NFC, and any character the font lacks (Devanagari, an
+ * emoji) falls back to its base letter, or drops out, rather than printing a box.
+ */
+export function fontText(supported: Set<number>): (s: string | undefined | null) => string {
+  return (s) => {
+    let out = ''
+    for (const ch of (s ?? '').normalize('NFC')) {
+      const cp = ch.codePointAt(0)!
+      if (supported.has(cp)) out += ch
+      else if (/\s/.test(ch)) out += ' '
+      else {
+        const base = ch.normalize('NFD')[0]
+        if (base !== ch && supported.has(base.codePointAt(0)!)) out += base
+      }
+    }
+    return out
+  }
+}
+
+export const FONT_URLS = ['/fonts/NotoSans-Regular.subset.ttf', '/fonts/NotoSans-Bold.subset.ttf'] as const
+
+let fontsPromise: Promise<[Uint8Array, Uint8Array] | null> | null = null
+
+/** The two text fonts, fetched once per session; null if they cannot be had. */
+function defaultFonts(): Promise<[Uint8Array, Uint8Array] | null> {
+  fontsPromise ??= Promise.all(FONT_URLS.map(async (u) => {
+    const res = await fetch(u)
+    if (!res.ok) throw new Error(`${u}: ${res.status}`)
+    return new Uint8Array(await res.arrayBuffer())
+  }))
+    .then(([a, b]) => [a, b] as [Uint8Array, Uint8Array])
+    .catch(() => { fontsPromise = null; return null })
+  return fontsPromise
 }
 
 /** Greedy word-wrap to a width, capped at `maxLines` with an ellipsis. */
@@ -148,9 +190,12 @@ export async function buildCharacterPdf(opts: {
   all?: WorkCharacter[]
   onProgress?: (p: PdfProgress) => void
   signal?: AbortSignal
+  /** Regular + bold font bytes; defaults to fetching Noto Sans. Null = Helvetica. */
+  loadFonts?: () => Promise<[Uint8Array, Uint8Array] | null>
 }): Promise<Uint8Array> {
-  const { title, entries, all, onProgress, signal } = opts
+  const { title, entries, all, onProgress, signal, loadFonts = defaultFonts } = opts
   const { PDFDocument, StandardFonts, rgb } = await import('pdf-lib')
+  const fontBytes = loadFonts().catch(() => null)
   const total = entries.length
   let done = 0
   onProgress?.({ done, total })
@@ -161,11 +206,23 @@ export async function buildCharacterPdf(opts: {
   )
 
   const doc = await PDFDocument.create()
-  doc.setTitle(pdfText(`${title} — characters`))
   doc.setAuthor('Studio Whence')
   doc.setCreator('Studio Whence portal')
-  const font = await doc.embedFont(StandardFonts.Helvetica)
-  const bold = await doc.embedFont(StandardFonts.HelveticaBold)
+  const faces = await fontBytes
+  let font: PDFFont, bold: PDFFont, t: (s: string | undefined | null) => string
+  try {
+    if (!faces) throw new Error('no fonts')
+    const { default: fontkit } = await import('@pdf-lib/fontkit')
+    doc.registerFontkit(fontkit)
+    font = await doc.embedFont(faces[0])
+    bold = await doc.embedFont(faces[1])
+    t = fontText(new Set(font.getCharacterSet()))
+  } catch {
+    font = await doc.embedFont(StandardFonts.Helvetica)
+    bold = await doc.embedFont(StandardFonts.HelveticaBold)
+    t = pdfText
+  }
+  doc.setTitle(t(`${title} — characters`))
   const ink = rgb(0.16, 0.14, 0.3)
   const grey = rgb(0.42, 0.42, 0.48)
   const gold = rgb(0.6, 0.47, 0.25)
@@ -190,12 +247,12 @@ export async function buildCharacterPdf(opts: {
     const page = doc.addPage(PAGE)
     let y = PAGE[1] - M - 10
     if (cp === 0) {
-      page.drawText(pdfText(title), { x: M, y: y - 18, size: 30, font: bold, color: ink })
+      page.drawText(t(title), { x: M, y: y - 18, size: 30, font: bold, color: ink })
       y -= 46
       page.drawText('CHARACTERS', { x: M, y, size: 11, font, color: gold })
       y -= 18
       const uniq = new Set(entries.map((e) => e.character.uid)).size
-      page.drawText(pdfText(`${entries.length} sheets · ${uniq} characters · generated ${date} · Studio Whence`),
+      page.drawText(t(`${entries.length} sheets · ${uniq} characters · generated ${date} · Studio Whence`),
         { x: M, y, size: 10, font, color: grey })
       y -= 30
     } else {
@@ -211,7 +268,7 @@ export async function buildCharacterPdf(opts: {
       const yy = y - row * 13
       const num = String(c.first)
       const nameMax = colW - bold.widthOfTextAtSize(num, 9) - 12
-      const [name] = wrap(pdfText(c.name), nameMax, measure(font, 9), 1)
+      const [name] = wrap(t(c.name), nameMax, measure(font, 9), 1)
       page.drawText(name, { x, y: yy, size: 9, font, color: ink })
       page.drawText(num, { x: x + colW - font.widthOfTextAtSize(num, 9), y: yy, size: 9, font, color: grey })
     })
@@ -223,16 +280,16 @@ export async function buildCharacterPdf(opts: {
     const page = doc.addPage(PAGE)
     const { character: c, version: v } = e
     const top = PAGE[1] - M
-    const name = pdfText(c.name)
+    const name = t(c.name)
     page.drawText(name, { x: M, y: top - 18, size: 20, font: bold, color: ink })
-    const label = pdfText(v.label).toUpperCase()
+    const label = t(v.label).toUpperCase()
     page.drawText(label, { x: M + bold.widthOfTextAtSize(name, 20) + 12, y: top - 16, size: 10, font, color: gold })
     const kind = c.kind === 'generalized' ? 'Generalised' : c.kind === 'shared' ? 'Shared cast' : ''
-    const meta = [kind, pdfText(where(v))].filter(Boolean).join('  ·  ')
+    const meta = [kind, t(where(v))].filter(Boolean).join('  ·  ')
     const [metaLine] = wrap(meta, PAGE[0] - 2 * M, measure(font, 8.5), 1)
     if (metaLine) page.drawText(metaLine, { x: M, y: top - 34, size: 8.5, font, color: grey })
 
-    const look = v.look ? wrap(pdfText(v.look), PAGE[0] - 2 * M, measure(font, 8.5), 3) : []
+    const look = v.look ? wrap(t(v.look), PAGE[0] - 2 * M, measure(font, 8.5), 3) : []
     const footY = M - 6
     const imgTop = top - 46
     const imgBottom = footY + 14 + look.length * 11
@@ -263,7 +320,7 @@ export async function buildCharacterPdf(opts: {
     look.forEach((line, k) => {
       page.drawText(line, { x: M, y: footY + 14 + (look.length - 1 - k) * 11, size: 8.5, font, color: grey })
     })
-    const foot = pdfText(`${title} · characters`)
+    const foot = t(`${title} · characters`)
     page.drawText(foot, { x: M, y: footY, size: 7.5, font, color: grey })
     const n = String(contentsPages + i + 1)
     page.drawText(n, { x: PAGE[0] - M - font.widthOfTextAtSize(n, 7.5), y: footY, size: 7.5, font, color: grey })
@@ -277,7 +334,7 @@ export async function buildCharacterPdf(opts: {
       for (const v of c.versions) {
         if (v.drawn) continue
         const line = `${c.name} — ${v.label}${where(v) ? `  (${where(v)})` : ''}`
-        ;(v.text ? text : owed).push(pdfText(line))
+        ;(v.text ? text : owed).push(t(line))
       }
     }
     const sections: [string, string[]][] = [

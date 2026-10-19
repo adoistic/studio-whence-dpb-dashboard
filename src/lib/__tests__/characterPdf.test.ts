@@ -20,7 +20,14 @@ vi.mock('@/lib/dataApi', () => ({
 
 import { PDFDocument } from 'pdf-lib'
 import { mergeCasts, type CastDoc } from '@/lib/castModel'
-import { buildCharacterPdf, pdfImageKey, pdfText, wrap } from '@/lib/characterPdf'
+import { readFileSync } from 'node:fs'
+import { buildCharacterPdf, fontText, pdfImageKey, pdfText, wrap } from '@/lib/characterPdf'
+
+const FONTS = (): Promise<[Uint8Array, Uint8Array]> => Promise.resolve([
+  new Uint8Array(readFileSync('public/fonts/NotoSans-Regular.subset.ttf')),
+  new Uint8Array(readFileSync('public/fonts/NotoSans-Bold.subset.ttf')),
+])
+const NO_FONTS = () => Promise.resolve(null)
 
 const sheet = (id: string, stage: string, label: string, pages: number[], extra = {}) => ({
   stage, label, drawn: true, pages, bytes: 3_000_000, printBytes: 300_000,
@@ -61,6 +68,12 @@ describe('text the PDF fonts can set', () => {
     expect(wrap('one two three four five', 9, measure)).toEqual(['one two', 'three', 'four five'])
     expect(wrap('one two three four five', 9, measure, 2)).toEqual(['one two', 'three…'])
   })
+  test('with the Unicode font, diacritics stay and what the font lacks falls back', () => {
+    const t = fontText(new Set([...'Rāmyṇa —Kṣ '].map((c) => c.codePointAt(0)!)))
+    expect(t('Rāmāyaṇa — Kṣ')).toBe('Rāmāyaṇa — Kṣ')
+    expect(t('Ré\u0301')).toBe('R')           // é is not in this set and neither is e
+    expect(t('Ram\tदेव')).toBe('Ram ')
+  })
   test('a page embeds the print copy, else the thumbnail, else the sheet', () => {
     expect(pdfImageKey({ print: 'p', thumb: 't', key: 'k' })).toBe('p')
     expect(pdfImageKey({ thumb: 't', key: 'k' })).toBe('t')
@@ -73,7 +86,7 @@ describe('buildCharacterPdf', () => {
     const all = mergeCasts([CAST])
     const entries = all.flatMap((c) => c.versions.filter((v) => v.drawn).map((version) => ({ character: c, version })))
     const progress: number[] = []
-    const bytes = await buildCharacterPdf({ title: 'Rāmāyaṇa', entries, all, onProgress: (p) => progress.push(p.done) })
+    const bytes = await buildCharacterPdf({ title: 'Rāmāyaṇa', entries, all, onProgress: (p) => progress.push(p.done), loadFonts: NO_FONTS })
     const pdf = await PDFDocument.load(bytes)
     // contents (1) + three sheets + the appendix (1)
     expect(pdf.getPageCount()).toBe(5)
@@ -85,8 +98,22 @@ describe('buildCharacterPdf', () => {
   test('a selection has no appendix, and a sheet that will not fetch still gets its page', async () => {
     const all = mergeCasts([CAST])
     const sita = all.find((c) => c.id === 'sita')!
-    const bytes = await buildCharacterPdf({ title: 'X', entries: [{ character: sita, version: sita.versions[0] }] })
+    const bytes = await buildCharacterPdf({ title: 'X', entries: [{ character: sita, version: sita.versions[0] }], loadFonts: NO_FONTS })
     const pdf = await PDFDocument.load(bytes)
     expect(pdf.getPageCount()).toBe(2)
+  })
+
+  test('set in Noto Sans, the names keep their diacritics', async () => {
+    const all = mergeCasts([CAST])
+    const entries = all.flatMap((c) => c.versions.filter((v) => v.drawn).map((version) => ({ character: c, version })))
+    const bytes = await buildCharacterPdf({ title: 'Rāmāyaṇa — Lakṣmaṇa', entries, all, loadFonts: FONTS })
+    const pdf = await PDFDocument.load(bytes)
+    expect(pdf.getTitle()).toBe('Rāmāyaṇa — Lakṣmaṇa — characters')
+    expect(pdf.getPageCount()).toBe(5)
+  })
+
+  test('fonts that will not load leave Helvetica, folded', async () => {
+    const bytes = await buildCharacterPdf({ title: 'Rāmāyaṇa', entries: [], loadFonts: () => Promise.reject(new Error('offline')) })
+    expect((await PDFDocument.load(bytes)).getTitle()).toBe('Ramayana — characters')
   })
 })
