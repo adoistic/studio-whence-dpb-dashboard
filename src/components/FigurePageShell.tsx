@@ -329,7 +329,7 @@ export function FigurePageShell({
         )}
         <div className="grid gap-12 pt-12 md:grid-cols-[minmax(0,20rem)_minmax(0,1fr)] md:items-start">
           {/* Sources index — sticky on desktop; scrolls internally if long */}
-          <section className="flex flex-col gap-6 md:sticky md:top-24 md:max-h-[calc(100vh-7rem)] md:self-start md:overflow-y-auto md:pr-1">
+          <section className="flex flex-col gap-6 md:sticky md:top-24 md:max-h-[calc(100vh-7rem)] md:self-start md:overflow-y-auto md:pr-3">
             <SectionHead kicker="The dossier" title="Sources" />
             {sources.length > 0 && (
               <div className="flex flex-col gap-2">
