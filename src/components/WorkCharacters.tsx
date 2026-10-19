@@ -43,12 +43,14 @@ import {
   downloadZip,
   formatBytes,
   safeFilename,
+  saveBlob,
   uniquePaths,
   ZIP_FILE_MAX,
   ZIP_FOLDER_MAX,
   type ZipItem,
   type ZipProgress,
 } from '@/lib/downloads'
+import { buildCharacterPdf, type PdfProgress } from '@/lib/characterPdf'
 import { useResolved, refreshResolved } from '@/lib/useResolved'
 
 const PAGE_SIZE = 24
@@ -118,6 +120,7 @@ export function castReadme(
   paths: Map<string, string>,
   failed: string[],
   root: string,
+  pdfPath?: string,
 ): string {
   const t = castTotals(all)
   const lines = [
@@ -133,6 +136,7 @@ export function castReadme(
       'including the versions nobody has drawn yet and the generalised roles (unnamed walk-ons, ' +
       'crowds and stock extras).',
     '',
+    ...(pdfPath ? [`\`${pdfPath.slice(root.length + 1)}\` holds the same sheets as one PDF, a page each.`, ''] : []),
   ]
   for (const c of all) {
     const kind = c.kind === 'generalized' ? 'generalised' : c.kind === 'shared' ? 'shared cast' : 'named'
@@ -158,6 +162,31 @@ export function castReadme(
     lines.push('## Could not be fetched', '', ...failed.map((f) => `- ${f.slice(root.length + 1)}`), '')
   }
   return lines.join('\n')
+}
+
+// ─── what a multi-sheet download contains ─────────────────────────────────────
+
+/** The sheets as PNGs in a zip, a PDF contact book, or both (the PDF then inside the zip). */
+export interface DownloadFormats {
+  sheets: boolean
+  pdf: boolean
+}
+
+const FORMATS_KEY = 'sw.characters.formats'
+const DEFAULT_FORMATS: DownloadFormats = { sheets: true, pdf: false }
+
+/** The bytes a download will move, for the label on its button. */
+export function downloadSize(
+  entries: { version: Pick<WorkVersion, 'bytes' | 'printBytes'> }[],
+  f: DownloadFormats,
+): number {
+  return entries.reduce((n, { version: v }) =>
+    n + (f.sheets ? v.bytes ?? 0 : 0) + (f.pdf ? v.printBytes ?? 0 : 0), 0)
+}
+
+/** "Download .zip" / "Download PDF" / "Download .zip + PDF". */
+export function downloadVerb(f: DownloadFormats): string {
+  return f.sheets && f.pdf ? '.zip + PDF' : f.pdf ? 'PDF' : '.zip'
 }
 
 // ─── the component ────────────────────────────────────────────────────────────
@@ -190,7 +219,26 @@ export function WorkCharacters({
   const [line, setLine] = useState('all')
   const [limit, setLimit] = useState(PAGE_SIZE)
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
-  const [busy, setBusy] = useState<{ label: string; progress: ZipProgress | null; abort: AbortController } | null>(null)
+  const [busy, setBusy] = useState<{
+    label: string
+    progress: ZipProgress | null
+    pdf: PdfProgress | null
+    abort: AbortController
+  } | null>(null)
+  // Remembered per browser: whoever always wants the PDF should not tick it every time.
+  const [formats, setFormats] = useState<DownloadFormats>(DEFAULT_FORMATS)
+  useEffect(() => {
+    try {
+      const f = JSON.parse(localStorage.getItem(FORMATS_KEY) ?? 'null') as DownloadFormats | null
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (f && (f.sheets || f.pdf)) setFormats({ sheets: !!f.sheets, pdf: !!f.pdf })
+    } catch { /* private window: the default stands */ }
+  }, [])
+  const chooseFormats = useCallback((f: DownloadFormats) => {
+    if (!f.sheets && !f.pdf) return // one of the two, always
+    setFormats(f)
+    try { localStorage.setItem(FORMATS_KEY, JSON.stringify(f)) } catch { /* not remembered */ }
+  }, [])
   const [notice, setNotice] = useState<string | null>(null)
   const [viewing, setViewing] = useState<string | null>(null) // version uid
 
@@ -230,7 +278,6 @@ export function WorkCharacters({
     () => Array.from(selected).map((uid) => byVersion.get(uid)).filter((x): x is NonNullable<typeof x> => !!x && !!x.version.key),
     [selected, byVersion],
   )
-  const pickedBytes = picked.reduce((n, p) => n + (p.version.bytes ?? 0), 0)
   const filteredDrawn = useMemo(() => drawnVersions(filtered), [filtered])
   const allFilteredSelected = filteredDrawn.length > 0 && filteredDrawn.every((p) => selected.has(p.version.uid))
 
@@ -246,29 +293,67 @@ export function WorkCharacters({
     })
   }, [])
 
-  const runZip = useCallback(
-    (label: string, entries: { character: WorkCharacter; version: WorkVersion }[], name: string) => {
+  const runDownload = useCallback(
+    (
+      label: string,
+      entries: { character: WorkCharacter; version: WorkVersion }[],
+      baseName: string,
+      /** The whole work: the PDF gets the not-drawn-yet appendix. */
+      whole = false,
+    ) => {
       if (busy || !entries.length) return
       const abort = new AbortController()
+      const { sheets, pdf } = formats
       setNotice(null)
-      setBusy({ label, progress: null, abort })
+      setBusy({ label, progress: null, pdf: null, abort })
+      const makePdf = () => buildCharacterPdf({
+        title,
+        entries,
+        all: whole ? all : undefined,
+        signal: abort.signal,
+        onProgress: (p) => setBusy((b) => (b ? { ...b, pdf: p } : b)),
+      })
+
+      // PDF only: one file, no zip.
+      if (pdf && !sheets) {
+        makePdf()
+          .then((bytes) => {
+            saveBlob(new Blob([bytes as BlobPart], { type: 'application/pdf' }), `${baseName}.pdf`)
+            setNotice('PDF ready — check your downloads.')
+          })
+          .catch(() => setNotice(abort.signal.aborted ? 'Download cancelled.' : 'The PDF could not be built. Please try again.'))
+          .finally(() => setBusy(null))
+        return
+      }
+
       const { root, items, paths } = zipItemsFor(title, entries)
+      let pdfPath: string | undefined
+      const extra: ZipItem[] = []
+      if (pdf) {
+        // Built while the PNGs stream, from the small print copies, and written into
+        // the zip after them.
+        const pending = makePdf()
+        pending.catch(() => { /* reported through the zip's failed list */ })
+        pdfPath = `${root}/${safeFilename(title, 'work', ZIP_FILE_MAX)} — characters.pdf`
+        extra.push({ path: pdfPath, data: () => pending })
+      }
       // Straight from the click: the save dialog needs the click's activation.
-      downloadZip(name, items, {
+      downloadZip(`${baseName}.zip`, [...items, ...extra], {
         signal: abort.signal,
         onProgress: (progress) => setBusy((b) => (b ? { ...b, progress } : b)),
-        readme: (failed) => castReadme(title, all, paths, failed, root),
+        readme: (failed) => castReadme(title, all, paths, failed, root, failed.includes(pdfPath ?? '') ? undefined : pdfPath),
         readmePath: `${root}/README.md`,
       })
         .then((r) => {
           if (r.cancelled) setNotice('Download cancelled.')
+          else if (pdfPath && r.failed.includes(pdfPath)) setNotice('The sheets are in the zip, but the PDF could not be built.')
           else if (r.failed.length) setNotice(`${plural(r.failed.length, 'sheet')} could not be fetched; the README in the zip lists them.`)
           else setNotice(r.streamedToDisk ? 'Saved.' : 'Download ready — check your downloads.')
         })
         .catch(() => setNotice('The zip could not be built. Please try again.'))
         .finally(() => setBusy(null))
     },
-    [busy, title, all],
+    [busy, title, all, formats],
   )
 
   const downloadOne = useCallback((c: WorkCharacter, v: WorkVersion) => {
@@ -279,9 +364,9 @@ export function WorkCharacters({
 
   const downloadCharacter = useCallback((c: WorkCharacter) => {
     const mine = c.versions.filter((v) => v.drawn && v.key).map((version) => ({ character: c, version }))
-    if (mine.length === 1) downloadOne(c, mine[0].version)
-    else runZip(c.name, mine, `${safeFilename(title)} — ${safeFilename(c.name)}.zip`)
-  }, [downloadOne, runZip, title])
+    if (mine.length === 1 && !formats.pdf) downloadOne(c, mine[0].version)
+    else runDownload(c.name, mine, `${safeFilename(title)} — ${safeFilename(c.name)}`)
+  }, [downloadOne, runDownload, title, formats.pdf])
 
   if (loading && !casts) {
     return <p role="status" className="py-16 font-sans text-[0.7rem] uppercase tracking-label text-brand-slate">Loading the cast…</p>
@@ -301,21 +386,28 @@ export function WorkCharacters({
           <p className="font-serif text-lg text-brand-umber">
             {plural(totals.characters, 'character')} · {totals.versionsDrawn} of {plural(totals.versions, 'version')} drawn
             {totals.versionsOwed > 0 && <span className="text-brand-slate"> · {totals.versionsOwed} not drawn yet</span>}
+            {totals.versionsText > 0 && (
+              <span className="text-brand-slate"> · {totals.versionsText} described in the page text</span>
+            )}
           </p>
           <p className="mt-1 font-sans text-[0.68rem] uppercase tracking-label text-brand-slate">
             {totals.generalized > 0 && <>{totals.generalized} generalised · </>}
             {showComics && totals.comics > 0 ? `across ${plural(totals.comics, 'book')}` : `${formatBytes(totals.bytesDrawn)} of sheets`}
           </p>
         </div>
-        <button
-          type="button"
-          className={BTN}
-          disabled={!!busy || allDrawn.length === 0}
-          onClick={() => runZip('Everything', allDrawn, `${safeFilename(title)} — characters.zip`)}
-        >
-          <DownloadIcon />
-          Download all · {allDrawn.length} {allDrawn.length === 1 ? 'sheet' : 'sheets'} · {formatBytes(totals.bytesDrawn)}
-        </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <FormatToggles value={formats} onChange={chooseFormats} disabled={!!busy} />
+          <button
+            type="button"
+            className={BTN}
+            disabled={!!busy || allDrawn.length === 0}
+            onClick={() => runDownload('Everything', allDrawn, `${safeFilename(title)} — characters`, true)}
+          >
+            <DownloadIcon />
+            Download all · {allDrawn.length} {allDrawn.length === 1 ? 'sheet' : 'sheets'}
+            {formats.pdf ? (formats.sheets ? ' + PDF' : ' as PDF') : ''} · {formatBytes(downloadSize(allDrawn, formats))}
+          </button>
+        </div>
       </div>
 
       {/* ── Filters ─────────────────────────────────────────────────── */}
@@ -408,10 +500,13 @@ export function WorkCharacters({
           {busy ? (
             <>
               <span className="font-serif" aria-live="polite">
-                {busy.progress
-                  ? `Zipping ${Math.min(busy.progress.done + 1, busy.progress.total)} of ${busy.progress.total}` +
-                    (busy.progress.bytesTotal ? ` · ${formatBytes(busy.progress.bytesDone)} of ${formatBytes(busy.progress.bytesTotal)}` : '')
-                  : 'Preparing the zip…'}
+                {[
+                  busy.progress
+                    ? `Zipping ${Math.min(busy.progress.done + 1, busy.progress.total)} of ${busy.progress.total}` +
+                      (busy.progress.bytesTotal ? ` · ${formatBytes(busy.progress.bytesDone)} of ${formatBytes(busy.progress.bytesTotal)}` : '')
+                    : null,
+                  busy.pdf ? `PDF ${busy.pdf.done} of ${busy.pdf.total} sheets` : null,
+                ].filter(Boolean).join(' · ') || 'Preparing…'}
               </span>
               {busy.progress && busy.progress.bytesTotal > 0 && (
                 <span className="h-1 min-w-24 flex-1 overflow-hidden rounded-full bg-brand-twilight-mid">
@@ -428,14 +523,15 @@ export function WorkCharacters({
           ) : selected.size > 0 ? (
             <>
               <span className="font-serif">
-                {plural(picked.length, 'sheet')} selected{pickedBytes ? ` · ${formatBytes(pickedBytes)}` : ''}
+                {plural(picked.length, 'sheet')} selected · {formatBytes(downloadSize(picked, formats))}
               </span>
+              <FormatToggles value={formats} onChange={chooseFormats} tone="dark" />
               <button
                 type="button"
-                onClick={() => runZip('Selection', picked, `${safeFilename(title)} — ${picked.length} character sheets.zip`)}
+                onClick={() => runDownload('Selection', picked, `${safeFilename(title)} — ${picked.length} character sheets`)}
                 className="ml-auto inline-flex items-center gap-2 rounded-md bg-brand-gold px-3 py-1.5 font-sans text-[0.68rem] font-semibold uppercase tracking-label text-brand-deep hover:brightness-105"
               >
-                <DownloadIcon /> Download .zip
+                <DownloadIcon /> Download {downloadVerb(formats)}
               </button>
               <button type="button" onClick={() => setSelected(new Set())} className="font-sans text-[0.68rem] uppercase tracking-label text-brand-pale-dusk/80 hover:text-white">
                 Clear
@@ -592,7 +688,7 @@ function VersionTile({
   const pages = v.comics.flatMap((a) => a.pages)
   const where = showComics && v.comics.length > 1
     ? `${plural(pages.length, 'page')} · ${plural(v.comics.length, 'book')}`
-    : pages.length ? `p${pageRanges(pages, 4)}` : ''
+    : pages.length ? `p${pageRanges(pages, 6)}` : ''
   return (
     <figure className="flex flex-col gap-1.5">
       <div
@@ -658,15 +754,28 @@ function VersionTile({
           </>
         )}
       </div>
-      <figcaption className="flex items-baseline justify-between gap-2">
-        <span className="truncate font-sans text-[0.66rem] uppercase tracking-label text-brand-indigo" title={v.label}>
-          {v.label}
+      {/* Label on its own line, pages beneath: a lead's page list must never squeeze
+          the name of the version it belongs to. */}
+      <figcaption className="flex min-w-0 flex-col gap-0.5">
+        <span className="flex items-baseline gap-2">
+          <span className="truncate font-sans text-[0.66rem] uppercase tracking-label text-brand-indigo" title={v.label}>
+            {v.label}
+          </span>
+          {v.unstaged && (
+            <span className="shrink-0 font-sans text-[0.58rem] uppercase tracking-label text-brand-gold">not staged yet</span>
+          )}
+          {v.fromLibrary && !v.unstaged && (
+            <span
+              className="shrink-0 font-sans text-[0.58rem] uppercase tracking-label text-brand-lavender"
+              title="This book was not drawn with this sheet; it is the character's locked look from the line's cast library."
+            >
+              cast library
+            </span>
+          )}
         </span>
-        {v.unstaged ? (
-          <span className="shrink-0 font-sans text-[0.58rem] uppercase tracking-label text-brand-gold">not staged yet</span>
-        ) : where ? (
-          <span className="shrink-0 font-serif text-xs text-brand-slate">{where}</span>
-        ) : null}
+        {where && !v.unstaged && (
+          <span className="truncate font-serif text-xs text-brand-slate" title={where}>{where}</span>
+        )}
       </figcaption>
     </figure>
   )
@@ -723,7 +832,7 @@ function SheetViewer({
       role="dialog"
       aria-modal="true"
       aria-label={`${c.name} — ${v.label}`}
-      className="fixed inset-0 z-50 flex flex-col bg-canvas-dark/95 text-brand-cream"
+      className="fixed inset-0 z-50 flex flex-col bg-canvas-dark text-brand-cream"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
@@ -779,6 +888,54 @@ function SheetViewer({
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+/** Sheets (PNG, zipped), PDF, or both — at least one stays on. */
+function FormatToggles({
+  value,
+  onChange,
+  tone = 'light',
+  disabled = false,
+}: {
+  value: DownloadFormats
+  onChange: (f: DownloadFormats) => void
+  tone?: 'light' | 'dark'
+  disabled?: boolean
+}) {
+  const chip = (on: boolean) =>
+    tone === 'dark'
+      ? `inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 font-sans text-[0.62rem] uppercase tracking-label transition-colors ${
+          on ? 'border-brand-gold text-brand-gold' : 'border-brand-twilight-mid text-brand-pale-dusk/70 hover:text-white'}`
+      : `inline-flex cursor-pointer items-center gap-1.5 rounded-full border px-2.5 py-1 font-sans text-[0.62rem] uppercase tracking-label transition-colors ${
+          on ? 'border-brand-indigo bg-brand-indigo text-white' : 'border-brand-pale-dusk bg-white text-brand-slate hover:border-brand-indigo'}`
+  const opts: { key: keyof DownloadFormats; label: string; hint: string }[] = [
+    { key: 'sheets', label: 'Sheets', hint: 'Every sheet as a full-resolution PNG, zipped' },
+    { key: 'pdf', label: 'PDF', hint: 'One PDF, a sheet a page, with the books and pages each is on' },
+  ]
+  return (
+    <div role="group" aria-label="Download as" className="flex items-center gap-1.5">
+      <span className={`font-sans text-[0.6rem] uppercase tracking-label ${tone === 'dark' ? 'text-brand-pale-dusk/60' : 'text-brand-slate'}`}>
+        As
+      </span>
+      {opts.map((o) => {
+        const on = value[o.key]
+        const only = on && !value[o.key === 'sheets' ? 'pdf' : 'sheets']
+        return (
+          <label key={o.key} className={chip(on)} title={only ? `${o.hint} (one format stays on)` : o.hint}>
+            <input
+              type="checkbox"
+              className="sr-only"
+              checked={on}
+              disabled={disabled || only}
+              onChange={(e) => onChange({ ...value, [o.key]: e.target.checked })}
+            />
+            <span aria-hidden>{on ? '\u2713' : '+'}</span>
+            {o.label}
+          </label>
+        )
+      })}
     </div>
   )
 }

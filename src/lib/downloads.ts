@@ -121,6 +121,8 @@ export interface ZipItem {
   key?: string
   /** …text written into the zip directly (a README). */
   text?: string
+  /** …or bytes made while the zip streams (a PDF built from the same sheets). */
+  data?: () => Promise<Uint8Array>
   /** Expected size, for the progress total. */
   bytes?: number
 }
@@ -210,7 +212,7 @@ export async function downloadZip(
   const report = () => opts.onProgress?.({ done, total, bytesDone, bytesTotal })
   const lastModified = new Date()
 
-  type Entry = { name: string; input: AsyncIterable<Uint8Array> | string; lastModified: Date; size?: number }
+  type Entry = { name: string; input: AsyncIterable<Uint8Array> | string | Uint8Array; lastModified: Date; size?: number }
 
   // The body is handed over as an async iterator rather than a piped stream: it
   // counts bytes for the progress bar as the zip consumes them, and it never trips
@@ -259,7 +261,8 @@ export async function downloadZip(
     const queue: Promise<Entry | null>[] = []
     let i = 0
     const textItems = items.filter((it) => it.text !== undefined)
-    const fileItems = items.filter((it) => it.text === undefined)
+    const dataItems = items.filter((it) => it.data !== undefined)
+    const fileItems = items.filter((it) => it.text === undefined && it.data === undefined)
     while (i < fileItems.length && queue.length < concurrency) queue.push(fetchOne(fileItems[i++]))
     while (queue.length) {
       const next = await queue.shift()!
@@ -269,6 +272,16 @@ export async function downloadZip(
         done += 1
         report()
       }
+    }
+    for (const d of dataItems) {
+      try {
+        yield { name: d.path, input: await d.data!(), lastModified }
+      } catch (err) {
+        if (opts.signal?.aborted) throw err
+        failed.push(d.path)
+      }
+      done += 1
+      report()
     }
     for (const t of textItems) {
       yield { name: t.path, input: t.text!, lastModified }

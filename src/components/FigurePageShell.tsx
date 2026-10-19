@@ -7,7 +7,7 @@ import { ResearchReader } from '@/components/ResearchReader'
 import { VariationGallery } from '@/components/VariationGallery'
 import { WorkCharacters } from '@/components/WorkCharacters'
 import { mergeCasts } from '@/lib/castModel'
-import { useCasts } from '@/lib/casts'
+import { useSubjectCasts } from '@/lib/casts'
 import { formatBytes, type ZipProgress } from '@/lib/downloads'
 import {
   downloadFigureResearch,
@@ -177,7 +177,7 @@ export function FigurePageShell({
   // The cast of this subject's books (one small read per book), so the tab can say
   // how many characters there are before anyone opens it.
   const castIds = useMemo(() => mine.map((c) => `${c.line}__${c.slug}`), [mine])
-  const casts = useCasts(castIds)
+  const casts = useSubjectCasts(figure.slug, canMod, castIds)
   const characterCount = useMemo(() => mergeCasts(casts.data ?? []).length, [casts.data])
 
   // ── Downloads ──
@@ -277,7 +277,7 @@ export function FigurePageShell({
             casts={casts.data}
             loading={casts.loading}
             title={figureName(figure)}
-            showComics={mine.length > 1}
+            showComics={(casts.data?.length ?? 0) > 1}
           />
         </main>
       ) : (

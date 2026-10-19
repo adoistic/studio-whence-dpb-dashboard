@@ -21,8 +21,13 @@ export interface CastVersion {
   key?: string
   /** 800 px JPEG for the grid. */
   thumb?: string
+  /** 1600 px JPEG the character PDF embeds as it is. */
+  print?: string
   bytes?: number
+  printBytes?: number
   look?: string
+  /** Borrowed from the line's cast library for a book that was not drawn with it. */
+  fromLibrary?: boolean
   pages: number[]
 }
 
@@ -162,14 +167,21 @@ export function mergeCasts(docs: CastDoc[], opts: { program?: string } = {}): Wo
         const vuid = versionUid(p, v)
         let wv = w._v.get(vuid)
         if (!wv) {
-          wv = { ...v, uid: vuid, pages: [], comics: [], unstaged: d.library ? true : undefined }
+          wv = { ...v, uid: vuid, pages: [], comics: [], unstaged: d.library ? true : undefined,
+            fromLibrary: v.fromLibrary || undefined }
           w._v.set(vuid, wv)
         }
         wv.drawn = wv.drawn || v.drawn
         wv.key = wv.key ?? v.key
         wv.thumb = wv.thumb ?? v.thumb
         wv.bytes = wv.bytes ?? v.bytes
+        wv.print = wv.print ?? v.print
+        wv.printBytes = wv.printBytes ?? v.printBytes
         wv.look = wv.look ?? v.look
+        // Borrowed only while EVERY book that holds it borrowed it: a sheet that one
+        // book stages for real is that book's drawing, whoever else borrows it.
+        wv.fromLibrary = !!wv.fromLibrary && !!v.fromLibrary ? true : undefined
+        if (/\s*\(cast library\)$/.test(wv.label) && !/\(cast library\)$/.test(v.label)) wv.label = v.label
         if (!d.library) {
           wv.unstaged = undefined
           wv.comics.push({ comicId: d.comicId, line: d.line, slug: d.slug, title: d.title, pages: v.pages ?? [] })
@@ -238,6 +250,8 @@ export interface CastTotals {
   versions: number
   versionsDrawn: number
   versionsOwed: number
+  /** Stock extras whose look lives in the page prompt: neither drawn nor owed. */
+  versionsText: number
   bytesDrawn: number
   comics: number
 }
@@ -246,7 +260,7 @@ export function castTotals(chars: WorkCharacter[]): CastTotals {
   const comics = new Set<string>()
   const t: CastTotals = {
     characters: chars.length, drawn: 0, undrawn: 0, generalized: 0,
-    versions: 0, versionsDrawn: 0, versionsOwed: 0, bytesDrawn: 0, comics: 0,
+    versions: 0, versionsDrawn: 0, versionsOwed: 0, versionsText: 0, bytesDrawn: 0, comics: 0,
   }
   for (const c of chars) {
     if (c.kind === 'generalized') t.generalized += 1
@@ -256,7 +270,8 @@ export function castTotals(chars: WorkCharacter[]): CastTotals {
     for (const v of c.versions) {
       t.versions += 1
       if (v.drawn) { t.versionsDrawn += 1; t.bytesDrawn += v.bytes ?? 0 }
-      else if (!v.text) t.versionsOwed += 1
+      else if (v.text) t.versionsText += 1
+      else t.versionsOwed += 1
     }
   }
   t.comics = comics.size

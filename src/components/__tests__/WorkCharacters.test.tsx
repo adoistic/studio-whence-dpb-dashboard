@@ -22,10 +22,16 @@ vi.mock('next/link', () => ({
 }))
 const downloadKey = vi.fn(async () => {})
 const downloadZip = vi.fn(async () => ({ failed: [], cancelled: false, streamedToDisk: false }))
+const saveBlob = vi.fn()
 vi.mock('@/lib/downloads', async (orig) => ({
   ...(await orig<typeof import('@/lib/downloads')>()),
   downloadKey: (...a: unknown[]) => downloadKey(...(a as [])),
   downloadZip: (...a: unknown[]) => downloadZip(...(a as [])),
+  saveBlob: (...a: unknown[]) => saveBlob(...(a as [])),
+}))
+const buildCharacterPdf = vi.fn<(opts: unknown) => Promise<Uint8Array>>(async () => new Uint8Array([37, 80, 68, 70]))
+vi.mock('@/lib/characterPdf', () => ({
+  buildCharacterPdf: (opts: unknown) => buildCharacterPdf(opts),
 }))
 
 import { WorkCharacters, castReadme, pageRanges, zipItemsFor } from '@/components/WorkCharacters'
@@ -53,6 +59,9 @@ const CAST: CastDoc = {
 beforeEach(() => {
   downloadKey.mockClear()
   downloadZip.mockClear()
+  saveBlob.mockClear()
+  buildCharacterPdf.mockClear()
+  localStorage.clear()
 })
 
 function setup() {
@@ -64,6 +73,7 @@ describe('WorkCharacters', () => {
     setup()
     expect(screen.getByText(/3 characters · 2 of 5 versions drawn/)).toBeInTheDocument()
     expect(screen.getByText(/2 not drawn yet/)).toBeInTheDocument()
+    expect(screen.getByText(/1 described in the page text/)).toBeInTheDocument()
     const urmila = screen.getByRole('article', { name: 'Urmila' })
     expect(within(urmila).getByText('Not drawn yet')).toBeInTheDocument()
     const sage = screen.getByRole('article', { name: 'Stock sage' })
@@ -129,6 +139,46 @@ describe('WorkCharacters', () => {
     expect(screen.getByText(/1 sheet selected/)).toBeInTheDocument()
     rerender(<WorkCharacters casts={[{ ...CAST, comicId: 'indic__other', slug: 'other' }]} title="Other" />)
     expect(screen.queryByText(/selected/)).not.toBeInTheDocument()
+  })
+
+  test('PDF alone: one PDF of the selection, no zip', async () => {
+    setup()
+    fireEvent.click(screen.getAllByRole('checkbox', { name: /^pdf$/i })[0])   // + PDF
+    fireEvent.click(screen.getAllByRole('checkbox', { name: /^sheets$/i })[0]) // - sheets
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select every drawn version of Rama' }))
+    fireEvent.click(screen.getByRole('button', { name: /download pdf/i }))
+    await vi.waitFor(() => expect(saveBlob).toHaveBeenCalled())
+    expect(downloadZip).not.toHaveBeenCalled()
+    const opts = buildCharacterPdf.mock.calls[0][0] as unknown as { title: string; entries: unknown[]; all?: unknown }
+    expect(opts.title).toBe('Rāmāyaṇa')
+    expect(opts.entries).toHaveLength(2)
+    expect(opts.all).toBeUndefined() // a selection has no appendix
+    expect(saveBlob.mock.calls[0][1]).toBe('Rāmāyaṇa — 2 character sheets.pdf')
+  })
+
+  test('both: the PDF goes inside the zip, beside the sheets, and the whole work gets the appendix', () => {
+    setup()
+    fireEvent.click(screen.getAllByRole('checkbox', { name: /^pdf$/i })[0])
+    fireEvent.click(screen.getByRole('button', { name: /download all · 2 sheets \+ pdf/i }))
+    const [name, items] = downloadZip.mock.calls[0] as unknown as [string, { path: string; data?: unknown }[]]
+    expect(name).toBe('Rāmāyaṇa — characters.zip')
+    expect(items.map((i) => i.path)).toEqual([
+      'Rāmāyaṇa — characters/Rama/Rama — Boy.png',
+      'Rāmāyaṇa — characters/Rama/Rama — Main look.png',
+      'Rāmāyaṇa — characters/Rāmāyaṇa — characters.pdf',
+    ])
+    expect(typeof items[2].data).toBe('function')
+    const opts = buildCharacterPdf.mock.calls[0][0] as unknown as { all?: unknown[] }
+    expect(opts.all).toHaveLength(3)
+  })
+
+  test('one format always stays on, and the choice is remembered', () => {
+    setup()
+    const sheets = screen.getAllByRole('checkbox', { name: /^sheets$/i })[0]
+    expect(sheets).toBeChecked()
+    expect(sheets).toBeDisabled() // the only one on
+    fireEvent.click(screen.getAllByRole('checkbox', { name: /^pdf$/i })[0])
+    expect(JSON.parse(localStorage.getItem('sw.characters.formats')!)).toEqual({ sheets: true, pdf: true })
   })
 
   test('an empty work says so', () => {

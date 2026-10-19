@@ -22,7 +22,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore'
+import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { surfaceOfLineSlug, type Surface } from '@/lib/surface'
 import type { CastDoc } from '@/lib/castModel'
@@ -33,10 +33,12 @@ export * from '@/lib/castModel'
 
 const TTL_MS = 5 * 60_000
 const cache = new Map<string, { at: number; p: Promise<CastDoc | null> }>()
+const subjectCache = new Map<string, { at: number; p: Promise<CastDoc[]> }>()
 
 /** Test-only. */
 export function __clearCastCache(): void {
   cache.clear()
+  subjectCache.clear()
 }
 
 /**
@@ -112,4 +114,29 @@ export function useSurfaceCasts(
     [source.data, surface],
   )
   return { data: scoped, loading: source.loading }
+}
+
+
+/**
+ * A subject's book casts. A moderator may read every cast, so one indexed query by
+ * `subject_slug` answers at once, without waiting for the comics scan that a member's
+ * view must go through; a member reads their visible comics' casts by id, as ever.
+ */
+export function useSubjectCasts(subject: string, canModerate: boolean, memberIds: string[]): CastLoad {
+  const viaIds = useCasts(canModerate ? [] : memberIds)
+  const [direct, setDirect] = useState<CastLoad>({ data: null, loading: true })
+  useEffect(() => {
+    if (!canModerate || !subject) return
+    let active = true
+    const hit = subjectCache.get(subject)
+    const p = hit && Date.now() - hit.at < TTL_MS
+      ? hit.p
+      : getDocs(query(collection(db, 'casts'), where('subject_slug', '==', subject)))
+          .then((snap) => snap.docs.map((d) => d.data() as CastDoc))
+          .catch(() => [] as CastDoc[])
+    if (!hit || hit.p !== p) subjectCache.set(subject, { at: Date.now(), p })
+    p.then((data) => { if (active) setDirect({ data, loading: false }) })
+    return () => { active = false }
+  }, [subject, canModerate])
+  return canModerate ? direct : viaIds
 }

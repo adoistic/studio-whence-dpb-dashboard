@@ -70,4 +70,14 @@ describe('downloadZip', () => {
     expect(files['Work/README.md']).toContain('Work/Hidden.png')
     expect(Object.keys(files)).not.toContain('Work/Hidden.png')
   })
+
+  test('bytes made while the zip streams (the PDF) go in after the sheets', async () => {
+    await downloadZip('W', [
+      { path: 'W/a.png', key: 'artifacts/characters/x/a/a.png' },
+      { path: 'W/W — characters.pdf', data: async () => new TextEncoder().encode('%PDF-test') },
+    ], { noPicker: true, sink: (b) => { saved = b } })
+    const files = await zipped()
+    expect(files['W/W — characters.pdf']).toBe('%PDF-test')
+    expect(files['W/a.png']).toBe('bytes of a.png')
+  })
 })

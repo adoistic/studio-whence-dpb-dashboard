@@ -89,7 +89,9 @@ by ONE component, `WorkCharacters`, over per-comic cast docs:
 - **Downloads** — `lib/downloads.ts`: one file = `/resolve` with a `download`
   name (R2 `Content-Disposition: attachment`) + a link click; many files = a
   client-zip stream (File System Access API where present, else a Blob).
-  Character sheets are zipped in the browser; research uses pre-built
+  Character sheets are zipped in the browser — as PNGs, as one PDF contact book
+  (`lib/characterPdf.ts`, built from the 1600 px `print` JPEGs, which pdf-lib embeds
+  without decoding), or both with the PDF inside the zip; research uses pre-built
   `bundles/research/{line}/{figure}/…` (content repo
   `tools/publish_research_bundles.py`, pointers `figures/*.researchZip` and
   `sources/*.bundle`) and assembles in the browser when a bundle is stale.

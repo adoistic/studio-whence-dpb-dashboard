@@ -88,10 +88,22 @@ describe('mergeCasts', () => {
     expect(out[0].status).toBe('drawn')
   })
 
+  test('a sheet stays marked as borrowed only while every book borrowed it', () => {
+    const borrowed = (comic: string) => doc(comic, [{ id: 'rama', line: 'manga-indic', name: 'Rama', kind: 'named', pages: [1],
+      versions: [v('rama-forest', true, [1], { fromLibrary: true, label: 'Forest (cast library)' })] }])
+    const staged = doc('manga-indic__v1', [{ id: 'rama', line: 'manga-indic', name: 'Rama', kind: 'named', pages: [5],
+      versions: [v('rama-forest', true, [5], { label: 'Forest' })] }])
+    expect(mergeCasts([borrowed('manga-indic__h')])[0].versions[0].fromLibrary).toBe(true)
+    const both = mergeCasts([borrowed('manga-indic__h'), staged])[0].versions[0]
+    expect(both.fromLibrary).toBeUndefined()
+    expect(both.label).toBe('Forest')
+  })
+
   test('text-only stock extras are their own status, never owed art', () => {
     const out = mergeCasts([doc('x__a', [{ id: 's', line: 'x', name: 'Stock sage', kind: 'generalized', pages: [], versions: [v('sage', false, [], { text: true })] }])])
     expect(out[0].status).toBe('text')
     expect(castTotals(out).versionsOwed).toBe(0)
+    expect(castTotals(out).versionsText).toBe(1)
   })
 
   test('named before shared before generalised, then by appearances', () => {

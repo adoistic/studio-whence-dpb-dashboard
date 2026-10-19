@@ -58,6 +58,13 @@ export function kindLabel(kind: string): string {
   return KIND_LABEL[kind] ?? kindFolder(kind)
 }
 
+/** A source's title for a FILE name: the index's `Source · ` prefix is a label for the
+ *  list, not part of the work's name (the bundle builder drops it the same way). */
+export function sourceTitle(source: Pick<ResearchSource, 'title' | 'slug'>): string {
+  const t = (source.title ?? '').replace(/^\s*source\s*[·—–-]\s*/i, '').trim()
+  return t || source.title || source.slug
+}
+
 export function figureName(figure: Pick<Figure, 'slug'>): string {
   return figure.slug.split('-').map((w) => (w ? w[0].toUpperCase() + w.slice(1) : w)).join(' ')
 }
@@ -94,8 +101,8 @@ export function figureZipIsCurrent(figure: Figure, sources: ResearchSource[]): b
 
 export function fileDownloadName(source: ResearchSource, fileIndex: number): string {
   const file = source.files[fileIndex]
-  if (source.files.length === 1) return `${safeFilename(source.title)}.md`
-  return `${safeFilename(source.title)} — ${safeFilename(file?.title ?? `part ${fileIndex + 1}`)}.md`
+  if (source.files.length === 1) return `${safeFilename(sourceTitle(source))}.md`
+  return `${safeFilename(sourceTitle(source))} — ${safeFilename(file?.title ?? `part ${fileIndex + 1}`)}.md`
 }
 
 export async function downloadResearchFile(source: ResearchSource, fileIndex: number): Promise<void> {
@@ -114,7 +121,7 @@ export function sourceMarkdown(
   date = new Date().toISOString().slice(0, 10),
 ): string {
   const lines = [
-    `# ${source.title}`,
+    `# ${sourceTitle(source)}`,
     '',
     `${kindLabel(source.kind)} · ${(source.words ?? 0).toLocaleString('en-US')} words · ${source.files.length} files · ${subject}`,
     `Studio Whence research library · generated ${date}`,
@@ -151,7 +158,7 @@ async function fetchTexts(paths: string[], concurrency = 8): Promise<(string | n
 }
 
 export async function downloadSourceMarkdown(figure: Figure, source: ResearchSource): Promise<void> {
-  const name = `${safeFilename(source.title)}.md`
+  const name = `${safeFilename(sourceTitle(source))}.md`
   if (sourceBundleIsCurrent(source) && source.bundle?.md?.key) {
     await downloadKey(source.bundle.md.key, name)
     return
@@ -163,7 +170,7 @@ export async function downloadSourceMarkdown(figure: Figure, source: ResearchSou
 function sourceReadme(source: ResearchSource, subject: string, failed: string[] = []): string {
   const names = numberedFileNames(source)
   const lines = [
-    `# ${source.title}`,
+    `# ${sourceTitle(source)}`,
     '',
     `${kindLabel(source.kind)} · ${(source.words ?? 0).toLocaleString('en-US')} words · ${source.files.length} files · ${subject}`,
     `Studio Whence research library · generated ${new Date().toISOString().slice(0, 10)}`,
@@ -189,7 +196,7 @@ export async function downloadSourceZip(
   source: ResearchSource,
   onProgress?: (p: ZipProgress) => void,
 ): Promise<void> {
-  const name = `${safeFilename(source.title)}.zip`
+  const name = `${safeFilename(sourceTitle(source))}.zip`
   if (sourceBundleIsCurrent(source) && source.bundle?.zip?.key) {
     await downloadKey(source.bundle.zip.key, name)
     return
@@ -210,8 +217,8 @@ export function figureZipItems(figure: Figure, sources: ResearchSource[]): ZipIt
   const folders: { source: ResearchSource; path: string }[] = []
   for (const s of sources) {
     const dir = `${root}/${kindFolder(s.kind)}`
-    if (s.files.length === 1) singles.push({ source: s, path: `${dir}/${safeFilename(s.title, 'untitled', ZIP_FILE_MAX)}.md` })
-    else folders.push({ source: s, path: `${dir}/${safeFilename(s.title, 'untitled', ZIP_FOLDER_MAX)}` })
+    if (s.files.length === 1) singles.push({ source: s, path: `${dir}/${safeFilename(sourceTitle(s), 'untitled', ZIP_FILE_MAX)}.md` })
+    else folders.push({ source: s, path: `${dir}/${safeFilename(sourceTitle(s), 'untitled', ZIP_FOLDER_MAX)}` })
   }
   const singlePaths = uniquePaths(singles.map((x) => x.path))
   const folderPaths = uniquePaths(folders.map((x) => x.path))
@@ -231,7 +238,7 @@ function figureReadme(figure: Figure, sources: ResearchSource[], failed: string[
     '',
     '| Kind | Source | Words | Files |',
     '|---|---|---:|---:|',
-    ...sources.map((s) => `| ${kindLabel(s.kind)} | ${s.title} | ${(s.words ?? 0).toLocaleString('en-US')} | ${s.files.length} |`),
+    ...sources.map((s) => `| ${kindLabel(s.kind)} | ${sourceTitle(s)} | ${(s.words ?? 0).toLocaleString('en-US')} | ${s.files.length} |`),
   ]
   if (failed.length) lines.push('', '## Not included', '', ...failed.map((f) => `- ${f} could not be fetched`))
   return lines.join('\n') + '\n'

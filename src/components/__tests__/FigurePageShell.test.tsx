@@ -31,7 +31,10 @@ let mockComics: () => { data: unknown[] | null }
 vi.mock('@/lib/visibleCatalog', () => ({ useVisibleComics: () => mockComics() }))
 // The subject's book casts (Characters tab) and the gated presign used by the
 // research downloads — inert here; this file pins the research reader.
-vi.mock('@/lib/casts', () => ({ useCasts: () => ({ data: [], loading: false }) }))
+vi.mock('@/lib/casts', () => ({
+  useCasts: () => ({ data: [], loading: false }),
+  useSubjectCasts: () => ({ data: [], loading: false }),
+}))
 vi.mock('@/lib/dataApi', () => ({ resolveUrls: async () => ({}) }))
 vi.mock('@/lib/auth', () => ({
   useUser: () => ({ user: { email: 'mod@x.com' }, loading: false }),

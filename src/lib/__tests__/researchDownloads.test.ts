@@ -13,6 +13,7 @@ import {
   fileDownloadName,
   numberedFileNames,
   researchKeyOf,
+  sourceTitle,
   sourceBundleIsCurrent,
   sourceMarkdown,
   sourceZipItems,
@@ -40,6 +41,13 @@ describe('keys and names', () => {
 
   test('files are numbered so every file browser keeps the reading order', () => {
     expect(numberedFileNames(book)).toEqual(['01 Chapter map.md', '02 Intro.md', '03 Aden the years abroad.md'])
+  })
+
+  test("the index's 'Source · ' label is not part of a file name", () => {
+    expect(sourceTitle({ slug: 's', title: 'Source · Make Something Wonderful' })).toBe('Make Something Wonderful')
+    expect(sourceTitle({ slug: 's', title: 'Source — Talk' })).toBe('Talk')
+    expect(sourceTitle({ slug: 'only-slug', title: 'Source · ' })).toBe('Source · ')
+    expect(fileDownloadName({ ...book, title: 'Source · The Polyester Prince' }, 1)).toBe('The Polyester Prince — Intro.md')
   })
 
   test('a one-file source downloads under the source title', () => {
