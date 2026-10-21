@@ -112,6 +112,86 @@ export async function downloadKey(key: string, filename: string): Promise<void> 
   followDownloadUrl(url)
 }
 
+// ─── signing as the zip goes ──────────────────────────────────────────────────
+
+/**
+ * A presigned URL lives ten minutes (`functions/src/r2.ts`). A zip used to sign every key
+ * before its first byte, so anything fetched more than ten minutes in failed — and a
+ * gigabyte on an ordinary connection takes longer than that. Keys are now signed in
+ * batches just ahead of the fetch window, and a URL older than this is signed again.
+ */
+export const PRESIGN_FRESH_MS = 8 * 60 * 1000
+const PRESIGN_BATCH = 50
+
+export interface Presigner {
+  /** The URL for `key`: null when the gate refuses it. `force` signs again (a 403 on a URL that should have worked). */
+  url(key: string, opts?: { force?: boolean }): Promise<string | null>
+}
+
+/**
+ * Sign `order`'s keys lazily, in that order: asking for one key signs it and up to 49
+ * keys after it that are not already signed, so a zip makes one request per 50 files and
+ * never holds a URL long enough for it to expire. A failed request rejects the callers
+ * waiting on it (their files fail; the zip goes on).
+ */
+export function createPresigner(
+  order: string[],
+  opts: {
+    resolve?: (keys: string[]) => Promise<Record<string, string>>
+    now?: () => number
+    freshMs?: number
+    batch?: number
+  } = {},
+): Presigner {
+  const resolve = opts.resolve ?? ((keys: string[]) => resolveUrls(keys))
+  const now = opts.now ?? (() => Date.now())
+  const freshMs = opts.freshMs ?? PRESIGN_FRESH_MS
+  const batchSize = Math.max(1, Math.min(PRESIGN_BATCH, opts.batch ?? PRESIGN_BATCH))
+  const keys = Array.from(new Set(order))
+  const index = new Map(keys.map((k, i) => [k, i]))
+  const signed = new Map<string, { url: string | null; at: number }>()
+  const pending = new Map<string, Promise<void>>()
+  const fresh = (k: string) => {
+    const s = signed.get(k)
+    return !!s && now() - s.at < freshMs
+  }
+
+  function sign(first: string): Promise<void> {
+    const batch = [first]
+    const start = index.get(first)
+    if (start !== undefined) {
+      for (let j = start + 1; j < keys.length && batch.length < batchSize; j++) {
+        const k = keys[j]
+        if (!pending.has(k) && !fresh(k)) batch.push(k)
+      }
+    }
+    const at = now()
+    const p: Promise<void> = resolve(batch)
+      .then((urls) => {
+        for (const k of batch) signed.set(k, { url: urls[k] ?? null, at })
+      })
+      .finally(() => {
+        for (const k of batch) if (pending.get(k) === p) pending.delete(k)
+      })
+    for (const k of batch) pending.set(k, p)
+    return p
+  }
+
+  return {
+    async url(key, { force = false } = {}) {
+      if (!force && fresh(key)) return signed.get(key)!.url
+      const waiting = pending.get(key)
+      if (!force && waiting) {
+        await waiting
+        return signed.get(key)?.url ?? null
+      }
+      signed.delete(key)
+      await sign(key)
+      return signed.get(key)?.url ?? null
+    },
+  }
+}
+
 // ─── many files, as a zip ─────────────────────────────────────────────────────
 
 export interface ZipItem {
@@ -132,6 +212,8 @@ export interface ZipProgress {
   total: number
   bytesDone: number
   bytesTotal: number
+  /** The path of the file most recently started — what to name in a progress line. */
+  current?: string
 }
 
 export interface ZipResult {
@@ -140,6 +222,8 @@ export interface ZipResult {
   cancelled: boolean
   /** True when the stream went straight to disk (File System Access API). */
   streamedToDisk: boolean
+  /** Bytes written into the zip, per path (the README excluded). */
+  written: Record<string, number>
 }
 
 interface SaveHandle {
@@ -159,8 +243,13 @@ function savePicker(): Picker | null {
  * CALL IT STRAIGHT FROM THE CLICK, before any other `await`: the save dialog needs the
  * click's user activation, and a network round-trip first can use it up.
  *
- * `readme`, when given, is called last with the paths that failed, so the README in
- * the zip can say honestly what is missing.
+ * `readme`, when given, is called last with the paths that failed and the bytes each
+ * file wrote, so the README in the zip can say honestly what is missing and how big
+ * everything is.
+ *
+ * Keys are signed as the zip reaches them (`createPresigner`), not all at the start, so
+ * a download that runs past a URL's ten minutes still completes. A file whose URL is
+ * refused with 401/403 is signed again once and retried.
  */
 export async function downloadZip(
   name: string,
@@ -169,7 +258,7 @@ export async function downloadZip(
     onProgress?: (p: ZipProgress) => void
     signal?: AbortSignal
     concurrency?: number
-    readme?: (failed: string[]) => string
+    readme?: (failed: string[], written: Record<string, number>) => string
     /** Where the README goes inside the zip (default `README.md` at the root). */
     readmePath?: string
     /** Test seam: skip the save dialog. */
@@ -192,24 +281,30 @@ export async function downloadZip(
       writable = await handle.createWritable()
     } catch (err) {
       if ((err as { name?: string })?.name === 'AbortError') {
-        return { failed: [], cancelled: true, streamedToDisk: false }
+        return { failed: [], cancelled: true, streamedToDisk: false, written: {} }
       }
       writable = null // the dialog is unavailable here (an iframe, a policy) — fall back to a Blob
     }
   }
 
-  // 2. Presigned URLs for everything, 50 at a time, in parallel.
-  const keys = items.filter((i) => i.key).map((i) => i.key!) as string[]
-  const urls = keys.length ? await resolveUrls(Array.from(new Set(keys))) : {}
+  // 2. Presigned URLs, signed as the zip reaches each file (see createPresigner).
+  const keys = items.filter((i) => i.key && i.text === undefined && i.data === undefined).map((i) => i.key!)
+  const presigner = createPresigner(keys)
 
   const { makeZip } = await import('client-zip')
   const concurrency = Math.max(1, opts.concurrency ?? 6)
   const failed: string[] = []
+  const written: Record<string, number> = {}
   const total = items.length
   const bytesTotal = items.reduce((n, i) => n + (i.bytes ?? 0), 0)
   let done = 0
   let bytesDone = 0
-  const report = () => opts.onProgress?.({ done, total, bytesDone, bytesTotal })
+  let current: string | undefined
+  const report = () => opts.onProgress?.({ done, total, bytesDone, bytesTotal, current })
+  const started = (path: string) => {
+    current = path
+    report()
+  }
   const lastModified = new Date()
 
   type Entry = { name: string; input: AsyncIterable<Uint8Array> | string | Uint8Array; lastModified: Date; size?: number }
@@ -217,19 +312,34 @@ export async function downloadZip(
   // The body is handed over as an async iterator rather than a piped stream: it
   // counts bytes for the progress bar as the zip consumes them, and it never trips
   // over a ReadableStream from another realm (a worker, a polyfill, a test runner).
-  async function* counted(body: ReadableStream<Uint8Array>): AsyncGenerator<Uint8Array> {
-    const reader = body.getReader()
+  //
+  // The READER is taken the moment the response arrives (in fetchOne), not when the zip
+  // reaches the file, and the response is held until its body is read: an unlocked body
+  // whose Response is collected can be cancelled by the runtime (Node's fetch does it), and
+  // it then reads as empty — 31 files of a 158-file zip came out 0 bytes that way. A body
+  // that ends short of its Content-Length is reported as failed, never passed off as whole.
+  async function* counted(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    path: string,
+    expected: number | undefined,
+    keepAlive: Response,
+  ): AsyncGenerator<Uint8Array> {
+    written[path] = 0
     try {
       for (;;) {
         const { done: end, value } = await reader.read()
         if (end) break
         bytesDone += value.byteLength
+        written[path] += value.byteLength
         report()
         yield value
       }
     } finally {
       reader.releaseLock()
+      void keepAlive
     }
+    // Short only: R2 gzips text for browsers, and a decoded body is longer than its Content-Length.
+    if (expected !== undefined && written[path] < expected) failed.push(path)
     done += 1
     report()
   }
@@ -238,16 +348,25 @@ export async function downloadZip(
     if (item.text !== undefined) {
       return { name: item.path, input: item.text, lastModified }
     }
-    const url = item.key ? urls[item.key] : undefined
-    if (!url) {
-      failed.push(item.path)
-      return null
-    }
+    started(item.path)
     try {
-      const res = await fetch(url, { signal: opts.signal })
+      let url = item.key ? await presigner.url(item.key) : null
+      if (!url) {
+        failed.push(item.path)
+        return null
+      }
+      let res = await fetch(url, { signal: opts.signal })
+      if (res.status === 401 || res.status === 403) {
+        // An expired or refused signature: sign this one again and try once more.
+        url = await presigner.url(item.key!, { force: true })
+        if (!url) throw new Error('refused')
+        res = await fetch(url, { signal: opts.signal })
+      }
       if (!res.ok || !res.body) throw new Error(String(res.status))
       const size = Number(res.headers.get('content-length')) || undefined
-      return { name: item.path, input: counted(res.body), lastModified, size }
+      // Lock the body now; see `counted`.
+      const reader = res.body.getReader()
+      return { name: item.path, input: counted(reader, item.path, size, res), lastModified, size }
     } catch {
       if (opts.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
       failed.push(item.path)
@@ -274,8 +393,13 @@ export async function downloadZip(
       }
     }
     for (const d of dataItems) {
+      started(d.path)
       try {
-        yield { name: d.path, input: await d.data!(), lastModified }
+        const bytes = await d.data!()
+        if (opts.signal?.aborted) throw new DOMException('Aborted', 'AbortError')
+        written[d.path] = bytes.byteLength
+        bytesDone += bytes.byteLength
+        yield { name: d.path, input: bytes, lastModified }
       } catch (err) {
         if (opts.signal?.aborted) throw err
         failed.push(d.path)
@@ -283,12 +407,15 @@ export async function downloadZip(
       done += 1
       report()
     }
+    const utf8 = new TextEncoder()
     for (const t of textItems) {
+      started(t.path)
+      written[t.path] = utf8.encode(t.text!).byteLength
       yield { name: t.path, input: t.text!, lastModified }
       done += 1
     }
     if (opts.readme) {
-      yield { name: opts.readmePath ?? 'README.md', input: opts.readme([...failed]), lastModified }
+      yield { name: opts.readmePath ?? 'README.md', input: opts.readme([...failed], { ...written }), lastModified }
     }
     report()
   }
@@ -298,17 +425,17 @@ export async function downloadZip(
   try {
     if (writable) {
       await stream.pipeTo(writable, { signal: opts.signal })
-      return { failed, cancelled: false, streamedToDisk: true }
+      return { failed, cancelled: false, streamedToDisk: true, written }
     }
     // Typed, so a browser that names a download from its type (Safari) keeps the .zip.
     const blob = await new Response(stream, { headers: { 'Content-Type': 'application/zip' } }).blob()
-    if (opts.signal?.aborted) return { failed, cancelled: true, streamedToDisk: false }
+    if (opts.signal?.aborted) return { failed, cancelled: true, streamedToDisk: false, written }
     ;(opts.sink ?? saveBlob)(blob, filename)
-    return { failed, cancelled: false, streamedToDisk: false }
+    return { failed, cancelled: false, streamedToDisk: false, written }
   } catch (err) {
     if (opts.signal?.aborted || (err as { name?: string })?.name === 'AbortError') {
       try { await writable?.abort?.() } catch { /* already closed */ }
-      return { failed, cancelled: true, streamedToDisk: !!writable }
+      return { failed, cancelled: true, streamedToDisk: !!writable, written }
     }
     try { await writable?.abort?.() } catch { /* already closed */ }
     throw err

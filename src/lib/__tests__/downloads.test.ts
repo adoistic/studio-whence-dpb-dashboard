@@ -10,7 +10,7 @@ vi.mock('@/lib/dataApi', () => ({
   resolveUrls: vi.fn(async (keys: string[]) => Object.fromEntries(keys.filter((k) => !k.includes('denied')).map((k) => [k, `https://r2.test/${k}`]))),
 }))
 
-import { downloadZip, formatBytes, safeFilename, uniquePaths } from '@/lib/downloads'
+import { createPresigner, downloadZip, formatBytes, PRESIGN_FRESH_MS, safeFilename, uniquePaths } from '@/lib/downloads'
 
 describe('names', () => {
   test('keeps diacritics and drops what file systems refuse', () => {
@@ -80,5 +80,136 @@ describe('downloadZip', () => {
     const files = await zipped()
     expect(files['W/W — characters.pdf']).toBe('%PDF-test')
     expect(files['W/a.png']).toBe('bytes of a.png')
+  })
+
+  test('the README is told how many bytes each file wrote, and progress names the file under way', async () => {
+    const seen: string[] = []
+    let sizes: Record<string, number> = {}
+    const result = await downloadZip('W', [
+      { path: 'W/a.png', key: 'artifacts/comics/x/a.png' },
+      { path: 'W/made.pdf', data: async () => new Uint8Array(7) },
+      { path: 'W/notes.txt', text: 'héllo' },
+    ], {
+      noPicker: true,
+      sink: (b) => { saved = b },
+      onProgress: (p) => { if (p.current && !seen.includes(p.current)) seen.push(p.current) },
+      readme: (_failed, written) => { sizes = written; return 'R' },
+    })
+    expect(sizes['W/a.png']).toBe('bytes of a.png'.length)
+    expect(sizes['W/made.pdf']).toBe(7)
+    expect(sizes['W/notes.txt']).toBe(6) // é is two bytes in UTF-8
+    expect(result.written).toEqual(sizes)
+    expect(seen).toEqual(['W/a.png', 'W/made.pdf', 'W/notes.txt'])
+  })
+
+  test('a body waiting its turn is locked at once, so it cannot be cancelled before the zip reaches it', async () => {
+    // Node's fetch cancels an unread, UNLOCKED body when its Response is garbage-collected;
+    // the zip reads bodies one at a time, so a body further down the window used to arrive
+    // empty. Mimic it: any body still unlocked a moment after it is handed over is cancelled.
+    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+      const bytes = new TextEncoder().encode(`bytes of ${String(url).split('/').pop()}`)
+      const body = new ReadableStream<Uint8Array>({
+        start(c) { setTimeout(() => { c.enqueue(bytes); c.close() }, 5) },
+      })
+      setTimeout(() => { if (!body.locked) void body.cancel('collected') }, 0)
+      return new Response(body, { headers: { 'content-length': String(bytes.byteLength) } })
+    }) as typeof fetch
+    const items = Array.from({ length: 8 }, (_, i) => ({ path: `W/${i}.png`, key: `artifacts/comics/x/${i}.png` }))
+    const result = await downloadZip('W', items, { noPicker: true, sink: (b) => { saved = b } })
+    const files = await zipped()
+    expect(result.failed).toEqual([])
+    for (let i = 0; i < 8; i++) expect(files[`W/${i}.png`]).toBe(`bytes of ${i}.png`)
+  })
+
+  test('a body that ends short of its Content-Length is reported, never passed off as whole', async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(new TextEncoder().encode('half'), { headers: { 'content-length': '100' } })) as typeof fetch
+    let failedInReadme: string[] = []
+    const result = await downloadZip('W', [{ path: 'W/a.png', key: 'artifacts/comics/x/a.png' }], {
+      noPicker: true,
+      sink: (b) => { saved = b },
+      readme: (failed) => { failedInReadme = failed; return 'R' },
+    })
+    expect(result.failed).toEqual(['W/a.png'])
+    expect(failedInReadme).toEqual(['W/a.png'])
+  })
+
+  test('a body longer than its Content-Length (text R2 sent gzipped) is whole, not failed', async () => {
+    globalThis.fetch = vi.fn(async () =>
+      new Response(new TextEncoder().encode('# a long decoded markdown file'), { headers: { 'content-length': '12' } })) as typeof fetch
+    const result = await downloadZip('W', [{ path: 'W/a.md', key: 'docs/x/a.md' }], { noPicker: true, sink: (b) => { saved = b } })
+    expect(result.failed).toEqual([])
+    expect((await zipped())['W/a.md']).toBe('# a long decoded markdown file')
+  })
+
+  test('a refused signature is signed again once and retried', async () => {
+    const { resolveUrls } = await import('@/lib/dataApi')
+    let calls = 0
+    globalThis.fetch = vi.fn(async (url: string | URL | Request) => {
+      calls += 1
+      // The first URL handed out has expired by the time it is used.
+      return calls === 1
+        ? new Response('expired', { status: 403 })
+        : new Response(new TextEncoder().encode(`bytes of ${String(url).split('/').pop()}`))
+    }) as typeof fetch
+    vi.mocked(resolveUrls).mockClear()
+    const result = await downloadZip('W', [{ path: 'W/a.png', key: 'artifacts/comics/x/a.png' }], {
+      noPicker: true,
+      sink: (b) => { saved = b },
+    })
+    expect(result.failed).toEqual([])
+    expect(vi.mocked(resolveUrls)).toHaveBeenCalledTimes(2)
+    expect((await zipped())['W/a.png']).toBe('bytes of a.png')
+  })
+})
+
+describe('createPresigner', () => {
+  test('signs in batches of at most 50, starting at the key asked for', async () => {
+    const keys = Array.from({ length: 120 }, (_, i) => `images/k${i}.jpg`)
+    const batches: string[][] = []
+    const p = createPresigner(keys, {
+      resolve: async (ks) => { batches.push(ks); return Object.fromEntries(ks.map((k) => [k, `u:${k}`])) },
+    })
+    expect(await p.url('images/k0.jpg')).toBe('u:images/k0.jpg')
+    expect(await p.url('images/k49.jpg')).toBe('u:images/k49.jpg') // came with the first batch
+    expect(batches).toHaveLength(1)
+    expect(batches[0]).toHaveLength(50)
+    expect(await p.url('images/k50.jpg')).toBe('u:images/k50.jpg')
+    expect(batches).toHaveLength(2)
+    expect(batches[1][0]).toBe('images/k50.jpg')
+  })
+
+  test('callers waiting on the same batch share one request', async () => {
+    let requests = 0
+    const p = createPresigner(['a', 'b', 'c'], {
+      resolve: async (ks) => { requests += 1; return Object.fromEntries(ks.map((k) => [k, `u:${k}`])) },
+    })
+    const urls = await Promise.all([p.url('a'), p.url('b'), p.url('c')])
+    expect(urls).toEqual(['u:a', 'u:b', 'u:c'])
+    expect(requests).toBe(1)
+  })
+
+  test('a URL older than the freshness window is signed again (they expire after ten minutes)', async () => {
+    let t = 0
+    let n = 0
+    const p = createPresigner(['a'], {
+      now: () => t,
+      resolve: async (ks) => { n += 1; return Object.fromEntries(ks.map((k) => [k, `u${n}:${k}`])) },
+    })
+    expect(await p.url('a')).toBe('u1:a')
+    t = PRESIGN_FRESH_MS - 1
+    expect(await p.url('a')).toBe('u1:a')
+    t = PRESIGN_FRESH_MS + 1
+    expect(await p.url('a')).toBe('u2:a')
+    expect(await p.url('a', { force: true })).toBe('u3:a')
+  })
+
+  test('a key the gate refuses comes back null; a failed request rejects', async () => {
+    const p = createPresigner(['ok', 'denied'], {
+      resolve: async (ks) => Object.fromEntries(ks.filter((k) => k !== 'denied').map((k) => [k, `u:${k}`])),
+    })
+    expect(await p.url('denied')).toBeNull()
+    const broken = createPresigner(['x'], { resolve: async () => { throw new Error('resolve failed: 500') } })
+    await expect(broken.url('x')).rejects.toThrow('resolve failed')
   })
 })
