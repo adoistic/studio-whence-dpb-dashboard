@@ -23,6 +23,9 @@ export interface Panel {
 export interface Page {
   number: string
   panels: Panel[]
+  /** A TRANSLATED draft has no panels: each page is its numbered caption and balloon
+   *  boxes in reading order (`p.cs-box`). Absent on a panel draft. */
+  boxes?: { number: string; text: string }[]
 }
 
 export interface ParsedDraft {
@@ -100,6 +103,14 @@ export function parseDraftHtml(html: string): ParsedDraft {
       }
 
       page.panels.push(panel)
+    }
+
+    const boxEls = Array.from(sectionEl.querySelectorAll('.cs-box'))
+    if (boxEls.length) {
+      page.boxes = boxEls.map((el, i) => ({
+        number: /\.b(\d+)$/.exec(el.getAttribute('data-box-ref') ?? '')?.[1] ?? String(i + 1),
+        text: cleanText(el),
+      }))
     }
 
     pages.push(page)

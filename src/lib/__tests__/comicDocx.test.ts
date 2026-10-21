@@ -47,6 +47,32 @@ describe('parseDraftHtml', () => {
   })
 })
 
+// A translated draft has no panels: each page is its numbered caption and balloon boxes,
+// in reading order (the 01-the-wall Hindi Word file came out as bare page headings).
+const BOXES = `
+<section class="cs-page" data-page-ref="p1"><h2 class="cs-page-h">Page 1</h2>
+<p class="cs-box" data-box-ref="p1.b1">नमस्ते, पहला डिब्बा।</p>
+<p class="cs-box" data-box-ref="p1.b2">दूसरा डिब्बा।</p></section>
+<section class="cs-page" data-page-ref="p2"><h2 class="cs-page-h">Page 2</h2>
+<p class="cs-box" data-box-ref="p2.b1">तीसरा।</p></section>
+`
+
+describe('parseDraftHtml — a translated (box) draft', () => {
+  const { pages } = parseDraftHtml(BOXES)
+  test('keeps every box, numbered, in order, on its page', () => {
+    expect(pages.map((p) => p.number)).toEqual(['1', '2'])
+    expect(pages[0].panels).toEqual([])
+    expect(pages[0].boxes).toEqual([
+      { number: '1', text: 'नमस्ते, पहला डिब्बा।' },
+      { number: '2', text: 'दूसरा डिब्बा।' },
+    ])
+    expect(pages[1].boxes).toEqual([{ number: '1', text: 'तीसरा।' }])
+  })
+  test('a panel draft has no boxes', () => {
+    expect(parseDraftHtml(FIXTURE).pages[0].boxes).toBeUndefined()
+  })
+})
+
 describe('parseDraftHtml provenance', () => {
   // Diamond reviews the Word export as the master script; it must carry the same
   // [src:] provenance the doc pack does (outstanding-items files, 7-8 Oct 2026).

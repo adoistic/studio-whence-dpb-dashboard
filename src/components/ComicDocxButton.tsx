@@ -46,7 +46,7 @@ export function readerNoteFor(comic: Pick<Comic, 'line' | 'readerNote'>): string
  * Serena). Fetched from the doc pack, so the two can never say different things.
  * Returns null when the book has none or it cannot be read.
  */
-async function fetchInsideCovers(comic: Comic): Promise<string | null> {
+export async function fetchInsideCovers(comic: Comic): Promise<string | null> {
   // The as-printed text (generated from the cover renderer's own specs) is what Diamond
   // checks against; inside-covers.md is the writer's working copy, used only when a
   // book's pack predates the printed item.
@@ -163,6 +163,24 @@ export async function buildComicDocument(comic: Comic, draftHtml: string, inside
         ]
       : []
 
+  // A translated script has no panels: each page is its numbered caption and balloon
+  // boxes, in reading order. Say so once, so the numbers read as boxes.
+  if (pages.some((p) => p.boxes?.length)) {
+    children.push(
+      new Paragraph({
+        spacing: { before: 120, after: 80 },
+        children: [
+          new TextRun({
+            text: 'Each numbered line is one caption or speech balloon on the page, in reading order.',
+            italics: true,
+            size: 18,
+            color: '666666',
+          }),
+        ],
+      }),
+    )
+  }
+
   // ── Pages → panels → beats ────────────────────────────────────────────
   pages.forEach((page, pi) => {
     children.push(
@@ -172,6 +190,17 @@ export async function buildComicDocument(comic: Comic, draftHtml: string, inside
         children: [new TextRun(`Page ${page.number}`)],
       }),
     )
+    for (const box of page.boxes ?? []) {
+      children.push(
+        new Paragraph({
+          spacing: { after: 80 },
+          children: [
+            new TextRun({ text: `${box.number}.  `, bold: true, color: ACCENT }),
+            new TextRun({ text: box.text, color: INK }),
+          ],
+        }),
+      )
+    }
     for (const panel of page.panels) {
       children.push(
         new Paragraph({ heading: HeadingLevel.HEADING_3, children: [new TextRun(`Panel ${panel.number}`)] }),
