@@ -63,6 +63,8 @@ export interface Comic {
   sources_count?: number
   slug: string
   subject_slug: string | null
+  /** R2 key of the original-language draft (`drafts/{line}/{slug}.html`), when one is published. */
+  draftKey?: string
   // Program tier (Line → Program → Subject): which program this comic belongs to.
   program_slug?: string | null
   // Toddlers-specific optional fields

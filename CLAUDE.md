@@ -99,6 +99,34 @@ by ONE component, `WorkCharacters`, over per-comic cast docs:
   figure's research scope. Zip entry names are capped (folder 60, file 80) so
   Windows' built-in unzip never meets a path over 260 characters.
 
+## Download all (2026-10-21)
+
+Every comic page has a **Download all** button in its masthead: every file the portal
+holds for the book, as ONE zip in numbered folders (`01 Comic` … `09 History and
+comments`) with a `README.txt` at the top that explains each folder and file, says what
+the book has none of, and lists anything that did not arrive.
+
+- `lib/downloadAll.ts` is PURE: `buildBundlePlan(comic, ctx)` lists every file by group
+  (an R2 key to stream, text to write, or a file the browser makes); `bundleReadme`
+  writes the README last, from what actually landed. `lib/downloadAllRun.ts` binds each
+  made file to the builder its own button uses (`lib/comicPdf`, `ComicDocxButton`, the
+  Export… model, `lib/characterPdf`, `lib/researchDownloads`), so a file in the zip is the
+  file its button gives.
+- **A new download on the comic page must be added to `buildBundlePlan` too**, or
+  Download all silently leaves it out. Folder numbers are fixed (07 is always the
+  characters): a new kind joins a folder or takes the next number, never renumbers.
+- Built in the browser and streamed (to disk where the File System Access API exists);
+  no server copy, nothing new in the gate. Keys are signed as the zip goes
+  (`createPresigner` in `lib/downloads.ts`): a presigned URL lives 10 minutes and a 1 GB
+  zip takes longer.
+- `downloadZip` takes each response's READER the moment it arrives. An unlocked body
+  whose Response is collected can be cancelled by the runtime, and the file then lands
+  in the zip as 0 bytes, unreported: 31 of 158 files did in the first real build. A body
+  that ends short of its Content-Length is reported as failed. Only SHORT counts: R2
+  gzips text for browsers, so a decoded `.md` is longer than its Content-Length.
+- Visual QA without a session: `/dev-download-all-preview` (renders nothing in a
+  production build).
+
 ## Deploy
 `npm run build && firebase deploy --only hosting` (also `firestore:rules` when rules change).
 Firebase **Storage is intentionally not used** — gated assets go through the

@@ -142,7 +142,8 @@ export function sourceMarkdown(
   return lines.join('\n')
 }
 
-async function fetchTexts(paths: string[], concurrency = 8): Promise<(string | null)[]> {
+/** Each path's text, in order; a file that cannot be fetched is null. */
+export async function fetchTexts(paths: string[], concurrency = 8): Promise<(string | null)[]> {
   const keys = paths.map(researchKeyOf)
   const urls = await resolveUrls(Array.from(new Set(keys)))
   const out: (string | null)[] = new Array(paths.length).fill(null)

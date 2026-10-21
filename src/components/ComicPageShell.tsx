@@ -25,6 +25,7 @@ import { ComicCmykButton } from '@/components/ComicCmykButton'
 import { ComicDocxButton } from '@/components/ComicDocxButton'
 import { ComicPanelExportButton } from '@/components/ComicPanelExportButton'
 import { ComicExportButton } from '@/components/ComicExportButton'
+import { ComicDownloadAll } from '@/components/ComicDownloadAll'
 import { AmazonModulesPanel } from '@/components/AmazonModulesPanel'
 import { useGatedText } from '@/lib/useGatedText'
 import { parsePanelModel, panelsKeyFor } from '@/lib/panelModel'
@@ -176,10 +177,10 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
   const comicId = `${comic.line}__${comic.slug}`
   const [commentPage, setCommentPage] = useState<number | null>(null)
   const { data: fbThreads } = useComicFeedback(comicId, canMod, email ?? '')
-  const pageCounts = useMemo(
-    () => countThreadsByPage(fbThreads.filter((t) => visibleTo(t.root, canMod))),
-    [fbThreads, canMod],
-  )
+  const visibleThreads = useMemo(() => fbThreads.filter((t) => visibleTo(t.root, canMod)), [fbThreads, canMod])
+  const pageCounts = useMemo(() => countThreadsByPage(visibleThreads), [visibleThreads])
+  // Known only once the original language's draft has been asked for and is not there.
+  const originalDraftMissing = lang === languages[0].code && !draft.loading && !draft.text
 
   function jumpInDraft(ref: string) {
     setView('draft')
@@ -247,6 +248,18 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
               {comic.logline}
             </p>
           )}
+          {/* Every file for the book in one organised zip, with a README.txt. */}
+          <div className="mt-8">
+            <ComicDownloadAll
+              comic={comic}
+              figure={hasFigure ? fig.data : null}
+              figureLoading={fig.loading}
+              cast={cast}
+              castLoading={castLoad.loading}
+              threads={visibleThreads}
+              hasDraft={originalDraftMissing ? false : undefined}
+            />
+          </div>
         </div>
       </section>
 
@@ -382,7 +395,7 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
                       comic={comic}
                       lang={lang}
                       originalLanguage={languages[0].code}
-                      threads={fbThreads.filter((t) => visibleTo(t.root, canMod))}
+                      threads={visibleThreads}
                       draftHtml={draft.text || null}
                     />
                   </>

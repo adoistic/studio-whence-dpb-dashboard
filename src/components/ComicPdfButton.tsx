@@ -1,134 +1,21 @@
 'use client'
 
 import { useState } from 'react'
-import { PDFDocument } from 'pdf-lib'
 import type { Comic } from '@/types/content'
-import { comicPdfKeys, webVariantKey } from '@/lib/comicPageKeys'
-import { resolveUrls } from '@/lib/dataApi'
-import { fetchPagesWithFallback } from '@/lib/exportFetch'
-import { previewPageJpeg } from '@/lib/watermark'
+import { comicPdfBytes, type PdfVariant } from '@/lib/comicPdf'
 
-/** True when the bytes start with the PNG 8-byte signature. */
-function isPng(bytes: Uint8Array): boolean {
-  return (
-    bytes.length >= 8 &&
-    bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47 &&
-    bytes[4] === 0x0d && bytes[5] === 0x0a && bytes[6] === 0x1a && bytes[7] === 0x0a
-  )
-}
-
-/** True when the bytes start with the JPEG SOI marker. */
-function isJpg(bytes: Uint8Array): boolean {
-  return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
-}
-
-/** Assemble a PDF (one page per image, page sized to the image). Pure — no DOM.
- * The format is sniffed from the actual bytes, not the HTTP content-type or the
- * key's extension — a page served as `.jpg` may really be PNG (and vice versa),
- * and pdf-lib throws if embedJpg/embedPng is handed the wrong format. We fall
- * back to the content-type only when neither signature is recognised. */
-export async function buildComicPdf(
-  images: { bytes: Uint8Array; type: string }[],
-): Promise<Uint8Array> {
-  const pdf = await PDFDocument.create()
-  const embeddedAll = []
-  for (const img of images) {
-    const usePng = isPng(img.bytes) || (!isJpg(img.bytes) && img.type.includes('png'))
-    embeddedAll.push(usePng
-      ? await pdf.embedPng(img.bytes)
-      : await pdf.embedJpg(img.bytes))
-  }
-  const sizes = pdfPageSizes(embeddedAll.map((e) => ({ width: e.width, height: e.height })))
-  embeddedAll.forEach((embedded, i) => {
-    const [w, h] = sizes[i]
-    const page = pdf.addPage([w, h])
-    page.drawImage(embedded, { x: 0, y: 0, width: w, height: h })
-  })
-  return pdf.save()
-}
-
-/** One page size per plate, normalised to the book's own interior trim.
- *
- * The reference is the most common pixel size, which is the interior page. A
- * plate within 1% of its shape (an inside cover rendered at 2016x2822 beside
- * 1429x2000 pages) gets the reference size exactly; any other plate keeps its
- * own shape at the reference height. Sizing each page off its own pixels made
- * a same-shaped plate at a different resolution a different page size, which a
- * client reads as a defect (Diamond, 30 Sep 2026: "one approved size
- * throughout"). Pure. */
-export function pdfPageSizes(dims: { width: number; height: number }[]): [number, number][] {
-  if (dims.length === 0) return []
-  const counts = new Map<string, number>()
-  for (const d of dims) counts.set(`${d.width}x${d.height}`, (counts.get(`${d.width}x${d.height}`) ?? 0) + 1)
-  let ref = dims[0]
-  let best = 0
-  for (const d of dims) {
-    const n = counts.get(`${d.width}x${d.height}`) ?? 0
-    if (n > best) { best = n; ref = d }
-  }
-  const refRatio = ref.height / ref.width
-  return dims.map((d) => {
-    const ratio = d.height / d.width
-    if (Math.abs(ratio - refRatio) / refRatio <= 0.01) return [ref.width, ref.height]
-    return [(d.width * ref.height) / d.height, ref.height]
-  })
-}
-
-/** What a download contains. `low` and `watermarked` are both low-resolution;
- *  only the latter carries the © Diamond Toons mark. */
-type PdfVariant = 'full' | 'low' | 'watermarked'
+// The assembly lives in lib/comicPdf so the "Download all" zip builds the same file.
+export { buildComicPdf, pdfPageSizes } from '@/lib/comicPdf'
 
 export function ComicPdfButton({ comic }: { comic: Comic }) {
   const [busy, setBusy] = useState<null | PdfVariant>(null)
   const [error, setError] = useState<string | null>(null)
 
-  /**
-   * `full` embeds the print masters untouched. `low` and `watermarked` both
-   * start from the 1200px web variants and downscale again; only `watermarked`
-   * is stamped, which is what makes it safe to circulate.
-   */
+  /** `full` embeds the print masters; `low` and `watermarked` are light copies (lib/comicPdf). */
   async function onDownload(variant: PdfVariant) {
-    const small = variant !== 'full'
     setBusy(variant); setError(null)
     try {
-      // Resolve the masters always, plus the web variants when we want the small
-      // ones, then fall back at FETCH time — `/resolve` signs a URL whether or
-      // not the object exists, so a missing web variant only shows up on fetch.
-      // Book order, inside covers included (comicPdfKeys). Inside covers have no
-      // web variant; the fetch falls back to the master for them.
-      const masterKeys = comicPdfKeys(comic)
-      const pairs = masterKeys.map((masterKey) => ({
-        webKey: webVariantKey(masterKey), masterKey,
-      }))
-      const urls = await resolveUrls(
-        small ? [...pairs.map((p) => p.webKey), ...masterKeys] : masterKeys,
-      )
-      const fetched = await fetchPagesWithFallback(pairs, urls, small)
-      type PageBytes = { bytes: Uint8Array; type: string }
-      let images: PageBytes[] = fetched
-        .filter((b): b is Uint8Array => b !== null)
-        // Inside covers are PNG; pages are JPEG. Name the real format.
-        .map((bytes) => ({ bytes, type: isPng(bytes) ? 'image/png' : 'image/jpeg' }))
-      if (images.length === 0) throw new Error('no pages could be fetched')
-      if (images.length < masterKeys.length) {
-        throw new Error(
-          `${masterKeys.length - images.length} of ${masterKeys.length} pages could not be fetched`)
-      }
-      if (small) {
-        // Sequential, not Promise.all: a 64-page book would otherwise hold 64
-        // decoded bitmaps and 64 canvases in memory at once.
-        const processed: PageBytes[] = []
-        for (const img of images) {
-          processed.push({
-            bytes: await previewPageJpeg(img.bytes, img.type, {
-              watermark: variant === 'watermarked',
-            }),
-            type: 'image/jpeg',
-          })
-        }
-        images = processed
-      }
-      const pdfBytes = await buildComicPdf(images)
+      const pdfBytes = await comicPdfBytes(comic, variant)
       // Copy into a fresh ArrayBuffer so the BlobPart type is a plain
       // ArrayBuffer (pdf-lib returns Uint8Array<ArrayBufferLike>).
       const buffer = new ArrayBuffer(pdfBytes.byteLength)

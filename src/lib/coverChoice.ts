@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
+import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { uploadCoverRef } from '@/lib/dataApi'
 import type { CoverChoice } from '@/types/content'
@@ -21,6 +21,12 @@ export interface CoverChoiceAuthor {
  */
 export function coverChoiceDocId(comicId: string, lang?: string, originalLang = 'en'): string {
   return !lang || lang === originalLang ? comicId : `${comicId}__${lang}`
+}
+
+/** The official-cover choice once, not live (the "Download all" zip reads it at the click). */
+export async function fetchCoverChoice(docId: string): Promise<CoverChoice | null> {
+  const snap = await getDoc(doc(db, 'coverChoices', docId))
+  return snap.exists() ? (snap.data() as CoverChoice) : null
 }
 
 /** Live official-cover choice (`coverChoices/{docId}`, see `coverChoiceDocId`). */
