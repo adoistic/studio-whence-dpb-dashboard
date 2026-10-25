@@ -304,3 +304,32 @@ describe('the text files', () => {
     expect(asTxt(['a', 'b\nc'])).toBe('﻿a\r\nb\r\nc\r\n')
   })
 })
+
+describe('print version of a black-and-white book', () => {
+  const printVersion = {
+    label: 'Print version',
+    summary: 'Sample summary.',
+    press: 'Sample press on sample paper',
+    pages: 48,
+    files: {
+      pdf: { key: `${A}/print-version/sample-print-version.pdf`, bytes: 60_000_000, filename: 'p.pdf' },
+      tiff: { key: `${A}/print-version/sample-tiff.zip`, bytes: 60_000_000, filename: 't.zip' },
+    },
+    testPack: { key: `${A}/print-version/sample-test-sheet.pdf`, bytes: 4_000_000, filename: 's.pdf', pages: [3] },
+    compare: { viewPrefix: `${A}/print-version`, versions: [], views: [] },
+  }
+
+  test('the print PDF and the test sheet go into 01 Comic; the TIFF zip stays on the page', () => {
+    const items = plan({ cmykPdf: undefined, printVersion }).groups.flatMap((g) => g.items)
+    const keys = items.map((i) => i.key)
+    expect(keys).toContain(printVersion.files.pdf.key)
+    expect(keys).toContain(printVersion.testPack.key)
+    expect(keys).not.toContain(printVersion.files.tiff.key)
+    const pdf = items.find((i) => i.key === printVersion.files.pdf.key)!
+    expect(pdf.path).toMatch(/01 Comic\/.*print version, black and white\.pdf$/)
+  })
+
+  test('a book with a print version is not reported as missing a CMYK file', () => {
+    expect(plan({ cmykPdf: undefined, printVersion }).absent).not.toContain('A CMYK print file.')
+  })
+})

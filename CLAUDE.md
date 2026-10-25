@@ -127,6 +127,17 @@ the book has none of, and lists anything that did not arrive.
 - Visual QA without a session: `/dev-download-all-preview` (renders nothing in a
   production build).
 
+## Print version (2026-10-25)
+
+A black-and-white comic can carry a `printVersion` block: its print file remade for the press that
+will run it.
+`components/PrintVersion.tsx` shows the downloads (print PDF, TIFF pages, test sheet) and a two-up
+compare: any page, as first sent beside the print version, seen as the files or through the content
+repo's print simulator. Previews live at `artifacts/comics/{line}/{slug}/print-version/{version}/{view}/
+page-NNN.jpg`, already gated by `scopeOfKey`. Written by the content repo's
+`tools/bw_print/publish_print_version.py`. Download all carries the print PDF and the test sheet in
+`01 Comic`.
+
 ## Deploy
 `npm run build && firebase deploy --only hosting` (also `firestore:rules` when rules change).
 Firebase **Storage is intentionally not used** — gated assets go through the

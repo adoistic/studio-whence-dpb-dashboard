@@ -413,6 +413,7 @@ export function buildBundlePlan(comic: Comic, ctx: BundleContext = {}): BundlePl
         },
       )
     }
+    const printPdf = comic.printVersion?.files.pdf
     if (comic.cmykPdf?.key) {
       items.push({
         path: at(FOLDERS.comic, titled(title, 'CMYK for print', '.pdf')),
@@ -420,8 +421,26 @@ export function buildBundlePlan(comic: Comic, ctx: BundleContext = {}): BundlePl
         bytes: comic.cmykPdf.bytes || 0,
         note: 'The print file: converted to CMYK for uncoated paper (PSO Uncoated v3, FOGRA52), with text and line art on the black plate only.',
       })
-    } else if (pages) {
+    } else if (!printPdf && pages) {
       absent.push('A CMYK print file.')
+    }
+    // A black-and-white book's print version (its TIFF pages stay on the comic page: a zip inside a zip).
+    if (printPdf?.key) {
+      items.push({
+        path: at(FOLDERS.comic, titled(title, 'print version, black and white', '.pdf')),
+        key: printPdf.key,
+        bytes: printPdf.bytes || 0,
+        note: `The print file for a one-colour press (${comic.printVersion!.press}). Every page is a 1-bit 600 dpi image at 5 x 7 inches. The same pages as TIFF images are on the comic page.`,
+      })
+      const pack = comic.printVersion!.testPack
+      if (pack?.key) {
+        items.push({
+          path: at(FOLDERS.comic, titled(title, 'print test sheet', '.pdf')),
+          key: pack.key,
+          bytes: pack.bytes || 0,
+          note: 'The hardest pages as first sent and as the print version, with grey steps from 0 to 100%. Print it on the real press and paper before the run.',
+        })
+      }
     }
     if (pages) {
       const keys = comicPageKeys(comic)

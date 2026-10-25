@@ -37,6 +37,7 @@ import { normalizeSubjectSlug } from '@/lib/slugs'
 import { citationMapFromSources } from '@/lib/provenance'
 import { PersonTabs } from '@/components/PersonTabs'
 import { ComicEditions } from '@/components/ComicEditions'
+import { PrintVersion } from '@/components/PrintVersion'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { comicLanguages, draftKeyFor } from '@/lib/comicLanguages'
 import { useProvenanceMarkers } from '@/lib/useProvenanceMarkers'
@@ -342,6 +343,12 @@ export function ComicPageShell({ comic }: { comic: Comic }) {
             published a translations[] block. */}
         <div className="mt-16">
           <LanguageSection comic={comic} />
+        </div>
+
+        {/* The print version of a black-and-white book: compare with the file as sent, download, test sheet.
+            Renders nothing unless the catalog published a printVersion block. */}
+        <div className="mt-16">
+          <PrintVersion comic={comic} />
         </div>
 
         {/* Read the comic — the page reader (PDF) and/or the Amazon A+ modules.

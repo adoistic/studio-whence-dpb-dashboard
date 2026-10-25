@@ -166,6 +166,11 @@ export interface Comic {
     bytes: number
     filename: string
   }
+  // The PRINT VERSION of a black-and-white book: the same pages re-toned for the press that will print
+  // it, with every page shown beside the file as first sent, as our file and through a print simulator.
+  // Built by the content repo's tools/bw_print/build_print_versions.py, published by
+  // tools/bw_print/publish_print_version.py. Drives the "Print version" section.
+  printVersion?: PrintVersionBlock
   // Panel-layout script exports — the SAME approximate comic-page layout the
   // `Script | Panels` toggle renders on screen, rendered to Word and PDF by
   // biographies/tools/render_comic.sh --layout panel and published to gated
@@ -298,6 +303,45 @@ export interface CoverChoice {
 export interface ResearchFile {
   path: string
   title: string
+}
+
+/** One downloadable file in R2 (gated, comic-scoped). */
+export interface GatedFile {
+  key: string
+  bytes: number
+  filename: string
+}
+
+/** A way of looking at a page in the print-version compare: our file, or through the print simulator. */
+export interface PrintView {
+  id: string                 // "file", "digital-test", or the estimate for the book's press
+  label: string
+  note: string
+}
+
+export interface PrintVersionBlock {
+  updated?: string
+  /** One short paragraph for this book. */
+  intro?: string
+  label: string              // "Print version"
+  summary: string            // what it does, in plain words
+  press: string              // what it is for
+  pages: number
+  files: {
+    pdf?: GatedFile          // 5 x 7 in, one 1-bit 600 dpi page per page
+    tiff?: GatedFile         // the same pages as TIFF images, zipped
+  }
+  /** The hard pages as sent and as the print version, with a grey step wedge: print it on the real paper. */
+  testPack?: GatedFile & { pages?: number[] }
+  compare: {
+    /** Previews live at `${viewPrefix}/{version}/{view}/page-NNN.jpg` (900 px JPEG). */
+    viewPrefix: string
+    /** Left then right: the file as sent, then the print version. */
+    versions: { id: string; label: string }[]
+    views: PrintView[]
+    /** The hard pages worth looking at first, with why. */
+    quickPages?: { page: number; why: string }[]
+  }
 }
 
 /** An InDesign edition set again at a print trim (6.25 × 9 in): the deck's page scaled once and
