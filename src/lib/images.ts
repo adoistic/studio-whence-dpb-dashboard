@@ -40,6 +40,12 @@ export const LINE_VISUALS: Record<string, LineVisual> = {
   // own CSS register (see MangaBackdrop / .surface-manga) rather than by the
   // photographic hero the comics lines use, so no image key belongs here.
   'manga-indic': { note: 'The epics in manga grammar · in volumes' },
+  // Fiction — invented worlds and invented characters, and the one line that
+  // needs no research behind it. Unlike manga-indic it is NOT split by surface:
+  // Fiction carries both formats, and each work declares `format: comic | manga`,
+  // because opening Fiction has to show the manga and the comics together.
+  // Note-only while the art is still to come.
+  'fiction-comics': { note: 'Invented worlds · comics and manga' },
 }
 
 export type NamedImage = { rel: string; name: string }
