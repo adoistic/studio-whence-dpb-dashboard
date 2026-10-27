@@ -240,16 +240,18 @@ export interface Comic {
   // Inside covers (inside-front + inside-back printed inner pages — e.g. Hanuman's
   // "Meet the Characters" cast page and "The World of Hanuman" reader's companion).
   // Gated artifacts/comics/…/inside-covers/ keys; drives the InsideCovers section.
+  // `bwKey` is the black-and-white edition of the same page, when one exists
+  // (the Ramayana manga, 27 Oct 2026); the section then offers a Colour / B&W switch.
   insideCovers?: {
     language: string
-    images: { key: string; label: string }[]
+    images: { key: string; label: string; bwKey?: string }[]
   }
   // Activity pages (the 4-page activity supplement generated per comic — quiz,
   // vocabulary, themed activity, draw & color). Gated
   // artifacts/comics/…/activities/ keys; drives the Activities section.
   activities?: {
     language: string
-    pages: { key: string; label: string }[]
+    pages: { key: string; label: string; bwKey?: string }[]
   }
   // "About the Book" sell copy: printed back-cover pointers (book's language)
   // plus buyer-segment pitches (kid / parent / school / retailer / wholesaler /

@@ -4,6 +4,8 @@ import type { Comic } from '@/types/content'
 import { useResolved } from '@/lib/useResolved'
 import { SectionHead } from '@/components/SectionHead'
 import { downloadKey } from '@/lib/downloadDoc'
+import { InkSwitch, inkKey, type Ink } from '@/components/InkSwitch'
+import { useState } from 'react'
 
 /**
  * "Inside covers" section — the printed inner-cover pages (inside-front +
@@ -16,7 +18,9 @@ import { downloadKey } from '@/lib/downloadDoc'
 export function InsideCovers({ comic }: { comic: Comic }) {
   const ic = comic.insideCovers
   const images = ic?.images ?? []
-  const urls = useResolved(images.map((i) => i.key))
+  const [ink, setInk] = useState<Ink>('colour')
+  const hasBw = images.some((i) => i.bwKey)
+  const urls = useResolved(images.map((i) => inkKey(i, ink)))
   if (images.length === 0) return null
 
   return (
@@ -26,13 +30,14 @@ export function InsideCovers({ comic }: { comic: Comic }) {
         The printed inner-cover pages{ic?.language ? ` (${ic.language})` : ''} — inside-front and
         inside-back. Reference exemplars for the format we carry across the line.
       </p>
+      {hasBw && <InkSwitch ink={ink} onChange={setInk} />}
       <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
         {images.map((i) => (
           <figure key={i.key} className="flex flex-col gap-3">
             <div className="overflow-hidden rounded-brand border border-brand-pale-dusk bg-brand-cream shadow-[0_30px_50px_-35px_rgba(30,26,58,0.5)]">
-              {urls[i.key] ? (
+              {urls[inkKey(i, ink)] ? (
                 <img
-                  src={urls[i.key]}
+                  src={urls[inkKey(i, ink)]}
                   alt={i.label}
                   loading="lazy"
                   className="block w-full"
@@ -48,7 +53,7 @@ export function InsideCovers({ comic }: { comic: Comic }) {
               <button
                 type="button"
                 aria-label={`Download ${i.label}`}
-                onClick={() => downloadKey(i.key, `${comic.slug}-${i.key.split('/').pop()}`)}
+                onClick={() => downloadKey(inkKey(i, ink), `${comic.slug}-${inkKey(i, ink).split('/').pop()}`)}
                 className="shrink-0 rounded-full border border-brand-pale-dusk px-3 py-1 font-sans text-[0.66rem] font-semibold uppercase tracking-label text-brand-indigo transition-colors hover:bg-brand-threshold/60"
               >
                 Download

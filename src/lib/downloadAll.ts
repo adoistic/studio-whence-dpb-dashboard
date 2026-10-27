@@ -667,6 +667,8 @@ export function buildBundlePlan(comic: Comic, ctx: BundleContext = {}): BundlePl
       if (!img.key) continue
       items.push({ path: at(FOLDERS.covers, `Inside covers/${safeFilename(img.label, 'Inside cover', 70)}${extOf(img.key)}`), key: img.key, bytes: EST.insideCover, approx: true,
         listAs: 'Inside covers/', note: 'The printed inside front and back covers, for every edition that has its own.' })
+      if (img.bwKey) items.push({ path: at(FOLDERS.covers, `Inside covers/Black and white/${safeFilename(img.label, 'Inside cover', 70)}${extOf(img.bwKey)}`), key: img.bwKey, bytes: EST.insideCover, approx: true,
+        listAs: 'Inside covers/Black and white/', note: 'The same inside covers in black and white, for a one-ink printing.' })
     }
     if (comic.backCover?.image?.key) {
       const bc = comic.backCover.image
@@ -677,6 +679,8 @@ export function buildBundlePlan(comic: Comic, ctx: BundleContext = {}): BundlePl
       if (!p.key) return
       items.push({ path: at(FOLDERS.covers, `Activities/${pad(i + 1)} ${safeFilename(p.label, 'Activity', 70)}${extOf(p.key)}`), key: p.key, bytes: EST.activity, approx: true,
         listAs: 'Activities/', note: 'The activity pages that go with the book.' })
+      if (p.bwKey) items.push({ path: at(FOLDERS.covers, `Activities/Black and white/${pad(i + 1)} ${safeFilename(p.label, 'Activity', 70)}${extOf(p.bwKey)}`), key: p.bwKey, bytes: EST.activity, approx: true,
+        listAs: 'Activities/Black and white/', note: 'The same activity pages in black and white, for a one-ink printing.' })
     })
     if (comic.aboutTheBook && ((comic.aboutTheBook.backCover?.length ?? 0) > 0 || (comic.aboutTheBook.segments?.length ?? 0) > 0)) {
       const text = aboutTheBookText(comic)

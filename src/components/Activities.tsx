@@ -4,6 +4,8 @@ import type { Comic } from '@/types/content'
 import { useResolved } from '@/lib/useResolved'
 import { SectionHead } from '@/components/SectionHead'
 import { downloadKey } from '@/lib/downloadDoc'
+import { InkSwitch, inkKey, type Ink } from '@/components/InkSwitch'
+import { useState } from 'react'
 
 /**
  * "Activity pages" section — the 4-page activity supplement each comic carries
@@ -15,7 +17,9 @@ import { downloadKey } from '@/lib/downloadDoc'
 export function Activities({ comic }: { comic: Comic }) {
   const act = comic.activities
   const pages = act?.pages ?? []
-  const urls = useResolved(pages.map((p) => p.key))
+  const [ink, setInk] = useState<Ink>('colour')
+  const hasBw = pages.some((p) => p.bwKey)
+  const urls = useResolved(pages.map((p) => inkKey(p, ink)))
   if (pages.length === 0) return null
 
   return (
@@ -26,13 +30,14 @@ export function Activities({ comic }: { comic: Comic }) {
         pages bound after the story: a quiz, vocabulary, a themed activity, and a
         drawing page.
       </p>
+      {hasBw && <InkSwitch ink={ink} onChange={setInk} />}
       <div className="grid grid-cols-2 gap-6 lg:grid-cols-4">
         {pages.map((p) => (
           <figure key={p.key} className="flex flex-col gap-3">
             <div className="overflow-hidden rounded-brand border border-brand-pale-dusk bg-brand-cream shadow-[0_30px_50px_-35px_rgba(30,26,58,0.5)]">
-              {urls[p.key] ? (
+              {urls[inkKey(p, ink)] ? (
                 <img
-                  src={urls[p.key]}
+                  src={urls[inkKey(p, ink)]}
                   alt={p.label}
                   loading="lazy"
                   className="block w-full"
@@ -48,7 +53,7 @@ export function Activities({ comic }: { comic: Comic }) {
               <button
                 type="button"
                 aria-label={`Download ${p.label}`}
-                onClick={() => downloadKey(p.key, `${comic.slug}-${p.key.split('/').pop()}`)}
+                onClick={() => downloadKey(inkKey(p, ink), `${comic.slug}-${inkKey(p, ink).split('/').pop()}`)}
                 className="shrink-0 rounded-full border border-brand-pale-dusk px-3 py-1 font-sans text-[0.66rem] font-semibold uppercase tracking-label text-brand-indigo transition-colors hover:bg-brand-threshold/60"
               >
                 Download
